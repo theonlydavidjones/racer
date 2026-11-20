@@ -80,6 +80,45 @@ async function extract(dir, first, days) {
   console.log(`extract ${first} + ${days} d: ${done} of ${n} hours in ${dir}${missing.length ? `; not got: ${missing.join(' ')}` : ''}`);
 }
 
+/**
+ * The whole water column at a few elements (NOAA's current stations: their bins are 0.5–9 m down, the field is the
+ * top layer, so the model is compared with a station at the station's own depth; docs/plans/sfbofs-step2.md). Each
+ * hour's <dir>/layers/YYYYMMDDHH.bin is float32: for each element in turn, the water level ζ (m, the mean of its three
+ * nodes), then u in its 20 layers top to bottom, then v in its 20 (m/s). SFBOFS's sigma layers are uniform
+ * (siglay −0.025 … −0.975), so layer l lies (0.025 + 0.05 l)(h + ζ) below the surface, h from the mesh.
+ */
+async function layers(dir, first, days, elems) {
+  await h5wasm.ready;
+  mkdirSync(path.join(dir, 'layers'), { recursive: true });
+  const tmp = path.join(dir, 'download'); mkdirSync(tmp, { recursive: true });
+  writeFileSync(path.join(dir, 'layers.json'), JSON.stringify({ elems, layout: 'per element: zeta, u[20] top to bottom, v[20]; float32; m and m/s' }));
+  const t0 = Date.parse(first + 'T00:00:00Z'), n = days * 24, start = Date.now(), missing = [];
+  let done = 0, got = 0, nv = null;
+  for (let i = 0; i < n; i++) {
+    const d = new Date(t0 + i * 3600e3), out = path.join(dir, 'layers', stamp(d) + '.bin');
+    if (existsSync(out)) { done++; continue; }
+    const url = fileFor(d), nc = path.join(tmp, 'hour.nc');
+    try { execFileSync('curl', ['-sS', '--fail', '--retry', '4', '--retry-delay', '5', '-o', nc, url], { stdio: ['ignore', 'ignore', 'pipe'] }); }
+    catch (e) { missing.push(stamp(d)); console.error(`${stamp(d)}: not got (${String(e.stderr ?? e.message).trim().slice(0, 120)})`); continue; }
+    const f = new h5wasm.File(nc, 'r');
+    const T = f.get('Times').value, time = String(T.join ? T.join('') : T).slice(0, 13);
+    if (time !== d.toISOString().slice(0, 13)) { f.close(); unlinkSync(nc); throw new Error(`${url}: holds ${time}, not ${d.toISOString().slice(0, 13)}`); }
+    const u = f.get('u').value, v = f.get('v').value, zeta = f.get('zeta').value, ne = f.get('lonc').shape[0], L = f.get('u').shape[1];
+    nv ??= f.get('nv').value;
+    const buf = new Float32Array(elems.length * (1 + 2 * L));
+    elems.forEach((e, k) => {
+      const o = k * (1 + 2 * L);
+      buf[o] = (zeta[nv[e] - 1] + zeta[nv[ne + e] - 1] + zeta[nv[2 * ne + e] - 1]) / 3;
+      for (let l = 0; l < L; l++) { buf[o + 1 + l] = u[l * ne + e]; buf[o + 1 + L + l] = v[l * ne + e]; }
+    });
+    f.close(); unlinkSync(nc);
+    writeFileSync(out, Buffer.from(buf.buffer));
+    done++; got++;
+    if (got % 48 === 0) console.log(`${stamp(d)}: ${done} of ${n} hours, ${((Date.now() - start) / got / 1000).toFixed(1)} s an hour`);
+  }
+  console.log(`layers ${first} + ${days} d: ${done} of ${n} hours in ${dir}${missing.length ? `; not got: ${missing.join(' ')}` : ''}`);
+}
+
 /** The area's elements and their nodes, from the first file (the mesh is the same in every file). */
 function mesh(f, dir) {
   const lonc = f.get('lonc').value, latc = f.get('latc').value, nv = f.get('nv').value, lon = f.get('lon').value, lat = f.get('lat').value, h = f.get('h').value;
@@ -154,6 +193,62 @@ async function fit(out, dirs) {
   console.log(`fit: ${ne} elements (${res.elems.filter(e => !e).length} left out, dry over half the time), ${N} hours, ${P} terms; condition ${cond.toExponential(2)}; residual RMS ${res.rms} m/s (${(res.rms / 0.5144).toFixed(3)} kt), worst element ${res.worstRms} m/s`);
 }
 
+/**
+ * The model against NOAA's current stations at each station's own depth (docs/plans/sfbofs-step2.md §1). `stations`
+ * is a JSON list of { id, k (the element's place in mesh.json), elem, depthM (NOAA's bin, m below the surface), flood
+ * (deg true) }; `layers` dirs hold the stations' water columns (the `layers` command), in the stations' order. At each
+ * hour the current along NOAA's flood axis is taken at the bin's depth (between the two layers' centers either side;
+ * the top or bottom layer's beyond them) and in the top layer, and each is fitted as `fit` fits an element. Out: for
+ * each station and constituent NOAA's [A kt, G], the model's at the bin's depth and in the top layer, and the
+ * correction factor, NOAA over the model at the bin's depth (amplitude ratio, phase NOAA − model).
+ */
+async function stations(out, stationsJson, currentsJson, dirs) {
+  const { runnerImport } = await import('vite');
+  const { predict } = (await runnerImport(path.join(ROOT, 'src/environment/harmonics.ts'), { root: ROOT, configFile: false, logLevel: 'error' })).module;
+  const S = JSON.parse(readFileSync(stationsJson, 'utf8')), NOAA = JSON.parse(readFileSync(currentsJson, 'utf8')).stations;
+  const M = JSON.parse(readFileSync(path.join(dirs[0], 'mesh.json'), 'utf8'));
+  const Lyr = 20, per = 1 + 2 * Lyr, KT = 1 / 0.5144, nc = CONSTITUENTS.length, P = dirs.length + 2 * nc;
+  const hOf = s => M.tri[s.k].reduce((a, n) => a + M.depth[n], 0) / 3;
+  const rows = [], series = S.map(() => ({ bin: [], top: [] }));
+  dirs.forEach((dir, di) => {
+    const L = JSON.parse(readFileSync(path.join(dir, 'layers.json'), 'utf8'));
+    if (JSON.stringify(L.elems) !== JSON.stringify(S.map(s => s.elem))) throw new Error(`${dir}: its layers are for other elements`);
+    const files = readdirSync(path.join(dir, 'layers')).filter(x => x.endsWith('.bin')).sort();
+    const ms = files.map(x => Date.UTC(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8), +x.slice(8, 10)));
+    const cols = CONSTITUENTS.flatMap(c => [predict(0, [[c, 1, 0]], ms), predict(0, [[c, 1, 90]], ms)]);
+    files.forEach((x, i) => {
+      const row = new Float64Array(P); row[di] = 1; for (let k = 0; k < 2 * nc; k++) row[dirs.length + k] = cols[k][i]; rows.push(row);
+      const raw = readFileSync(path.join(dir, 'layers', x)), a = new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.length));
+      S.forEach((s, j) => {
+        const o = j * per, zeta = a[o], H = hOf(s) + zeta, th = s.flood * Math.PI / 180, ax = Math.sin(th), ay = Math.cos(th);
+        const along = l => a[o + 1 + l] * ax + a[o + 1 + Lyr + l] * ay;
+        // (the bin's depth as a share of the column, between the layers' centers at 0.025, 0.075 … 0.975)
+        const f = Math.min(Lyr - 1, Math.max(0, (s.depthM / H - 0.025) / 0.05)), l0 = Math.floor(f), l1 = Math.min(Lyr - 1, l0 + 1), w = f - l0;
+        series[j].bin.push(along(l0) * (1 - w) + along(l1) * w); series[j].top.push(along(0));
+      });
+    });
+    console.log(`${dir}: ${files.length} hours`);
+  });
+  const N = rows.length, A = new Float64Array(P * P);
+  for (const r of rows) for (let a = 0; a < P; a++) for (let b = 0; b < P; b++) A[a * P + b] += r[a] * r[b];
+  const Lc = cholesky(A, P);
+  const fitOne = y => {
+    const b = new Float64Array(P); rows.forEach((r, i) => { for (let a = 0; a < P; a++) b[a] += r[a] * y[i]; });
+    const x = solve(Lc, b, P); let ss = 0; rows.forEach((r, i) => { let p = 0; for (let a = 0; a < P; a++) p += r[a] * x[a]; ss += (y[i] - p) ** 2; });
+    return { mean: Array.from(x.slice(0, dirs.length), z => +(z * KT).toFixed(3)), rms: +(Math.sqrt(ss / N) * KT).toFixed(3),
+      hc: Object.fromEntries(CONSTITUENTS.map((c, j) => { const cc = x[dirs.length + 2 * j], sn = x[dirs.length + 2 * j + 1]; return [c, [+(Math.hypot(cc, sn) * KT).toFixed(3), +((Math.atan2(sn, cc) * 180 / Math.PI + 360) % 360).toFixed(1)]]; })) };
+  };
+  const res = { source: 'SFBOFS against NOAA CO-OPS current stations (sf-currents.json), at the bins\' depths; scripts/data/sfbofs-harmonics.mjs stations', seasons: dirs.map(d => path.basename(d)), hours: N, stations: [] };
+  S.forEach((s, j) => {
+    const n = NOAA.find(x => x.id === s.id), bin = fitOne(series[j].bin), top = fitOne(series[j].top);
+    const factor = {};
+    for (const c of CONSTITUENTS) { const q = n.hc.find(x => x[0] === c); if (q && bin.hc[c][0] > 0) factor[c] = [+(q[1] / bin.hc[c][0]).toFixed(3), +(((q[2] - bin.hc[c][1] + 540) % 360) - 180).toFixed(1)]; }
+    res.stations.push({ id: s.id, elem: s.elem, offM: s.offM, depthM: s.depthM, columnM: +hOf(s).toFixed(1), flood: s.flood, noaa: { z0: n.z0, hc: Object.fromEntries(n.hc.filter(x => CONSTITUENTS.includes(x[0])).map(x => [x[0], [x[1], x[2]]])) }, bin, top, factor });
+  });
+  writeFileSync(out, JSON.stringify(res, null, 1));
+  for (const s of res.stations) console.log(`${s.id.padEnd(9)} bin ${String(s.depthM).padStart(4)} m of ${String(s.columnM).padStart(5)} m: ` + ['M2', 'S2', 'N2', 'K1', 'O1'].map(c => s.factor[c] ? `${c} ×${s.factor[c][0].toFixed(2)} ${s.factor[c][1] >= 0 ? '+' : ''}${s.factor[c][1].toFixed(0)}°` : `${c} -`).join('  ') + `   (M2 top/bin ${(s.top.hc.M2[0] / s.bin.hc.M2[0]).toFixed(2)})`);
+}
+
 /** Cholesky factor (lower, row-major) of a symmetric positive-definite P×P matrix. */
 function cholesky(A, P) {
   const L = new Float64Array(P * P);
@@ -180,4 +275,6 @@ function condition(A, P) {
 
 if (cmd === 'extract') await extract(args[0], args[1], +args[2]);
 else if (cmd === 'fit') await fit(args[0], args.slice(1));
-else { console.error('usage: extract <dir> <YYYY-MM-DD> <days> | fit <out.json> <dir> [<dir> ...]'); process.exit(1); }
+else if (cmd === 'layers') await layers(args[0], args[1], +args[2], args[3].split(',').map(Number));
+else if (cmd === 'stations') await stations(args[0], args[1], args[2], args.slice(3));
+else { console.error('usage: extract <dir> <YYYY-MM-DD> <days> | fit <out.json> <dir> [<dir> ...] | layers <dir> <YYYY-MM-DD> <days> <element,element,...>'); process.exit(1); }
