@@ -16,6 +16,7 @@ const at = LL(C[0], C[1], 22);
 const VIEWS = {
   sw_300: [off(230, 380, 4), at], sw_1km: [off(230, 1080, 4), at], // from the Golden Gate side, the island's broadside
   ne_300: [off(50, 380, 4), at], ne_1km: [off(50, 1080, 4), at], // from the Angel Island side
+  light_150: [LL(37.82625 - 0.0016, -122.42230 - 0.0006, 4), LL(37.82645, -122.42265, 40)], // the lighthouse and the cellhouse, from the water about 200 m south-south-west of the tower
   over: [LL(C[0] - 0.0016, C[1] - 0.0008, 620), LL(C[0], C[1], 0)], // from above, a little to the south-west, looking down on the island
 };
 (async () => {
