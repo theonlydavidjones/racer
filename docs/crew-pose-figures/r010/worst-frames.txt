@@ -1,0 +1,6 @@
+8 kt S: worst 11.6 cm, crew1 forearm0 into own torso, 8.50 s into the tack, at (-0.74, 1.26, 1.59)
+14 kt S: worst 11.5 cm, crew1 upper arm1 into own torso, 5.30 s into the tack, at (-0.21, 0.68, 1.57)
+20 kt S: worst 11.5 cm, crew1 upper arm1 into own torso, 5.10 s into the tack, at (-0.21, 0.67, 1.57)
+8 kt P: worst 11.6 cm, helm forearm0 into own torso, 6.60 s into the tack, at (-0.13, 1.23, 2.77)
+14 kt P: worst 11.5 cm, crew1 upper arm1 into own torso, 4.70 s into the tack, at (-0.10, 0.73, 1.59)
+20 kt P: worst 11.4 cm, crew1 upper arm1 into own torso, 4.50 s into the tack, at (-0.17, 0.70, 1.57)
