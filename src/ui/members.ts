@@ -40,15 +40,8 @@ export function whoLine(m: Member): string {
   const role = m.roles.includes('skipper') && m.roles.includes('crew') ? 'Skipper & crew' : m.roles.includes('skipper') ? 'Skipper' : 'Crew';
   return `${m.origin === 'yours' ? 'Your member' : 'Club member'} · ${role}`;
 }
-/** Where they sail: "Crew on Josephine · middle: main", "Skipper of Josephine", or "Free". */
-export function berth(m: Member, boats: BoatSpec[]): string {
-  if (m.id === YOU) { const b = boats.find(x => x.skipper === 'you'); return b ? `Skipper of ${esc(b.name || 'your boat')}` : 'Skipper'; }
-  for (const b of boats) {
-    const i = (b.crewIds ?? []).indexOf(m.id);
-    if (i >= 0) return `Crew on ${esc(b.name || 'Unnamed')} · ${(b.crewIds!.length === 1 ? 'crew' : i === 0 ? 'middle: main' : 'forward: jib, pole')}`;
-  }
-  return 'Free · not on a boat';
-}
+/** Where they sail, as their card says it (seat below): the page and the card say the same thing (the owner, v194). */
+export function berth(m: Member, boats: BoatSpec[]): string { return seat(m, boats).line; }
 /**
  * Their seat, for the card: the skipper's, the middle crew's (the main), the forward hand's (the jib and the pole), or
  * none. A boat goes by her country and sail number beside her name (the owner: sailors in a fleet go by sail numbers).
@@ -71,6 +64,9 @@ function seat(m: Member, boats: BoatSpec[]): { line: string; kind: 'skipper' | '
  */
 const SEAT_CREW: Record<'middle' | 'forward' | 'free', Attr[]> = { middle: ['trim', 'eyes', 'react'], forward: ['handling', 'fitness', 'react'], free: ['trim', 'handling', 'react'] };
 const SEAT_SKIPPER: readonly SkipperAttr[] = ['start', 'speed', 'tactics'];
+/** Your own card: you're the helm, and how you sail is yours, not a rating, so it shows the ratings your page has, the
+ * crew's, three that matter at the helm too (the sails' trim, the boat's handling, and holding up at the start). */
+const YOUR_CARD: Attr[] = ['trim', 'handling', 'composure'];
 
 const bar = (label: string, v: number) =>
   `<span>${label}</span><div class="mbar"><i style="width:${Math.round(v * 100)}%"></i></div><span>${Math.round(v * 100)}</span>`;
@@ -79,8 +75,8 @@ const bar = (label: string, v: number) =>
 export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
   const card = (m: Member) => {
     const st = seat(m, boats);
-    const bars = st.kind === 'skipper' ? SKIPPER_UI.bars(m, SEAT_SKIPPER)
-      : `<div class="mbars">${CREW_UI.filter(([a]) => SEAT_CREW[st.kind as 'middle'].includes(a)).map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>`;
+    const crewBars = (as: Attr[]) => `<div class="mbars">${CREW_UI.filter(([a]) => as.includes(a)).map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>`;
+    const bars = m.id === YOU ? crewBars(YOUR_CARD) : st.kind === 'skipper' ? SKIPPER_UI.bars(m, SEAT_SKIPPER) : crewBars(SEAT_CREW[st.kind]);
     return `<button type="button" class="mcard" data-f="member" data-v="${esc(m.id)}"><b>${esc(m.name)}</b><span class="msub">${st.line} · ${fmtHeight(m.h)}, ${Math.round(m.w / LB)} lb</span>${bars}</button>`;
   };
   // (you first, then your boats' crews by seat, then the rest of yours; the club's own after)

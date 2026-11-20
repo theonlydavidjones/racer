@@ -1,4 +1,5 @@
 import { SKIPPER_ATTRS, type SkipperAttr, type SkipperAttrs } from '../ai/skipper';
+import { skillOf } from '../boat/crewPhys';
 import type { Member } from '../club/members';
 import { SKIPPER_UI } from './members';
 
@@ -19,9 +20,11 @@ export const SKIPPER_LABELS: [SkipperAttr, string, string][] = [
   ['nerve', 'Nerve', 'How close they sail to other boats in traffic'],
 ];
 
-/** Her ratings: the member's own where set, the rest mid-fleet (0.5) until the club's generator sets them (phase 4). */
+/** Her ratings: the member's own where set; the rest follow her Skill, as her crew ratings do (crewPhys.ts attrOf), until
+ * you set them or the club's generator does (phase 4). (A flat mid-fleet 0.5 had an Expert's card at 50 beside 100s.) */
 export function skipperOf(m: Member): SkipperAttrs {
-  const out = Object.fromEntries(SKIPPER_ATTRS.map(a => [a, 0.5])) as SkipperAttrs;
+  const sk = skillOf(m);
+  const out = Object.fromEntries(SKIPPER_ATTRS.map(a => [a, sk])) as SkipperAttrs;
   for (const a of SKIPPER_ATTRS) { const v = m.skipper?.[a]; if (v != null && Number.isFinite(v)) out[a] = Math.min(1, Math.max(0, v)); }
   return out;
 }
@@ -55,12 +58,15 @@ export function skipperGossip(sk: SkipperAttrs): string[] {
 /** Her page's skipper section: the sliders (yours to set), what's said of her, and her record against you. */
 export function skipperSection(m: Member): string {
   const sk = skipperOf(m), yours = m.origin === 'yours';
-  const sliders = SKIPPER_LABELS.map(([a, l, t]) =>
-    `<label class="mslider" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${sk[a]}" data-m="sk" data-a="${a}"${yours ? '' : ' disabled'}><output>${pct(sk[a])}</output></label>`).join('');
+  // (as the crew sliders: "auto" by a rating that's following her Skill)
+  const sliders = SKIPPER_LABELS.map(([a, l, t]) => {
+    const own = m.skipper?.[a] != null;
+    return `<label class="mslider${own ? ' own' : ''}" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${sk[a]}" data-m="sk" data-a="${a}"${yours ? '' : ' disabled'}><output>${pct(sk[a])}${own ? '' : '<i class="mauto">auto</i>'}</output></label>`;
+  }).join('');
   const gossip = skipperGossip(sk);
   // (her results in your races come with Seasons: the member record has no history yet)
   const record = '<p class="fnote">No races against you yet.</p>';
-  return `${sliders}${gossip.length ? `<p class="fnote"><b>At the club:</b> ${gossip.join(' ')}</p>` : ''}${record}`;
+  return `<p class="fnote">Each rating follows ${yours ? 'their' : 'the member\'s'} Skill until ${yours ? 'you set it' : 'the club sets it'}.</p>${sliders}${gossip.length ? `<p class="fnote"><b>At the club:</b> ${gossip.join(' ')}</p>` : ''}${record}`;
 }
 
 /** Fill the Members tab's skipper hooks (ui/members.ts SKIPPER_UI). */

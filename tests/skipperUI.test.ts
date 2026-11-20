@@ -16,7 +16,9 @@ describe('the Members tab: the skipper half', () => {
     const html = skipperBars(member({ skipper: { start: 0.9 } }));
     expect(html.match(/class="mbar"/g)).toHaveLength(7);
     expect(html).toContain('width:90%');
-    expect(skipperOf(member({})).nerve).toBe(0.5);
+    expect(skipperOf(member({})).nerve).toBe(0.6); // (unset: her Skill, Club racer)
+    expect(skipperOf(member({ skill: 0.9 })).start).toBe(0.9);
+    expect(skipperOf(member({ skill: 0.9, skipper: { start: 0.3 } })).start).toBe(0.3); // (set: hers, whatever her Skill)
   });
   it('your members\' sliders are yours to set; the club\'s are shown, not edited', () => {
     expect(skipperSection(member({}))).not.toContain('disabled');

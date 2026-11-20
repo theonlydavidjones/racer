@@ -15,8 +15,11 @@ describe('the Members tab', () => {
     expect(whoLine(you)).toBe('Your member · Skipper & crew');
     expect(whoLine(sam)).toBe('Your member · Crew');
     expect(whoLine({ ...ines, roles: ['skipper'] })).toBe('Club member · Skipper');
-    expect(berth(sam, boats)).toBe('Crew on Josephine · crew');
-    expect(berth(ines, boats)).toBe('Free · not on a boat');
+    // (where they sail: the card's line, on the page too)
+    expect(berth(sam, boats)).toMatch(/^Crew on Josephine [A-Z]{3} \d+ \(main and jib\)$/);
+    expect(berth(ines, boats)).toBe('Free: not on a boat');
+    expect(berth({ ...ines, roles: ['skipper'] }, boats)).toBe('Skipper, not on a boat of yours');
+    expect(membersGrid([sam], boats)).toContain(berth(sam, boats)); expect(memberPage(sam, boats, false)).toContain(berth(sam, boats));
   });
   it('lists you and your crew, then the club, with no filter and no badges (docs/UI-AUDIT.md §4.8)', () => {
     const g = membersGrid([ines, sam, you], boats);
