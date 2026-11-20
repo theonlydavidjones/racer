@@ -94,6 +94,61 @@ NOAA's API (api.tidesandcurrents.noaa.gov) and the SFBOFS bucket are reachable.
   page. That's a separate question for the owner. Without it, the shipped series plus the day-of-year median covers
   every date.
 
+## Results this week (20 Nov 2026)
+
+### The stations at their own depths
+
+The model's water column at the 18 station elements (scripts/data/sfbofs-harmonics.mjs `layers`, then `stations`):
+the same 1,392 hours, the current along NOAA's flood axis at the bin's depth, fitted as the field is. The factors are
+in docs/sfbofs/stations-depth.json. NOAA's bin depths are taken as meters below the surface (an assumption to confirm
+against CO-OPS's station metadata).
+
+| Station | Bin / column, m | M2 factor | S2 | N2 | K1 | O1 | Model's top / bin, M2 |
+|---|---|---|---|---|---|---|---|
+| PCT0336 Oakland, YBI | 4 / 11.8 | ×1.02 −8° | ×1.00 −16° | ×1.07 −8° | ×0.95 +8° | ×1.00 +5° | 1.19 |
+| SFB1202 Golden Gate Bridge | 6.5 / 46.1 | ×1.04 −4° | ×0.89 +8° | ×1.22 −12° | ×0.95 −10° | ×0.69 +8° | 0.93 |
+| SFB1203 E of the Bridge | 9.1 / 91.6 | ×1.04 −5° | ×0.83 −1° | ×1.13 −9° | ×1.05 −5° | ×1.04 +5° | 0.97 |
+| SFB1204 SW of Alcatraz | 0.5 / 22.1 | ×1.07 −5° | ×0.99 −2° | ×1.14 −17° | ×1.04 −11° | ×1.18 +10° | 1.00 |
+| SFB1205 N of Pier 35 | 3.5 / 20 | ×1.17 −6° | ×1.11 −2° | ×1.23 −18° | ×1.04 +1° | ×1.11 +7° | 1.04 |
+| SFB1206 Pier 23 | 1.2 / 15.5 | ×1.05 −11° | ×1.29 −15° | ×1.34 −22° | ×0.78 +17° | ×1.29 +33° | 1.02 |
+| SFB1207 Bay Bridge Pier D | 2.7 / 22.6 | ×0.90 −7° | ×0.78 −4° | ×1.05 −16° | ×0.95 −2° | ×0.84 −5° | 1.04 |
+| SFB1208 Bay Bridge B-C | 3.4 / 21.2 | ×0.92 −8° | ×0.79 −7° | ×1.02 −15° | ×0.99 −7° | ×0.76 −1° | 1.05 |
+| SFB1209 YBI, W of mid-channel | 3.7 / 34.1 | ×0.91 −13° | ×0.37 +6° | – | ×1.04 −8° | ×0.87 −7° | 1.06 |
+| SFB1210 NW of Treasure I. | 0.8 / 8.8 | ×0.91 −6° | ×0.81 −20° | ×1.08 −33° | ×0.62 +1° | ×0.59 −7° | 1.04 |
+| SFB1211 N of Alcatraz | 1.7 / 28.6 | ×1.15 −3° | ×0.84 +4° | ×1.20 −10° | ×1.25 −6° | ×0.68 −2° | 0.99 |
+| SFB1212 Raccoon Strait | 5.7 / 36 | ×0.96 +1° | ×0.97 +5° | ×1.31 −9° | ×0.78 +5° | ×0.74 −5° | 0.86 |
+| SFB1217 Rincon Point | 2.7 / 20.6 | ×0.91 −7° | ×0.86 −9° | ×0.79 −8° | ×0.87 +3° | ×0.89 +0° | 1.04 |
+| SFB1309 E of Pt Chauncey | 2.2 / 14 | ×1.04 −1° | ×1.00 +11° | ×1.28 +8° | ×0.97 −3° | ×1.05 −2° | 1.05 |
+| SFB1310 N of Pt Chauncey | 1.5 / 13.1 | ×0.90 +5° | ×0.74 +12° | ×0.94 +8° | ×0.83 +5° | ×0.91 +15° | 1.02 |
+| s08010 Southampton Shoal | 4.7 / 12.1 | ×1.04 +6° | ×1.00 +1° | ×1.00 +3° | ×1.08 +3° | ×1.06 +3° | 1.18 |
+| SFB1201 Bay Entrance | 5.8 / 64.3 | ×1.16 −4° | ×1.19 +6° | ×1.28 −12° | ×1.19 −14° | ×1.23 −9° | 1.01 |
+| PCT0666 Richmond | 4.3 / 15.5 | ×1.09 +2° | ×1.04 +2° | ×1.07 +4° | ×1.07 +1° | ×1.14 +3° | 1.14 |
+
+The factor is NOAA over the model at the bin's depth: the amplitude ratio, and NOAA's phase minus the model's
+(negative: the model is late).
+
+- **M2's corrections, at like depths, are ×0.90–1.17** and mostly −3° to −8°: the model is 6–16 minutes late.
+- **The depth mattered.**
+  - At PCT0336 the top layer against NOAA's 4 m bin made the model look 17% strong; at 4 m it's within 2%.
+  - At SFB1212 the top layer is 14% weaker than the model's own 5.7 m.
+- **N2 is late by 8–18°** at most stations: its own phase, not M2's.
+- **Outliers for the leave-one-out to test:**
+  - SFB1209 (S2 ×0.37; only 16 constituents published);
+  - SFB1206 (K1 +17°, O1 +33°, by the Pier 23 bulkhead);
+  - SFB1210 (K1 and O1 ×0.6, in 8.8 m off Treasure Island).
+
+### The outflow
+
+- **src/environment/data/delta-outflow.json** (31 KB, scripts/data/delta-outflow.mjs):
+  - DAYFLOW's OUT, final, 1 Oct 1996 – 30 Sep 2025;
+  - then CDEC's DTO, provisional, to the day fetched;
+  - and the day-of-year medians.
+- **DTO against DAYFLOW over WY2015–2025:** 3% high at the median. One year's median ratio ran 0.86 to 1.17
+  (WY2025 1.17). It's used as published, not scaled.
+- **The fitted months:** Dec 2024 averaged 27,449 cfs, Sep 2025 3,716. The record's median is 9,000.
+- **The two months to add:** Feb 2025 (100,006 cfs) and May 2025 (14,725).
+- **The owner's race day, 7 Nov 2026, was 5,300 cfs (DTO):** near the dry season's mean flow.
+
 ## Order of work
 
 1. **This week (light):**
