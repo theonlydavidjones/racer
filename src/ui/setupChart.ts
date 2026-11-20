@@ -1,7 +1,8 @@
 import type { SimView } from '../sim/host';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES, place, spotId } from '../sim/places';
+import { spotId } from '../sim/places';
+import { PICKABLE, placeLabel } from './placeNames';
 import { onLand } from '../geo/shore';
 import { inBasin, slipPlace } from '../geo/marina';
 import { chartPoint } from './chart';
@@ -59,7 +60,7 @@ export class SetupChart {
   sync(refit = false): void {
     const w = this.picks.world(), slip = w.homeSlip;
     for (const b of $('setupPinSeg').querySelectorAll<HTMLButtonElement>('[data-pin]')) b.setAttribute('aria-pressed', String(b.dataset.pin === this.which));
-    const name = (id: string) => id === 'slip' ? (slip ? `her slip (${slipPlace(slip)})` : 'her slip') : id ? place(id)?.name ?? '?' : 'nowhere in particular';
+    const name = placeLabel;
     $('setupPins').innerHTML = `<b>Start:</b> ${name(this.picks.get('from'))} · <b>To:</b> ${name(this.picks.get('to'))}`;
     const s = $('bPinSlip') as HTMLButtonElement;
     s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
@@ -86,7 +87,7 @@ export class SetupChart {
     const slip = w.homeSlip;
     if (slip) { const [x, y] = px(slip.p); if (Math.hypot(x - sx, y - sy) < 16 || Math.hypot(slip.p.x - q.x, slip.p.y - q.y) < 60) { this.put('slip'); return; } }
     let best: string | null = null, bd = 16;
-    for (const pl of PLACES) { const [x, y] = px(pl.p), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = pl.id; } }
+    for (const pl of PICKABLE) { const [x, y] = px(pl.p), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = pl.id; } }
     if (best) { this.put(best); return; }
     if (onLand(q)) { this.note('That\'s land. Pick a spot on the water.'); return; }
     if (inBasin(q)) { this.note(slip ? 'Inside a harbor: click her slip, or pick open water outside.' : 'Inside a harbor: pick open water outside (or give her a slip in the Fleet).'); return; }

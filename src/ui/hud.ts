@@ -4,6 +4,7 @@ import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { PLACES, isSpot } from '../sim/places';
+import { destName } from './placeNames';
 import { harborRouteCached, slipAt } from '../geo/marina';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
@@ -133,7 +134,7 @@ export class Hud {
   navLine(wd: SimView): string | null {
     if (!wd.dest || !wd.freeSail) return null;
     const pn = this.navPassage(wd); if (!pn) return null;
-    const to = wd.dest.name.replace(/^Off /, 'off ');
+    const to = destName(wd.dest).replace(/^Off /, 'off ');
     if (!pn.ok || pn.eta == null) return `To ${to}: no passage leaving now`;
     return `To ${to} · ${Math.max(1, Math.round(pn.eta - wd.clockUtc))} min · ETA ${clockOf(pn.eta)}`;
   }

@@ -2,7 +2,8 @@ import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES, latLon } from '../sim/places';
+import { PLACES } from '../sim/places';
+import { destName, spotName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -125,7 +126,7 @@ export class Chart {
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }
     if (!best && onLand(q)) { this.pick = null; this.info('That\'s land. Pick a spot on the water.'); this.draw(); return; }
-    this.pick = best ?? { p: q, name: latLon(q) };
+    this.pick = best ?? { p: q, name: spotName(q) };
     this.info(); this.draw();
   }
 
@@ -135,7 +136,7 @@ export class Chart {
     go.hidden = !(w?.cruising && this.pick);
     $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${destName(w.dest)}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
