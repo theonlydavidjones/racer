@@ -870,7 +870,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         // (nor does she tack onto a course the shore blocks close ahead: the shore check would only tack her straight back)
         if (doTack && blocked(w, b, other === 'S' ? csS : csP, 60)) doTack = false;
         // (unless footing can't build it, in a deep lull in a breezy day's chop: then she asks the tack anyway, and her
-        // helm wears her round (physics.ts footReaches; v213 review))
+        // helm takes her slowly through the wind, sculled round (physics.ts footReaches; v213 review))
         if (doTack && b.v < slowTack(b) * 1.15 && footReaches(b)) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
         else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? csS : csP; planned = desired; decideTurn(b, w.t); } // (called or not, by her skipper: boat/calls.ts)
       }

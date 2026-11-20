@@ -84,7 +84,8 @@ export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: nu
 /** Whether bearing away 10° below close-hauled can build her the way for a tack (slowTack × 1.15, as the AI asks) in the
  * wind and chop she has. Not always: the chop is the day's wind's (world.ts seaWind), slowTack the wind at her, so in a
  * deep lull or another boat's shadow on a breezy day her footed speed in the chop can stay under it (0.5 m chop and
- * 2 kt at her), and footing for it she never came round (v213 review). Then she wears round instead. */
+ * 2 kt at her), and footing for it she never came round (v213 review). Then she tacks slowly instead, sculled round
+ * (the helm, below). */
 export const footReaches = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): boolean => {
   const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
   return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15;
@@ -426,7 +427,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      // (but where footing can't build the way, in a deep lull in a breezy day's chop, she tacks slowly through the wind,
+      // sculled round onto the new tack's close-hauled course as 42.3(d) allows (SCULL 1, "on either tack"): about 30 s
+      // in 2 kt and 0.5 m chop, where wearing round took about 195 s (v213 review))
+      ai.turnCommit = throughWind && b.v < slowTack(b) && footReaches(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
