@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * r239, end to end in the page: sailing home to her slip, the tie-up option appears (the owner, 18 Nov 2026: cruising home
+ * r239 (and r241, the tag bound home), end to end in the page: sailing home to her slip, the tie-up option appears (the owner, 18 Nov 2026: cruising home
  * to Josephine's slip at Gashouse Cove, "Lines ready / G" never appeared). Her home slip gashouse-cove:572, a cruise, Sail
  * home from the chart; then brought in slowly along her harbor's own way in (geo/marina.ts harborRoute), by hand: from
  * 35 m off her slip in, the hint by her ("G · lines ready") and the Crew panel's Lines-ready row are there; G there gets
@@ -27,6 +27,9 @@ const BASE = (process.argv[2] || 'http://localhost:5173/').replace(/\/?$/, '/'),
   await p.keyboard.press('m'); await p.waitForTimeout(800);
   await p.evaluate(() => { const e = document.getElementById('bChartHome'); if (e) e.click(); else { window.__chartless = true; window.sim().sendHome(); } }); await p.waitForTimeout(2000); // (a build without it: sent home directly)
   check(await p.evaluate(() => window.sim().dest?.key === 'slip'), 'sent home: her slip the destination');
+  // (r241: the destination's tag, bound for her own slip, says Home)
+  const tag = await p.evaluate(() => [...document.querySelectorAll('.tag.mk')].map(e => e.textContent).filter(t => t));
+  check(tag.includes('Home'), `r241: the destination's tag says Home (${JSON.stringify(tag.slice(0, 6))})`);
   // (her harbor's way in, from the page's own modules)
   const way = await p.evaluate(async () => {
     const M = await import('/src/geo/marina.ts'), s = M.slipById('gashouse-cove:572'), r = M.harborRoute(s);
