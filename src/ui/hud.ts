@@ -727,13 +727,14 @@ export class Hud {
     const pal = this.shown(wd).chartPal ?? 'day', [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[pal];
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
-    const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    const avoid = PLACES.filter(pl => pl.buoy && scale > 0.12).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
     const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     const placed: [number, number, number, number][] = [[me[0] - 26, me[1] - 26, 52, 52]]; // (your boat's spot is kept clear of names)
     for (const pl of PLACES) {
+      if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
       if (!pl.buoy) { ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }

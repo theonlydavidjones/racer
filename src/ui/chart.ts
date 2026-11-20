@@ -114,6 +114,7 @@ export class Chart {
     // a place near the tap: take it, by name
     let best: { p: Vec; name: string } | null = null, bd = 16;
     for (const pl of PLACES) {
+      if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const px = r.width / 2 + (pl.p.x - this.cx) * this.scale, py = r.height / 2 - (pl.p.y - this.cy) * this.scale, d = Math.hypot(px - sx, py - sy);
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }

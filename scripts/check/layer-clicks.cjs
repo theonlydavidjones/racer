@@ -29,10 +29,10 @@ const out = process.argv[2] || '.';
     console.log(`chart chip ${f}: ticked ${d.checked.join(',')}, drawn ${d.kind}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`chart chip ${f}`);
   }
   // the chart's own Layers menu: each row once
-  await p.click('#bChartLayers'); await p.waitForTimeout(600);
-  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartLayersPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
+  await p.click('#bChartShow'); await p.waitForTimeout(600);
+  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartShowPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
   for (const r of rows) {
-    const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartLayersPop [data-field="${v}"]` : `#chartLayersPop [data-layer="${v}"]`;
+    const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartField [data-field="${v}"]` : `#chartShowPop [data-layer="${v}"]`;
     const before = await p.evaluate(s => document.querySelector(s).checked, sel);
     await p.click(sel); await settle();
     const after = await p.evaluate(s => document.querySelector(s)?.checked, sel);

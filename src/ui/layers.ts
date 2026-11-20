@@ -34,54 +34,36 @@ export function withLayer(s: Settings, k: LayerKey, on: boolean): NonNullable<Se
 }
 
 /**
- * A layer menu: a button that opens a small list of switches. `get` reads the settings now; `set` saves a change (the
- * app keeps the saved settings and the running race's in step); `changed` redraws.
+ * The chart's two small menus (the owner, 20 Nov 2026): the Key (what the map's symbols and lines are, a plain list) and
+ * the Layers dropdown beside the field picker (the switches for ships, laylines and wind shadows). Each is a button that
+ * opens a small pop. `get` reads the settings now; `set` saves a change (the app keeps the saved settings and the running
+ * race's in step); `changed` redraws; `key` fills the Key's list (it follows the map while the pop is open).
  */
-/** A view that isn't a map layer but is switched from the same menu (the owner, 13 Nov 2026: new controls go inside
- * existing elements, not on new buttons): the wind indicator, the flow view. */
-export interface MenuView { name: string; what: string; keyLabel: () => string; on: () => boolean; set: (on: boolean) => void }
-/** A one-of choice in the menu under its own heading (shown only when `shown()`): e.g. what the inset map shows. */
-export interface MenuChoice { heading: string; options: { v: string; name: string; what: string }[]; get: () => string; set: (v: string) => void; shown: () => boolean }
-export function layerMenu(button: HTMLElement, pop: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void,
-  key?: (el: HTMLElement, force: boolean) => void, views: MenuView[] = [], choices: MenuChoice[] = []): () => void {
+export function keyMenu(button: HTMLElement, pop: HTMLElement, key: (el: HTMLElement, force: boolean) => void): () => void {
   let keyEl: HTMLElement | null = null;
-  const render = () => {
-    const s = get(); if (!s) return;
-    // the field (what colours the water) is one of several, or none: radio rows under their own heading, apart from the
-    // switches, so it reads as a choice (the owner, 13 Nov 2026: a checkbox acting as a radio button was confusing)
-    const f = fieldLayer(s), fields = LAYERS.filter(l => isField(l.key)), rest = LAYERS.filter(l => !isField(l.key));
-    pop.innerHTML = '<div class="lp-h">Color the water <span class="lp-sub">· the full chart</span></div><div class="lp-field" role="radiogroup" aria-label="Color the water">'
-      + [...fields.map(l => ({ v: l.key as string, name: l.name, what: l.what })), { v: 'off', name: 'Off', what: 'The plain chart' }].map(o =>
-        `<label title="${o.what}"><input type="radio" name="lp-field" data-field="${o.v}"${(f ?? 'off') === o.v ? ' checked' : ''}><span>${o.name}</span></label>`).join('') + '</div>'
-      + '<div class="lp-h lp-kh">Show</div>' + rest.map(l =>
-      `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${shown(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('')
-      + choices.map((c, ci) => c.shown() ? `<div class="lp-h lp-kh">${c.heading}</div><div class="lp-field" role="radiogroup" aria-label="${c.heading}">` + c.options.map(o =>
-        `<label title="${o.what}"><input type="radio" name="lp-choice${ci}" data-choice="${ci}" value="${o.v}"${c.get() === o.v ? ' checked' : ''}><span>${o.name}</span></label>`).join('') + '</div>' : '').join('')
-      + (views.length ? '<div class="lp-h lp-kh">Training views</div>' + views.map((v, i) =>
-        `<label title="${v.what}"><input type="checkbox" data-view="${i}"${v.on() ? ' checked' : ''}><span>${v.name} <span class="lp-k">${v.keyLabel()}</span></span></label>`).join('') : '')
-      + (key ? '<div class="lp-h lp-kh">Key: what\'s on the map</div><div class="lp-key"></div>' : '');
-    keyEl = pop.querySelector('.lp-key');
-    if (key && keyEl) key(keyEl, true);
-  };
-  // the key follows the map while the list is open (what's on screen changes as it moves); rebuilt only when it changes
-  setInterval(() => { if (!pop.hidden && key && keyEl) key(keyEl, false); }, 500);
+  const render = () => { pop.innerHTML = '<div class="lp-key"></div>'; keyEl = pop.querySelector('.lp-key'); if (keyEl) key(keyEl, true); };
+  // (what's on screen changes as the map moves; rebuilt only when the key would change)
+  setInterval(() => { if (!pop.hidden && keyEl) key(keyEl, false); }, 500);
+  wirePop(button, pop, render);
+  return () => { if (!pop.hidden) render(); };
+}
+/** The switches: the layers that aren't the field (the field is the chart's big picker). */
+export const SWITCH_LAYERS = LAYERS.filter(l => !(FIELD_LAYERS as readonly string[]).includes(l.key));
+export const switchesHtml = (s: Settings): string => SWITCH_LAYERS.map(l =>
+  `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${layerOn(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('');
+export function layersMenu(button: HTMLElement, pop: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void): () => void {
+  const render = () => { const s = get(); if (s) pop.innerHTML = switchesHtml(s); };
+  wirePop(button, pop, render);
+  pop.addEventListener('change', e => {
+    const t = e.target as HTMLInputElement, k = t.dataset.layer as LayerKey | undefined;
+    if (k) { set(k, t.checked); render(); changed(); }
+  });
+  return () => { if (!pop.hidden) render(); };
+}
+/** A button that opens a pop and closes it on a click elsewhere. */
+function wirePop(button: HTMLElement, pop: HTMLElement, render: () => void): void {
   button.addEventListener('click', e => { e.stopPropagation(); if (pop.hidden) render(); pop.hidden = !pop.hidden; button.setAttribute('aria-expanded', String(!pop.hidden)); });
   pop.addEventListener('click', e => e.stopPropagation());
   pop.addEventListener('pointerdown', e => e.stopPropagation());
-  pop.addEventListener('change', e => {
-    const t = e.target as HTMLInputElement;
-    // a field picked: it on (withLayer puts the others off), or Off: the one showing off
-    const fv = t.dataset.field, cur = get() && fieldLayer(get()!);
-    const k = (fv ? (fv === 'off' ? cur ?? undefined : fv) : t.dataset.layer) as LayerKey | undefined;
-    if (fv) { if (k) { set(k, fv !== 'off'); render(); changed(); if (key && keyEl) setTimeout(() => key(keyEl!, false), 60); } return; }
-    if (t.dataset.choice != null) { choices[+t.dataset.choice]?.set(t.value); render(); return; }
-    if (t.dataset.view != null) { views[+t.dataset.view]?.set(t.checked); render(); return; }
-    if (k) { set(k, t.checked); render(); changed(); if (key && keyEl) setTimeout(() => key(keyEl!, false), 60); }
-  });
   document.addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target as Node) && e.target !== button) { pop.hidden = true; button.setAttribute('aria-expanded', 'false'); } });
-  // (for a change made elsewhere, the chart's field picker: the list and its key follow it if it's open)
-  return () => { if (!pop.hidden) render(); };
 }
-const isField = (k: LayerKey): boolean => (FIELD_LAYERS as readonly string[]).includes(k);
-/** Ticked in the menu: a field layer only if it's the one showing (an older save may have two on: one shows). */
-const shown = (s: Settings, k: LayerKey): boolean => (FIELD_LAYERS as readonly string[]).includes(k) ? fieldLayer(s) === k : layerOn(s, k);

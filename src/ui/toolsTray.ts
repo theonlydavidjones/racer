@@ -19,6 +19,7 @@ const svg = (d: string) => `<svg viewBox="0 0 20 20" aria-hidden="true">${d}</sv
 /** 20×20 line icons, as the top bar's. */
 export const TOOL_ICONS = {
   wind: '<path d="M3 7h9a2.5 2.5 0 1 0-2.5-2.5"/><path d="M3 11h12a2.5 2.5 0 1 1-2.5 2.5"/><path d="M3 15h6"/>',
+  rose: '<circle cx="10" cy="10" r="6.5"/><path d="M10 3.5v13M3.5 10h13"/>',
   flow: '<path d="M4 4c5 1 8 5 9 12"/><path d="M8 3c4 2 6 6 7 12"/><path d="M3 9c3 1 5 3 6 7"/>',
   band: '<path d="M5 3v14M10 3v14M15 3v14"/><path d="M3.5 7h3M8.5 12h3M13.5 9h3"/>',
   chart: '<path d="M3 5l4-2 6 2 4-2v12l-4 2-6-2-4 2Z"/><path d="M7 3v12M13 5v12"/>',

@@ -205,7 +205,7 @@ const closeAll = async p => {
       if (!(await shown(p, '#plan'))) { await click(p, '#map'); await p.waitForTimeout(1800); }
       if (await shown(p, '#plan')) {
         await sweep(p, sc, 'chart');
-        if (await click(p, '#bChartLayers')) { await p.waitForTimeout(500); await sweep(p, sc, 'chart-layers'); await click(p, '#bChartLayers'); }
+        for (const b of ['#bChartLayers', '#bChartShow']) if (await click(p, b)) { await p.waitForTimeout(500); await sweep(p, sc, 'chart-' + b.slice(7).toLowerCase()); await click(p, b); }
         await closeAll(p);
       } else unreached.push(`${sc}/chart: clicking the inset did not open #plan`);
       await p.keyboard.press('KeyM'); await p.waitForTimeout(1500);

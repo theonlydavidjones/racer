@@ -61,7 +61,7 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } fro
 import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, keyMenu, layersMenu, withLayer, type LayerKey } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
@@ -1124,19 +1124,11 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
     else setLayer(f as LayerKey, true);
   });
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
-  // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
-  const views: MenuView[] = [
-    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
-    { name: 'Points of sail', what: 'The points of sail and the wind on the water round her, turning with every shift (on in the lessons)', keyLabel: () => keymap.label('pointsRose'), on: () => roseOn(), set: on => roseShow(on) },
-    { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
-  // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
-  // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
-  const insetChoice: MenuChoice = {
-    heading: 'The inset map shows', shown: () => !!w?.cruising,
-    options: [{ v: 'map', name: 'The water round her', what: 'The chart round her, turned north up' }, { v: 'nav', name: 'The passage', what: 'The navigator\'s course to the destination, whole; tap the inset for the passage plan' }],
-    get: () => S.insetView ?? 'map', set: v => { S.insetView = v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews(); }
-  };
-  const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
+  // (the owner, 20 Nov 2026: the Key lists what's on the map; the switches are the Layers dropdown beside the field picker;
+  // the training views are in Tools and Keys, and what the inset shows cruising is in Settings)
+  const menus = [
+    keyMenu($('bChartLayers'), $('chartLayersPop'), (el, f) => hud.keyInto(el, 'chart', f)),
+    layersMenu($('bChartShow'), $('chartShowPop'), () => S, setLayer, () => {})];
 }
 $('map').addEventListener('click', () => { if (w.running && !chart.isOpen) openChart(); });
 function openChart(): void { releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel(); }
@@ -1160,11 +1152,17 @@ function chartNavLabel(): void {
 function chartToNav(): void { chart.close(); if (w.cruising) navView.open(w); else courseView.open(w); }
 $('bChartNav').onclick = chartToNav;
 /** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
- * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
+ * chosen in Settings and remembered with your settings (no buttons on the inset: the owner). */
+function paintInsetSeg(): void { document.querySelectorAll<HTMLButtonElement>('#insetSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (S.insetView ?? 'map')))); }
+$('insetSeg').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest('button'); if (!b) return;
+  S.insetView = b.dataset.v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews();
+});
 function insetViews(): void {
+  paintInsetSeg();
   const cruising = !!w?.cruising;
   $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
-  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
+  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in Settings, and remembered)
   $('map').title = hud.insetView === 'nav' ? 'Click for the chart, with the passage plan' : 'Click the map for the chart'; // (the hover says it: no words on the inset)
 }
 
@@ -1466,6 +1464,7 @@ const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'pointsRose', label: 'Points of sail', icon: 'rose', key: () => toolKey('pointsRose'), on: () => roseOn(), act: () => runAction('pointsRose') },
   { id: 'weatherHelm', label: 'Weather helm', icon: 'helm', key: () => toolKey('weatherHelm'), on: () => S.weatherHelm !== false, act: () => runAction('weatherHelm') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },

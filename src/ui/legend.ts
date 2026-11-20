@@ -75,12 +75,10 @@ export function renderKey(el: HTMLElement, sim: SimKey[], chart: Set<string>, pa
     const s = document.createElement('span'); s.textContent = name;
     r.append(c, s); el.append(r);
   };
-  const head = (t: string) => { const d = document.createElement('div'); d.className = 'lk-h'; d.textContent = t; el.append(d); };
   const mine = SIM.filter(e => sim.includes(e.key));
-  if (mine.length) { head('On the map'); for (const e of mine) row(e.name, e.draw); }
+  if (mine.length) { for (const e of mine) row(e.name, e.draw); }
   const kinds = CHART_ORDER.filter(k => chart.has(k));
   if (kinds.length) {
-    head('NOAA chart (US Chart No. 1)');
     // (a sample at the chart's scale, at least 0.25 px/m so its dashes show, drawn with the map's own pen)
     for (const k of kinds) row(AREA_NAME[k] ?? k, k === 'lane' ? laneSample : (g, I2, w, h) => { const p = areaPen(k, I2, Math.max(0.25, pxPerM), detail); if (p) line(g, w, h, { w: p.w, dash: p.dash }, p.c); });
   }
