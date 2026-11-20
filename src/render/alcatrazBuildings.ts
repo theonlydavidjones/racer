@@ -9,7 +9,7 @@ import type { Alcatraz } from './alcatraz';
  * Alcatraz's buildings as simple massing, on the lidar ground (render/alcatraz.ts): the minor buildings from
  * OpenStreetMap's footprints (scripts/make-alcatraz-structures.mjs; © OpenStreetMap contributors), and the cellhouse,
  * lighthouse and water tower at OSM's positions but the National Historic Landmark nomination's sizes (NPS, 1986:
- * cellhouse 465 × 165 ft, lighthouse 84 ft, water tower 94 ft). Heights: OSM's where it has them (the New Industries
+ * cellhouse 465 × 165 ft, lighthouse 84 ft, water tower 94 ft). The powerhouse chimney is a 30 m stack (estimated, unmeasured). Heights: OSM's where it has them (the New Industries
  * Building's 9 m, the lighthouse's 26 m); the rest are a two-story building's 7 m (ruins 3 m): nothing measured yet (the
  * lidar's roofs are the next step), and the cellhouse is 12 m, two stories on the Citadel's base, also not measured.
  */
@@ -21,7 +21,13 @@ export function addAlcatrazBuildings(grp: THREE.Group, alc: Alcatraz): void {
 
   // the minor buildings: each footprint extruded from just under its lowest ground to its roof
   const walls: THREE.BufferGeometry[] = [], ruins: THREE.BufferGeometry[] = [];
+  const CHIMNEY = 1056707165, CHIMNEY_H = 30; // (the powerhouse's chimney, about 3 × 3 m: its height isn't tagged or published where we could reach it, so 30 m is an estimate)
   for (const b of data.buildings) {
+    if (b.osm === CHIMNEY) {
+      const at = b.ring.reduce((a, [la, lo]) => [a[0] + la / b.ring.length, a[1] + lo / b.ring.length], [0, 0]), g = ground(at[0], at[1]);
+      const stack = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, CHIMNEY_H + 1, 10), RUIN); stack.position.set(sim(at[0], at[1]).x, g + (CHIMNEY_H - 1) / 2, -sim(at[0], at[1]).y); grp.add(stack);
+      continue;
+    }
     const pts = b.ring.map(([la, lo]) => sim(la, lo)), gs = b.ring.map(([la, lo]) => ground(la, lo));
     const lo = Math.min(...gs), mean = gs.reduce((a, v) => a + v, 0) / gs.length, h = b.height ?? (b.ruin ? 3 : 7);
     const shape = new THREE.Shape(); pts.forEach((p, i) => i ? shape.lineTo(p.x, p.y) : shape.moveTo(p.x, p.y));
