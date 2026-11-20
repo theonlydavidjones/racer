@@ -36,12 +36,13 @@ export async function buildAlcatraz(scene: THREE.Scene): Promise<Alcatraz> {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeVertexNormals();
   // colour: grey rock and concrete, the cliffs darker, the gardens' scrub on the flatter ground in patches
   const nrm = geo.attributes.normal as THREE.BufferAttribute, col = new Float32Array(nV * 3), c = new THREE.Color();
-  const stone = new THREE.Color('#8f8d86'), rock = new THREE.Color('#7b715f'), scrub = new THREE.Color('#68754a'), wet = new THREE.Color('#5d574d');
+  const stone = new THREE.Color('#8f8d86'), rock = new THREE.Color('#7b715f'), scrub = new THREE.Color('#68754a'), wet = new THREE.Color('#5d574d'), floor = new THREE.Color('#4f6a66'); // (the sea floor, a green-grey that blends into the water over it)
   for (let v = 0; v < nV; v++) {
     const h = gz[v], slope = 1 - nrm.getY(v), s = Math.sin(gx[v] * 0.071) * Math.sin(gy[v] * 0.053) + Math.sin(gx[v] * 0.19 + gy[v] * 0.13) * 0.5; // (a patchy pattern, not noise)
     c.copy(stone).lerp(scrub, h > 4 && slope < 0.3 ? Math.min(1, Math.max(0, 0.5 + s)) * 0.8 : 0);
     if (slope > 0.3) c.lerp(rock, Math.min(1, (slope - 0.3) * 3));
     if (h < 1.2) c.lerp(wet, Math.min(1, (1.2 - h) / 1.2)); // (the splash zone)
+    if (h < 0.2) c.lerp(floor, Math.min(1, (0.2 - h) / 0.8)); // (below the waterline: the belt of flat ground and the ramp, seen through the water)
     col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));

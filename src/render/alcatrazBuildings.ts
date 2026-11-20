@@ -44,13 +44,13 @@ export function addAlcatrazBuildings(grp: THREE.Group, alc: Alcatraz): void {
   const box = (w: number, d: number, h: number, mat: THREE.Material, y0 = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.y = y0 + h / 2; return m; };
 
   // the cellhouse: 465 × 165 ft along the island's crest, two stories on the Citadel's base, a low roof
-  // (its walls go down to the terrace's level, a little into it; the roof is 12 m over the mean)
+  // (the roof is 12 m over the mean)
   const c = data.cellhouse, cp = sim(c.at[0], c.at[1]), br = c.bearing * Math.PI / 180, gs: number[] = [];
   for (let u = -1; u <= 1; u += 0.5) for (let v = -1; v <= 1; v += 0.5) {
     const a = u * c.width / 2, d = v * c.length / 2; // across and along the heading (east = sin, north = cos)
     gs.push(Math.max(0, alc.heightAt(cp.x + a * Math.cos(br) + d * Math.sin(br), cp.y - a * Math.sin(br) + d * Math.cos(br)) ?? 0));
   }
-  const cMean = gs.reduce((a, v) => a + v, 0) / gs.length, cLow = [...gs].sort((a, b) => a - b)[Math.floor(gs.length / 3)] - 1; // (the terrace's own level, not a corner over the cliff)
+  const cMean = gs.reduce((a, v) => a + v, 0) / gs.length, cLow = Math.min(...gs) - 0.5; // (its walls go down to the ground under its lowest side, as the Citadel's masonry base does on the terrace's edge: no gap to see under it)
   const cell = new THREE.Group(); cell.add(box(c.width, c.length, cMean + 12 - cLow + 0.5, WALL, -0.5), box(c.width * 0.9, c.length * 0.9, 0.6, RUIN, cMean + 12 - cLow));
   put(cell, c.at, c.bearing, cLow);
 
