@@ -676,7 +676,7 @@ let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
   if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; } // (a new race: nothing carried over)
-  hud.favAsk = S.mode === 'drill' ? 'ask' : 'off';
+  hud.favAsk = S.mode === 'drill' ? 'ask' : S.mode === 'race' ? 'race' : 'off'; // (racing: shown once called, the owner, 20 Nov)
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
@@ -1072,9 +1072,14 @@ $('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode 
 $('ncRestart').addEventListener('keydown', e => e.stopPropagation());
 // the favored-end call, in the start line's card (8za): which end you've read as favored, before the gun
 $('ncAsk').addEventListener('click', e => {
-  e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0) return;
+  e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0 || (hud.favAsk === 'race' && favCall)) return; // (racing, the call stands once made: the end's shown)
   favCall = b.dataset.end === 'pin' ? 'pin' : 'committee'; hud.favCall = favCall;
 });
+// the flags in the start card: the flag index (the old Flags tile's click)
+$('ncFlags').addEventListener('click', e => { e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); });
+$('ncFlags').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); } });
+// the instruments sit under the start card while it's up (r272): its height, for the CSS
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { const c = $('nextCard'); document.body.style.setProperty('--nc-h', c.hidden ? '0px' : c.offsetHeight + 6 + 'px'); }).observe($('nextCard'));
 $('nextCard').addEventListener('click', () => (w.cruising ? navToggle() : courseView.toggle(w)));
 $('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navToggle() : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));

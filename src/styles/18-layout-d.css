@@ -29,3 +29,22 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 /* the four cards one width, the clock's (the owner, 20 Nov): a little less padding and spacing so each sub-line fits whole */
 #hud .pod{padding-left:5px;padding-right:5px}
 #hud .sub{letter-spacing:.05em}
+/* the start card (the owner, 20 Nov 2026): top left, above the instruments, its countdown large and the flags beside
+   it; the instruments move down under it while it's up (--nc-h, app.ts) and back up at the gun */
+#leftCol{top:calc(env(safe-area-inset-top,0px) + 16px)}
+#hud{top:calc(env(safe-area-inset-top,0px) + 16px + var(--nc-h,0px))}
+#nextCard .nc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+#nextCard .nc-top[hidden],#nextCard .nc-timer[hidden],#nextCard .nc-flags[hidden]{display:none}
+#nextCard .nc-timer{display:flex;flex-direction:column}
+#nextCard .nc-tl{font:600 9.5px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#nextCard .nc-tv{font:700 34px/1 var(--f-inst);font-variant-numeric:tabular-nums;color:var(--accent);margin-top:3px}
+#nextCard .nc-flags{display:flex;gap:4px;align-items:flex-start;cursor:pointer;margin-left:auto}
+#nextCard .nc-flags canvas{height:26px;width:auto;border-radius:1px}
+#nextCard .nc-flags .pennants,#nextCard .nc-flags .sig-over{display:flex;flex-direction:column;gap:2px}
+#nextCard .nc-flags .pennants canvas,#nextCard .nc-flags .sig-over canvas{height:13px}
+#linebox:empty{display:none}
+.nc-ask button:disabled{cursor:default}
+.nc-ask button.ok{border-color:var(--row);color:var(--row)} .nc-ask button.bad{border-color:var(--giveway);color:var(--giveway)}
+#navStrip .ns-race .ns-v{color:var(--accent)}
+#navStrip > div[hidden]{display:none}
+#navStrip > div[hidden] + div{border-left:0}
