@@ -386,7 +386,7 @@ function setControlsIdle(): void {
 }
 
 /** A cluster button's word (under its icon), set only when it changes. */
-function word(id: string, t: string): void { const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
+function word(id: string, t: string): void { if (id === 'bFast') $(id).classList.toggle('on', t !== 'Speed 1×'); /* (lit while time runs fast) */ const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
@@ -1086,7 +1086,9 @@ $('chartPlanLink').onclick = e => { e.preventDefault(); navView.open(w); };
 let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
-$('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
+/** The speed button's step (and its key): 1× → 2× → 4× → 1×. (The owner, 20 Nov 2026: one button beside Pause; it left Tools.) */
+function cycleSpeed(): void { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); }
+$('bFast').onclick = cycleSpeed;
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 // Sound and Exit sit with Pause and Speed, top right, Exit outermost (the owner, 13 Nov 2026)
 const results = mountResults(ctx); // (src/app/results.ts)
@@ -1207,7 +1209,7 @@ function keysHint(): void {
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bPilot', 'Tiller pilot: steers for you (cruising only); on standby, lifts it off the tiller pin', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
-  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
+  $('bFast').title = `Speed up time: 1×, 2×, 4× (${keymap.label('speed')})`; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -1314,6 +1316,7 @@ function runAction(a: Action): void {
     case 'weatherHelm': S.weatherHelm = S.weatherHelm === false; saveSettings(S); toast(`Weather helm at the tiller guide ${S.weatherHelm ? 'on' : 'off'}.`, 1600); break;
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
+    case 'speed': cycleSpeed(); break;
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
@@ -1475,10 +1478,7 @@ const TOOLS: Tool[] = [
   { id: 'log', label: 'Log', icon: 'log', key: () => toolKey('log'), on: () => !$('logView').hidden, act: () => { if ($('logView').hidden) openLog(); else $('logView').hidden = true; } },
   { id: 'perfMeter', label: 'Frame readout', icon: 'perf', key: () => toolKey('perfMeter'), on: () => perf.on, act: () => runAction('perfMeter') },
 ];
-const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS, {
-  get: () => speedSet,
-  set: v => { speedSet = v; send({ k: 'speed', v }); word('bFast', 'Speed ' + v + '×'); },
-});
+const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS);
 $('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);

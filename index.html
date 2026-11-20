@@ -23,15 +23,7 @@
 <div id="hudRight">
   <div class="pod"><span class="lab">TWS <i>kt</i></span><span class="val" id="tws">12</span><span class="sub" id="shiftLab">270°</span></div>
   <div class="pod"><span class="lab"><span id="tideLab">Tide</span> <i>kt</i></span><span class="val" id="tideVal">Slack</span><span class="sub" id="seaSub">no waves</span></div>
-  <!-- the app: small and dim -->
-<div class="ibar dim" id="appBar">
-  <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
-  <button class="ib" id="bTools" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg><span class="w">Tools</span></button>
-  <button class="ib" id="bFast" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button><!-- (time's speed is in Tools now; this stays for the setup and the checks that drive it) -->
-  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
-  <button class="ib" id="bExit" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
-</div>
-</div>
+  </div>
 <!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
 <!-- the wind angle dial, when it's on: right side, under the inset map (the owner, ROADMAP 8b) -->
 <canvas id="dial" aria-label="Wind angle dial"></canvas>
@@ -102,6 +94,7 @@
     <button class="ib on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14"/><path d="M7 10h10"/><path d="M13 6l4 4-4 4"/></svg><span class="w">Push off</span></button>
     <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
     <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
+  <button class="ib" id="bCrew" type="button" aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
     <button class="ib" id="bHome" type="button" hidden title="Send her back to her home slip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5"/><path d="M5.5 8v8h9V8"/><path d="M8.5 16v-4h3v4"/></svg><span class="w">Home</span></button>
   </div>
   <div class="row2">
@@ -129,11 +122,15 @@
 </div>
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
-  <button class="ib" id="bCrew" type="button" aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
   <button class="ib on" id="bBand" type="button" hidden aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
-  <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
+<button class="ib meta" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
+<button class="ib meta" id="bFast" type="button" ><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
+<button class="ib meta" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+<button class="ib meta" id="bTools" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg><span class="w">Tools</span></button>
+  <button class="ib meta" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
+  <button class="ib meta" id="bExit" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
 </div>
 <div id="crewPop" hidden role="dialog" aria-label="The crew's weight">
   <div class="tp-crewbox" id="tpCrewBox">

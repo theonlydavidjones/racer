@@ -6,7 +6,7 @@ export type Action =
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'weatherHelm' | 'restartStart' | 'pointsRose' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
-  | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
+  | 'course' | 'log' | 'pause' | 'speed' | 'keys' | 'trimNotes';
 
 /** Actions that last while the key is held (the rest fire once per press). */
 export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'travUp', 'travDown', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
@@ -66,6 +66,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'recentre', label: 'Overhead: back to your boat', group: 'Overhead' },
   { id: 'log', label: 'All messages', group: 'General' },
   { id: 'pause', label: 'Pause', group: 'General' },
+  { id: 'speed', label: 'Speed of time: 1× → 2× → 4× → 1×', group: 'General' },
   { id: 'keys', label: 'Keyboard settings', group: 'General' },
   { id: 'perfMeter', label: 'Frame-time readout: fps, the 95% frame time and long frames over the last 10 s (on / off)', group: 'General' },
 ];
@@ -77,7 +78,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], weatherHelm: ['Shift+W'], restartStart: ['Shift+R'], pointsRose: ['Shift+P'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],
+  log: ['l'], pause: ['p'], speed: ['Shift+Y'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */

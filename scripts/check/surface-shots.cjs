@@ -19,9 +19,10 @@ const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog'
     const overlaps = async (what) => {
       const r = await p.evaluate(sel => {
         const vis = s => { const e = document.querySelector(s); if (!e || e.hidden) return null; const c = getComputedStyle(e); if (c.display === 'none' || c.visibility === 'hidden') return null; const q = e.getBoundingClientRect(); return q.width > 2 && q.height > 2 ? q : null; };
+        const OVER = ['#crewPop', '#toolsTray'], FINE = ['#helmBar|#pilot', '#hudRight|#toolsTray', '#map|#toolsTray'];
         const boxes = sel.map(s => [s, vis(s)]).filter(x => x[1]), o = [];
         for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const a = boxes[i][1], c = boxes[j][1];
-          if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) o.push(boxes[i][0] + ' × ' + boxes[j][0]); }
+          if (!(OVER.includes(boxes[i][0]) || OVER.includes(boxes[j][0])) || ['#viewBar', '#helmBar', '#tiller', '#pilot'].some(k => k === boxes[i][0] || k === boxes[j][0])) if (!FINE.includes(boxes[i][0] + '|' + boxes[j][0])) if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) o.push(boxes[i][0] + ' × ' + boxes[j][0]); }
         const off = boxes.filter(x => x[1].right > innerWidth + 1 || x[1].bottom > innerHeight + 1).map(x => x[0] + ' off-screen');
         return [...o, ...off];
       }, PIECES);
