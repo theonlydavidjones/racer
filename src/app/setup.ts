@@ -152,6 +152,7 @@ function courseCard(): void {
     // (at a default club, its sailing instructions: locked, the club's committee's, as it runs its races; club/practice.ts)
     const R = asTheClubRunsIt({ ...app.S, mode: 'race' }), si = $('siBox') as HTMLDetailsElement;
     si.classList.toggle('locked', host !== 'practice'); if (host !== 'practice') si.open = false;
+    si.querySelector('summary')?.setAttribute('tabindex', host !== 'practice' ? '-1' : '0');
     const flag = R.prepFlag === 'black' ? 'black flag' : `${R.prepFlag ?? 'P'} flag`;
     const line = C.biasAdjustable ? ` · line ${R.bias ? (R.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(R.bias) + '°' : 'square'}` : '';
     $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${R.seq}-min sequence · ${flag} · ${R.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${R.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
@@ -561,6 +562,8 @@ $('bManoeuvres').onclick = () => { app.S.mode = 'manoeuvres'; app.courseView.clo
 // (Learn to sail's lessons and the Rules trainer: overlays of their own, over the Drill page, which Back returns to)
 $('bLessons').onclick = () => openLessons();
 $('bRoundings').onclick = () => { app.S.mode = 'roundings'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
+// (locked at a default club: however it's opened, by the mouse, the keyboard or a script, it shuts again)
+$('siBox').addEventListener('toggle', () => { const si = $('siBox') as HTMLDetailsElement; if (si.open && si.classList.contains('locked')) si.open = false; });
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's (club/practice.ts hostOf). */
 let lastPick = hostOf(app.S.course) === 'ggyc' && app.S.course !== RC_COURSE ? app.S.course : COURSES.find(c => c.group)!.id;
 function setCourse(id: string): void { app.S.course = id; saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); }
