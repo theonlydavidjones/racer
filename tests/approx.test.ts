@@ -124,6 +124,7 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
     expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
     const n = diff.length, dm = mean(diff), sd = Math.sqrt(diff.reduce((a, x) => a + (x - dm) ** 2, 0) / (n - 1)), T99 = 2.366; // (t, 95 df: the same one-sided 99%)
     expect(n).toBe(96);
+    console.log(`AI_EVERY fouls over ${n} races: every step ${penE}, twenty a second ${penD}; mean difference ${dm.toFixed(2)}, sd ${sd.toFixed(2)}, 99% bound ${(T99 * sd / Math.sqrt(n)).toFixed(2)}`);
     expect(dm, `penalties over ${n} races: every step ${penE}, twenty a second ${penD}; the mean difference ${dm.toFixed(2)} a race, its 99% bound ${(T99 * sd / Math.sqrt(n)).toFixed(2)}`).toBeLessThanOrEqual(T99 * sd / Math.sqrt(n));
   }, 5_400_000);
 });
