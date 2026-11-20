@@ -114,6 +114,8 @@ body.showroom #crewPop{visibility:hidden}
 #sigPanel #sigText{display:none}
 /* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */
 .sailband{left:calc(50% - 330px)!important}
+/* (at 1280 the game's six buttons, bottom right, would reach the band's right end: it steps left, clear of the coach card; r271) */
+@media (max-width:1400px){.sailband{left:calc(50% - 356px)!important}}
 /* the Coach card: no header text (the Auto-trim tab says who trims) */
 #trimPanel #tpWho{display:none}
 /* the where-next card: the big number, the sketch and one short line; the transit is its hover text */
