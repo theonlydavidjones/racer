@@ -18,7 +18,8 @@ import { LL } from '../geo/geo';
  * doubles back unless that really is quicker.
  *
  * The method is the one sailing routers use (isochrones: R. W. James, "Application of wave forecasts to marine
- * navigation", US Navy Hydrographic Office, 1957; Hagiwara 1989). Its steps here are estimates chosen for the Bay's
+ * navigation", US Navy Hydrographic Office, 1957, SP-1; H. Hagiwara, "Weather routing of (sail-)assisted motor vessels",
+ * PhD thesis, TU Delft, 1989, a modified isochrone method). Its steps here are estimates chosen for the Bay's
  * scales: STEP_MIN 1 min (100–200 m at her speeds, finer than the lee's and the tide's changes), HEADING_STEP 5°,
  * SECTOR 1° (how finely the front is kept), SHORE 50 m (how close to the land she may sail), STALL 10 min.
  */
