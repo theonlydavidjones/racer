@@ -767,16 +767,25 @@ export class Hud {
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
     const avoid = PLACES.filter(pl => pl.buoy && scale > 0.12).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
     const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
+    // the chart's own panels over it, the Layers panel, the field picker and Day | Dusk, the passage line, the info box: the
+    // names keep clear of them, the sim's and the chart's own print alike (chart audit #1)
+    const panels: [number, number, number, number][] = [];
+    if (c.id === 'chartC' && typeof document !== 'undefined') { const cr = c.getBoundingClientRect();
+      for (const id of ['chartLayersPanel', 'chartField', 'chartPal', 'chartPlan', 'chartInfo']) { const e = document.getElementById(id); if (!e || e.hidden || !e.offsetParent) continue;
+        const r = e.getBoundingClientRect(); if (r.width && r.height) panels.push([r.left - cr.left - 4, r.top - cr.top - 4, r.width + 8, r.height + 8]); } }
+    avoid.push(...panels);
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     const placed: [number, number, number, number][] = [[me[0] - 26, me[1] - 26, 52, 52]]; // (your boat's spot is kept clear of names)
+    placed.push(...panels); // (and the chart's own panels: chart audit #1)
     for (const pl of PLACES) {
       if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
       if (!pl.buoy) { ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
       const bw = ctx.measureText(pl.name).width; // (zoomed out, the names would pile up: each only where it fits)
+      if (q[1] - 17 < 0 || q[0] + 6 + bw > w) continue; // (not cut by the chart's edge: chart audit #1)
       if (placed.some(b => q[0] + 6 < b[0] + b[2] && q[0] + 6 + bw > b[0] && q[1] - 17 < b[1] + b[3] && q[1] - 3 > b[1])) continue;
       placed.push([q[0] + 6, q[1] - 17, bw, 14]);
       if (scale > 0.12 || !pl.buoy) { ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(pl.name, q[0] + 6, q[1] - 6); ctx.fillStyle = pl.buoy ? (pal === 'day' ? '#c24a00' : I.mark) : I.text; ctx.fillText(pl.name, q[0] + 6, q[1] - 6); }
