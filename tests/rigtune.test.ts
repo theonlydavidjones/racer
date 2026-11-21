@@ -125,6 +125,7 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
     // (racing it cites the class rules that fix the rig; cruising there are none to cite: the Coordinator, 19 Nov 2026)
     expect(l!.why).toMatch(/CR 7\.40/);
+    expect(lessons(b, { preStart: true }).list.find(x => x.id === 'rig:soft')).toBeUndefined(); // (before the start: the line and the clock, not the tune)
     const c = lessons(b, { cruising: true }).list.find(x => x.id === 'rig:soft')!;
     expect(c.why).not.toMatch(/CR /); expect(c.why).toMatch(/set at the dock/);
   });

@@ -635,7 +635,9 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
     }
     list.push(...helmLessons(b, s, list.filter(l => l.line).length));
   }
-  if (!busy) list.push(...rigLessons(b, s, !!ctx.cruising));
+  // (not before the start: nothing to do about the tune then, and the line and the clock come first; the first-hour
+  // audit, 21 Nov 2026: a new player's first words in the start drill were the rig's tune)
+  if (!busy && !ctx.preStart) list.push(...rigLessons(b, s, !!ctx.cruising));
   for (const src of SOURCES) list.push(...src(b, s, ctx));
   list.sort((x, y) => y.gain - x.gain);
   return { s, list };
