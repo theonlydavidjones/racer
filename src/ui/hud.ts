@@ -1,4 +1,5 @@
 import { fillFlagIndex } from './flagIndex';
+import { turnsWord } from './words';
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
@@ -775,9 +776,9 @@ export class Hud {
     // with the wind or the current on: what's on the water where you are, the layer's own first (as the chart's readout)
     const kind = this.drawn.inset?.kind;
     if (nav) { // the navigator's view: how far she has to sail, and when she'd get there
-      const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
+      const y = h - 34 - (fog ? 12 : 0), turns = turnsWord(nav.tacks.length, nav.gybes.length);
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
-      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} JIBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
+      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${turns.toUpperCase()}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
     } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; say(a.toUpperCase(), w / 2, y, 'center');
