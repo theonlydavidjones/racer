@@ -14,7 +14,6 @@ import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { placeLabel } from '../ui/placeNames';
 import { asTheClubRunsIt, coursePicker, hostOf, practiceSeq } from '../club/practice';
-import { place } from '../sim/places';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
