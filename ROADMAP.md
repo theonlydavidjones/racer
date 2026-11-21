@@ -865,6 +865,10 @@ sources. Each shipped item is added there when it's published.
    the weather loading, the shaders compiling, or the editor's speed report benching while it's open. First, profile both
    on the published page (perf.cjs's views, plus the editor open and a cruise's first 60 s), and name what runs. Then
    spread it out or defer it. Add both to perf-ab's views so it doesn't come back.
+   For v215 (Capacity, 21 Nov): perf.cjs's cruise views sail mark 18 to mark 16 (5e966235), because r270 sends a save
+   from an old named spot to her slip, and the views moved into the marina without saying so. Cruises now start from
+   her slip, so add a cruise_slip view that starts there among the moored boats, which is the start players see. Before it gates,
+   its ref has to be a version with the slip start too.
 8v. ~~**Now — the boat editor is very slow**~~ (done: look-only changes restyle her in place, sail pictures shared, the cockpit linings worked out once; a speed check) (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
