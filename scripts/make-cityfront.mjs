@@ -30,7 +30,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const CACHE = arg('--cache', '');
 const STRIP = { s: 37.7790, n: 37.8150, w: -122.4900, e: -122.3850 }; // (Fort Point to Pier 39 and Telegraph Hill's west slope, and south to Pacific Heights and Cow Hollow: the old random boxes' seam is now inland and out of the sailing views)
 const MARIN = { s: 37.8400, n: 37.8950, w: -122.5100, e: -122.4350 }; // (the Marin shore: Sausalito, Strawberry Point, Belvedere and Tiburon; no DEM tile of ours, so its ground comes from the lidar's ground class)
-const STRIPS = [STRIP, MARIN], inStrips = (la, lo) => STRIPS.some(t => la >= t.s && la <= t.n && lo >= t.w && lo <= t.e);
+const ISLANDS = { s: 37.8050, n: 37.8400, w: -122.3880, e: -122.3500 }; // (Yerba Buena and Treasure Islands: in the DEM and the lidar of the SF project)
+const STRIPS = [STRIP, MARIN, ISLANDS], inStrips = (la, lo) => STRIPS.some(t => la >= t.s && la <= t.n && lo >= t.w && lo <= t.e);
 const COLS = [-122.4900, -122.4600, -122.4435, -122.4318, -122.4250, -122.4180];
 // (OSM's map call allows 50,000 nodes a box, so the dense parts are cut small. Boxes 0 to 4 are phase 1's and 2's, in the same order, so a cache from them still holds.)
 const box = (cols, s, n) => cols.slice(1).map((e, i) => [cols[i], s, e, n]);
@@ -42,7 +43,9 @@ const BOXES = [...box(COLS.slice(0, 6), 37.7975, STRIP.n),
   // and the south band west of it (Nob Hill, Russian Hill's south side, the Tenderloin's edge, lon -122.4500 to -122.4070, lat 37.7790 to 37.7920)
   ...[37.7790, 37.7840, 37.7890, 37.7920].slice(1).flatMap((n, i) => box([-122.4500, -122.4390, -122.4280, -122.4170, -122.4070], [37.7790, 37.7840, 37.7890][i], n)),
   // the Marin shore, in boxes of about 1 km (OSM's map call allows 50,000 nodes a box)
-  ...[37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800, 37.8950].slice(1).flatMap((n, i) => box([-122.5100, -122.4950, -122.4850, -122.4770, -122.4690, -122.4600, -122.4500, -122.4430, -122.4350], [37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800][i], n))];
+  ...[37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800, 37.8950].slice(1).flatMap((n, i) => box([-122.5100, -122.4950, -122.4850, -122.4770, -122.4690, -122.4600, -122.4500, -122.4430, -122.4350], [37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800][i], n)),
+  // Yerba Buena and Treasure Islands
+  ...[37.8050, 37.8120, 37.8190, 37.8260, 37.8330, 37.8400].slice(1).flatMap((n, i) => box([-122.3880, -122.3800, -122.3720, -122.3640, -122.3560, -122.3500], [37.8050, 37.8120, 37.8190, 37.8260, 37.8330][i], n))];
 const MSL_NAVD88 = 0.969, DECK = 3; // (a pier's deck: about 3 m over the water, render/wharf.ts)
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = MLAT * Math.cos(LAT0 * Math.PI / 180);
 const sim = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];
@@ -98,7 +101,7 @@ function utm(lat, lon) {
 }
 // (a check: Alcatraz's highest point, E 550,804.5 N 4,186,695.5, is at about 37.82626, −122.42271)
 { const [e, n] = utm(37.82626, -122.42271); if (Math.hypot(e - 550804.5, n - 4186695.5) > 30) throw new Error(`UTM forward is off: ${e} ${n}`); }
-const lo = utm(STRIP.s - 0.0005, STRIP.w - 0.0005), hi = utm(STRIP.n + 0.0005, STRIP.e + 0.0005), UE0 = Math.min(lo[0], hi[0]), UE1 = Math.max(lo[0], hi[0]), UN0 = Math.min(lo[1], hi[1]), UN1 = Math.max(lo[1], hi[1]);
+const DEMS = [STRIP, ISLANDS], lo = utm(Math.min(...DEMS.map(t => t.s)) - 0.0005, Math.min(...DEMS.map(t => t.w)) - 0.0005), hi = utm(Math.max(...DEMS.map(t => t.n)) + 0.0005, Math.max(...DEMS.map(t => t.e)) + 0.0005), UE0 = Math.min(lo[0], hi[0]), UE1 = Math.max(lo[0], hi[0]), UN0 = Math.min(lo[1], hi[1]), UN1 = Math.max(lo[1], hi[1]);
 const tifs = process.argv.slice(2).filter(a => a.endsWith('.tif')).map(f => {
   const dem = openGeoTiff(f), TX = dem.tiepoint[3], TY = dem.tiepoint[4];
   const e0 = Math.max(UE0, TX), e1 = Math.min(UE1, TX + dem.width), n1 = Math.min(UN1, TY), n0 = Math.max(UN0, TY - dem.height);
