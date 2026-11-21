@@ -50,6 +50,8 @@ const VIEWS = {
   await p.goto(`http://localhost:${port}/?inproc`); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1200);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
+  if (process.env.NIGHT) await p.evaluate(() => { const w = window.sim(), d = new Date(w.gunUtc * 60000), loc = new Date(d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })), off = d.getTime() - loc.getTime();
+    loc.setHours(20, 30, 0, 0); w.gunUtc = (loc.getTime() + off) / 60000 - w.t / 60; }); // (NIGHT=1: the clock at 20:30, as perf.cjs's night views)
   await p.addStyleTag({ content: 'body *:not(#gl) { visibility: hidden !important; } #gl { visibility: visible !important; }' });
   for (const [name, [pos, tgt]] of Object.entries(VIEWS)) {
     if (only.length && !only.includes(name)) continue;
