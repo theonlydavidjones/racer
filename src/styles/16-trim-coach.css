@@ -66,3 +66,5 @@
 .tpx-ways button{background:none;border:1px solid var(--rule);border-radius:6px;color:var(--text);font:600 11px/1 var(--f-inst);letter-spacing:.06em;padding:5px 8px;cursor:pointer}
 .tpx-ways .tpx-strat{border-color:rgba(255,182,39,.5);color:var(--accent)}
 .tpx-ways button:hover{background:rgba(255,182,39,.12)}
+/* grown, the card's racing line whole (the debrief audit, 21 Nov 2026: "Green is clear astern and must keep…") */
+#trimPanel.open #situ .msg,#trimPanel.open .tp-race .msg{white-space:normal;overflow:visible}
