@@ -142,20 +142,30 @@ export function speedFactor(b: Boat, c: Controls, now = false): number {
   // (at that step her heel found afresh: the first look had the sails at the old one)
   const at1 = Math.abs(d1 - d0) < 0.01 ? first : speedAt(b, c, b.heel ?? 0, 0, 0, d1);
   if (!b.crew || Math.abs(at1.heel - (b.heelMag ?? 0)) < 0.2) return at1.s;
-  const fr = sailFrame(b), sideOf = Math.sign(b.heel || 1), at = (h: number) => sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, sideOf * h).awa;
-  const a0 = at(b.heelMag ?? 0), a1 = at(at1.heel);
+  // (and her leeway there: heeled less she slips less, so the sails turn with her course and meet the wind narrower; a
+  // main eased to the edge of its luff for the heel it takes off luffs once her leeway comes off: 0.7° in 16 kt, the
+  // promise missed by four fifths, 21 Nov 2026)
+  const fr = sailFrame(b), dRot = fr.rot ? Math.sign(fr.rot) * (at1.lw - (b.leeway ?? 0)) : 0, fr1 = frameTurned(b, dRot), sideOf = Math.sign(b.heel || 1);
+  const a0 = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, sideOf * (b.heelMag ?? 0)).awa, a1 = sailWind(b.ww.from, b.ww.kt, b.h + fr1.rot, fr1.along, fr1.across, sideOf * at1.heel).awa;
   // (a main the crew sheet: to the wider wind, and to the ease they mean at the step they'd move to)
   const dm = byHand(b, 'mainsheet') ? 0 : optimalSheet('main', a1) - optimalSheet('main', a0) + crewEaseBoom({ ...b, depower: d1 } as Boat) - crewEaseBoom(b), dj = byHand(b, 'jibsheet') ? 0 : optimalSheet('jib', a1) - optimalSheet('jib', a0);
-  return speedAt(b, c, sideOf * at1.heel, dm, dj, d1).s;
+  return speedAt(b, c, sideOf * at1.heel, dm, dj, d1, dRot).s;
 }
-function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, dep: number): { s: number; heel: number; helm: number } {
+/** The sail frame (physics.ts sailFrame) with its leeway rotation changed by `dRot` (deg). */
+function frameTurned(b: Boat, dRot: number): { rot: number; along: number; across: number } {
+  const fr = sailFrame(b);
+  if (!dRot) return fr;
+  const sw = b.sway ?? 0, rot = fr.rot + dRot, r = rot * D2R;
+  return { rot, along: b.v * Math.cos(r) + sw * Math.sin(r), across: -b.v * Math.sin(r) + sw * Math.cos(r) };
+}
+function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, dep: number, dRot = 0): { s: number; heel: number; helm: number; lw: number } {
   // (in the wind the sails see as she heels, as the boat does: physics.ts sailWind, ORC eqs. 7.2–7.3; and in the frame
   // the boat trims them in, across her course through the water, her leeway in it (physics.ts sailFrame). Without the
   // leeway the coach judged her trim some 5° off the boat's and promised what the boat never paid: Bay East, 14 Nov)
-  const fr = sailFrame(b), sw = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, heelIn);
+  const fr = frameTurned(b, dRot), sw = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, heelIn);
   const tws = b.ww.kt, awa = sw.awa, aws = sw.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
   const main = clamp(boomAngle(c) + dm, SAILS.main.min, SAILS.main.max), clew = jibClew(c, b.tack);
-  if (clew < 0) return { s: 0, heel: b.heelMag ?? 0, helm: 0 }; // backed: not sailing
+  if (clew < 0) return { s: 0, heel: b.heelMag ?? 0, helm: 0, lw: b.leeway ?? 0 }; // backed: not sailing
   const jib = clamp(clew + dj, SAILS.jib.min, SAILS.jib.max);
   const tm = sailTrim('main', awa, main), tj = plan === 'jib' ? sailTrim('jib', awa, jib) : null;
   const ms = mainShape(c, tws, rigOf(b), aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, rigOf(b)?.tune) : null;
@@ -230,12 +240,12 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, d
   // wind at 10 m, some 12% stronger in its pressure: the second physics review, 15 Nov)
   const apH = flog > 0 ? sailWind(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0), b.sway ?? 0, b.heel ?? 0) : null;
   const D = apH ? airDrag(apH.aws, apH.awa, flog) : 0;
-  if (vT <= 0.05 || (D <= 0 && helm === 0)) return { s: vT / vt0, heel: heelC, helm };
+  if (vT <= 0.05 || (D <= 0 && helm === 0)) return { s: vT / vt0, heel: heelC, helm, lw };
   const rT = hullResistance(vT), k = driveCurveFor(tws, crs, vT), g = (v: number) => rT * k(v) - hullResistance(v) - D - rudderDrag(helm, v);
   let lo = 0, hi = vT;
-  if (g(lo) <= 0) return { s: 0, heel: heelC, helm };
+  if (g(lo) <= 0) return { s: 0, heel: heelC, helm, lw };
   for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (g(m) > 0) lo = m; else hi = m; }
-  return { s: (lo + hi) / 2 / vt0, heel: heelC, helm };
+  return { s: (lo + hi) / 2 / vt0, heel: heelC, helm, lw };
 }
 
 const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] };
