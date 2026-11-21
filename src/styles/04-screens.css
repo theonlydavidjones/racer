@@ -32,9 +32,14 @@ body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-inde
 #showBar b{min-width:92px;color:var(--text)}
 /* lesson 1 (app/boatLesson.ts): the bar is the lesson's one line, "Find the boom", centered under her */
 #showCue{display:none}
-body.partsLesson #showBar>:not(#showCue){display:none}
+body.partsLesson #showBar>:not(#showCue):not(.showLeave){display:none}
 body.partsLesson #showBar{right:auto;left:50%;transform:translateX(-50%);bottom:28px;padding:10px 18px;text-transform:none;letter-spacing:0;font:600 16px/1.2 var(--f-ui,inherit)}
 body.partsLesson #showCue{display:block;min-width:0}
+/* lesson 1's way out, in its own cue (the audit, 21 Nov 2026: Esc alone was unstated) */
+#showBar .showLeave{display:none}
+body.partsLesson #showBar .showLeave{display:inline-block;margin-left:12px;background:none;border:0;color:var(--muted);font:600 15px/1 var(--f-ui,inherit);cursor:pointer;padding:2px 4px}
+body.partsLesson #showBar .showLeave:hover{color:var(--text)}
+body.partsLesson #showBar{display:flex;align-items:center}
 body.partsLesson #showCue.ok{color:#3fd197}
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 

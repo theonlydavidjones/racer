@@ -83,6 +83,7 @@ export function mountBoatLesson(app: AppCtx) {
     on = false; app.view.showUnderwater(false); document.body.classList.remove('partsLesson'); app.look.spin = true; app.showroom(false);
     if (back) app.openLessons();
   }
+  $('bShowLeave').addEventListener('click', () => close()); // (lesson 1's way out: the ✕ in its cue, or Esc)
   const gl = app.view.renderer.domElement;
   gl.addEventListener('pointerdown', e => { if (on) down = { x: e.clientX, y: e.clientY }; });
   gl.addEventListener('pointerup', e => {
