@@ -210,12 +210,33 @@ waves, and the waves' depth grid (step 1) comes from the same data.
   up; the hull's own draft at the turn of the bilge is checked against the lines drawing).
 - **Grounded** when her keel's depth is more than the water's at its point under the hull. That's one point at her
   keel's deepest part, or two (its leading and trailing ends) if one proves too coarse at a rock's edge.
-- **What it does:**
-  - On a depth area's mud or sand: she stops, aground, as on the shore today. She gets off as a sailor does: by
-    heeling her (the crew to leeward), going astern under motor, or waiting for the tide to float her.
-  - On a charted rock, wreck or obstruction: a strike, as on a wharf (boat/damage.ts), by her speed.
-  - The ENC's bottom quality (NATSUR) says which, where it's charted.
-  - How hard the damage is, is the owner's to set: a question below.
+- **What it does.** The owner approved step 0 (21 Nov 2026), and the Coordinator ruled on the strike: graded by the
+  physics, not fixed.
+  - **Mud and sand** (a depth area's floor; the ENC's bottom quality, NATSUR, where it's charted): she stops softly,
+    no damage unless she's driven on hard. She gets off as a sailor does: by heeling her (the crew to leeward), going
+    astern under motor, or waiting for the tide to float her.
+  - **A rock, wreck or obstruction:** a keel strike, graded by its energy on damage.ts's scale.
+    - The energy is her speed into the hazard along her keel: ½·m·v², as a wharf hit's (damage.ts impactEnergy).
+    - It's less what goes into her riding up. A full keel meeting a rock pivots her about the keel's leading edge, and
+      part of the blow lifts and pitches her instead of going into the keel. The share follows from her pitch inertia
+      and the strike's depth below her center of gravity (geometry, to work out from the lines).
+    - The grades:
+      - **a scrape** at a knot or two;
+      - **damage** at sailing speed (keel bolts, a crack at the garboard);
+      - **serious** for a hard strike at speed;
+      - **a wreck** (holed) only well past that.
+    - The owner's note is the anchor: a Folkboat striking a rock at 5 kt is serious, but rarely a sinking.
+    - damage.ts's present bands (a wreck above 1.5 m/s, square on into a wall) are for a stem hitting something; a
+      keel strike gets its own band edges on the same energy scale.
+    - The band edges are ESTIMATES until sourced. To find:
+      - ISO 12215-9 (small craft, the appendages' scantlings: its grounding load cases);
+      - ABYC's keel guidance;
+      - and survey or claims literature on keel groundings. damage.ts already records BoatUS's "usually ... at less
+        than 8 knots", an observation, not a threshold.
+  - **The crew are thrown forward** in a keel strike, by her deceleration (crewPhys.ts, as in a collision).
+  - **What the player sees:** the debrief and the logbook say what she hit, by its charted name and depth ("Anita
+    Rock, 1.5 m: keel strike"; "aground on the mud off Crissy Field").
+  - **The chart:** the hazards are drawn on it (the owner, yes; Charts' side).
 
 ### The cost
 
@@ -257,15 +278,17 @@ hour is land for planning. That's Skipper Model's side of src/ai: I'll tell it b
 About 2–3 days, as step 0 of the order below:
 
 1. The grid and the hazards from the ENC, Charts' JSON and the DEM: 1 day.
-2. Grounding in the step, getting off, and the damage on rocks: 1 day.
-3. The router and the AI reading it, with Skipper Model: ½–1 day.
+2. Grounding in the step, getting off, and the keel strike's grades: 1–1½ days, with the band edges' sources looked
+   for first.
+3. The router and the AI reading it, with Skipper Model (src/ai is shared; Skipper Model is told before any edit):
+   ½–1 day.
 
 Then the physics review.
 
-**Questions for the owner:**
+Settled (21 Nov 2026):
 
-- How hard is a rock strike? A wreck, as a wharf at speed is now, or a scrape that costs the race?
-- Should the chart's hazards also be drawn on the chart (Charts' side)?
+- **Rock strikes:** graded by the physics (above).
+- **The hazards drawn on the chart:** yes, by Charts.
 
 ## The order of work (for after Tuesday)
 
