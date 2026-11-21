@@ -1,7 +1,7 @@
-import { brg, cross, dist, sub, unit, type Vec } from '../core/math';
+import { brg, cross, sub, unit, type Vec } from '../core/math';
 import { compass } from '../environment/sun';
 import { shoreDist } from '../geo/shore';
-import { PLACES } from './places';
+import { nearFeature } from './places';
 
 /**
  * A briefing: the strategist's before a race (sim/strategist.ts) or the navigator's before a passage (sim/navigator.ts).
@@ -23,20 +23,8 @@ export const deg3 = (x: number) => String(Math.round(((x % 360) + 360) % 360)).p
 export const mins = (m: number) => { if (m < 1) return `${Math.round(m * 60)} s`; const r = Math.round(m); return r < 90 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')}`; };
 export const ft = (m: number) => `${(m / 0.3048).toFixed(m < 0.6 ? 1 : 0)} ft`;
 
-/** Features to name a side of the course or a stretch of a route by (the places you can sail to, by their short names). */
-const FEATURES: { name: string; p: Vec }[] = [
-  ['cityfront', 'the yacht clubs'], ['crissy', 'Crissy Field'], ['gate', 'the Golden Gate'], ['sausalito', 'Sausalito'],
-  ['belvedere', 'Belvedere Point'], ['raccoon', 'Raccoon Strait'], ['ayala', 'Angel Island'], ['alcatraz', 'Alcatraz'],
-  ['pier39', 'Pier 39'], ['baybridge', 'the Bay Bridge'], ['clipper', 'Treasure Island'], ['ti-north', 'Treasure Island'],
-  ['m-16', 'Blackaller'], ['m-15', 'Yellow Bluff'], ['m-17', 'Harding Rock'], ['m-4', 'Angel Island'], ['m-18', 'Blossom Rock'], ['m-6', 'Fort Mason']
-].flatMap(([id, name]) => { const pl = PLACES.find(p => p.id === id); return pl ? [{ name, p: pl.p }] : []; });
-
-/** The nearest named feature to a point, within `within` m (leaving out any within 600 m of the points in `not`). */
-export function nearFeature(p: Vec, within = 1800, not: Vec[] = []): string | null {
-  let best: { name: string; d: number } | null = null;
-  for (const f of FEATURES) { if (not.some(q => dist(q, f.p) < 600)) continue; const d = dist(f.p, p); if (d < within && (!best || d < best.d)) best = { name: f.name, d }; }
-  return best?.name ?? null;
-}
+// (the features, and nearFeature, live in places.ts with the places they're taken from: r270)
+export { nearFeature } from './places';
 
 /**
  * Which way a track goes from the straight line a→b, in words: the compass side, and toward what ("north, toward

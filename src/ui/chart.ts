@@ -2,8 +2,8 @@ import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES, latLon } from '../sim/places';
-import { destName } from './placeNames';
+import { PLACES, isSpot, latLon } from '../sim/places';
+import { spotName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -126,7 +126,7 @@ export class Chart {
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }
     if (!best && onLand(q)) { this.pick = null; this.info('That\'s land. Pick a spot on the water.'); this.draw(); return; }
-    // (a spot on the water goes to the sim named by its position: the pin in the 3D view and on the HUD is told by that form, sim/places.ts isSpot; the player reads the nearest place's name, destName)
+    // (a spot on the water goes to the sim named by its position: the pin in the 3D view and on the HUD is told by that form, the sim names it by the nearest place and flags it, sim/places.ts spotLabel; here the player reads that name, spotName)
     this.pick = best ?? { p: q, name: latLon(q) };
     this.info(); this.draw();
   }
@@ -137,7 +137,7 @@ export class Chart {
     go.hidden = !(w?.cruising && this.pick);
     $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${destName(w.dest)}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
@@ -145,7 +145,7 @@ export class Chart {
     const kind = twa < beat ? 'upwind of you: a beat, tacking' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'downwind: a run';
     const cur = w.currentDrawn(p), ckt = Math.hypot(cur.x, cur.y) / KT;
     const nm = d / 1852;
-    el.innerHTML = `<p><b>${destName(this.pick)}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
+    el.innerHTML = `<p><b>${isSpot(this.pick.name) ? spotName(this.pick.p) : this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
   }
 
