@@ -13,6 +13,8 @@ import { setVisibility } from '../environment/weather';
 /** How murky to draw a visibility: nothing at 10 km and over, thickening as it closes in (a veil, not a measurement). */
 const murk = (m: number) => clamp(Math.log(10000 / Math.max(50, m)) / Math.log(40), 0, 1) * 0.5;
 /** A visibility as a sailor says it; at the source's cap, "or more" (NWS: 10 statute miles; Pier 17: 10 km). */
+/** A wave height on the chart, m → feet as the HUD writes them: a decimal under a foot, whole feet from 1 ft (chart audit #7). */
+export const waveFt = (m: number): string => `${(m / 0.3048).toFixed(m < 0.3048 ? 1 : 0)} ft`;
 export const nm = (m: number, cap = Infinity) => m >= cap - 10 ? `${(cap / 1852).toFixed(1)}+ nm` : m < 185 ? `${Math.round(m / 10) * 10} m` : `${(m / 1852).toFixed(m < 1852 * 2 ? 1 : 0)} nm`;
 /** How thick to draw fog the forecast names but doesn't measure, by NWS's own words (a veil, not a measurement). */
 export function wordsStrength(w: string): number {
@@ -73,7 +75,7 @@ export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ct
 /**
  * Sea state, from the sim's own sea (the waves the boats sail in, World.seaHere): one mark about every 120 px of the
  * map, so it reads at any zoom without crowding. Each gives the significant height of the chop and swell together
- * ("0.6 m", their energies add), bold on a halo like the map's other overlays, and, where there's swell worth the name
+ * ("2.0 ft", their energies add), bold on a halo like the map's other overlays, and, where there's swell worth the name
  * (0.1 m or more), an arrow the way it runs, longer for a bigger swell; the chop runs with the wind, which the map
  * shows already. In teal, a colour NOAA's chart doesn't use (the owner: the old stipple and 9 px labels were "too small
  * and low-contrast to be useful").
@@ -96,7 +98,7 @@ export function drawSea(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: Vec) => S
       const head = (w: number, col: string) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.moveTo(bx, by); ctx.lineTo(bx - dx * 6 - dy * 4, by - dy * 6 + dx * 4); ctx.moveTo(bx, by); ctx.lineTo(bx - dx * 6 + dy * 4, by - dy * 6 - dx * 4); ctx.stroke(); };
       head(5, I.halo); head(2, I.seaMark);
     }
-    const t = `${hs.toFixed(1)} m`;
+    const t = waveFt(hs); // (in feet, as the setup and the HUD give the sea: chart audit #7)
     ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.strokeText(t, q[0], q[1] + 4); ctx.fillStyle = I.seaMark; ctx.fillText(t, q[0], q[1] + 4);
   }
   ctx.restore();
