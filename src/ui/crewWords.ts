@@ -9,7 +9,7 @@ const JOB: Record<string, string> = {
 /** The windward and leeward sides on this tack (the wind comes over the windward side), in words. */
 export function sides(u: Boat): { ww: string; lw: string; wwS: string; lwS: string } {
   const S = u.tack === 'S'; // starboard tack: the wind over the starboard side
-  return { ww: S ? 'starboard' : 'port', lw: S ? 'port' : 'starboard', wwS: S ? 'stbd' : 'port', lwS: S ? 'port' : 'stbd' };
+  return { ww: S ? 'starboard' : 'port', lw: S ? 'port' : 'starboard', wwS: S ? 'starboard' : 'port', lwS: S ? 'port' : 'starboard' }; // (spelled out: w035)
 }
 /**
  * What the crew are doing, in a line for the trim panel. On auto, where they are and why (the wind and her heel); placed

@@ -68,7 +68,8 @@ export function fmtClock(t: number): string {
   const a = Math.abs(t), m = Math.floor(a / 60), s = Math.floor(a % 60);
   return (t < 0 ? '' : '+') + m + ':' + String(s).padStart(2, '0');
 }
-export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
+/** A mark's side, spelled out wherever the player reads it (w035: "stbd" and "starboard" were both shown). */
+export const sideWord = (s: string) => s === 's' ? 'starboard' : 'port';
 
 /** Instrument pods, wind dial, course map, situation banner and line-aid readout. Redraws at 10 Hz. */
 /**
@@ -579,7 +580,7 @@ export class Hud {
     if (!m) { if (!el.hidden) { el.hidden = true; document.body.classList.remove('nav-on'); this.nsKey = ''; this.fitCompass(); } return; }
     const p = m.p, r = dist(u, p), b = brg(p.x - u.x, p.y - u.y), vmc = (u.vx * (p.x - u.x) + u.vy * (p.y - u.y)) / Math.max(1, r), ttg = vmc > 0.1 ? r / vmc : Infinity;
     const [n, un] = this.range(r), name = destName(m, race);
-    const side = race ? (m.side === 's' ? ' <span class="s">▶ stbd</span>' : ' <span class="p">◀ port</span>') : '';
+    const side = race ? (m.side === 's' ? ' <span class="s">▶ starboard</span>' : ' <span class="p">◀ port</span>') : '';
     const ttgS = !isFinite(ttg) ? '--' : ttg < 3600 ? `${Math.round(ttg / 60)}<small>min</small>` : `${(ttg / 3600).toFixed(1)}<small>h</small>`;
     // racing, VMG (straight up or down the wind) on a beat or a run, VMC (toward the mark) on a reach; cruising, VMC
     // VMG when she has to tack or jibe to reach the mark, VMC once she can lay it (the owner, 20 Nov 2026), by the

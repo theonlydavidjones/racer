@@ -65,7 +65,7 @@ export class FlowPanel {
     const sw = (c: string, w: string, tip: string) => `<span title="${tip}"><i style="background:${c}"></i>${w}</span>`;
     el.querySelector('.fp-key')!.innerHTML = sw(COL.attached, 'attached', 'The air following the sail round') + sw(COL.luffing, 'luffing', 'Too far out, or pinching: trim in or bear away')
       + sw(COL.stalled, 'stalled', 'Too far in: ease, or head up') + sw(COL.running, 'off wind', 'Off the wind the sails work stalled, the air pushing on them')
-      + sw(COL.stbd, 'stbd tell', 'The starboard telltales') + sw(COL.port, 'port tell', 'The port telltales')
+      + sw(COL.stbd, 'starboard tell', 'The starboard telltales') + sw(COL.port, 'port tell', 'The port telltales')
       + `<span class="fp-speed" title="The streamlines' color: the air's speed against the apparent wind"><i style="background:linear-gradient(90deg,${speedCol(0.6)},${speedCol(1.5)})"></i>air slow–fast</span>`;
     this.story = el.querySelector('.fp-story')!;
     el.querySelector<HTMLButtonElement>('.fp-x')!.onclick = () => this.onClose();
