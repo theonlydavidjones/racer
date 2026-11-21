@@ -276,7 +276,10 @@ function bucketPuffs(f: Puffs): void {
 }
 
 /** windTerrain on a precomputed 50 m grid (for drawing the wind on the water, where it's needed at thousands of points). */
-/** The spacing (m) of TerrainGrid's nodes beyond its grid, as the lee's inside it. */
+/** The spacing (m) of TerrainGrid's nodes beyond its grid, as the lee's inside it (w051): the lee is a ray upwind over
+ * the terrain's heights, reaching kilometers, so it changes only gradually across the water; 200 m is four of the
+ * terrain's 50 m cells (geo/shore.ts), and beyond the grid it's only for drawing the far wind on the water. An estimate,
+ * not fitted: finer costs time, and the drawn wind shows nothing that changes inside it. */
 const FAR_CELL = 200;
 export class TerrainGrid {
   private g: Float32Array;
@@ -288,7 +291,7 @@ export class TerrainGrid {
     this.n = Math.round(2 * half / cell) + 1;
     this.g = new Float32Array(this.n * this.n);
     // the lee of the land changes slowly across the water: worked out every 200 m and interpolated
-    const lc = 200, ln = Math.round(2 * half / lc) + 1, lee = new Float32Array(ln * ln).fill(1);
+    const lc = FAR_CELL, ln = Math.round(2 * half / lc) + 1, lee = new Float32Array(ln * ln).fill(1);
     if (from != null) for (let j = 0; j < ln; j++) for (let i = 0; i < ln; i++) lee[j * ln + i] = landLee({ x: cx - half + i * lc, y: cy - half + j * lc }, from);
     const leeAt = (x: number, y: number) => {
       const fx = Math.min(ln - 1.001, Math.max(0, (x - cx + half) / lc)), fy = Math.min(ln - 1.001, Math.max(0, (y - cy + half) / lc)), i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;

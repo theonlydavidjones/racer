@@ -281,7 +281,10 @@ function channelFlow(c: Vec, across: Vec, h: number, u: number): number {
   if (here <= 0) return 0;
   return u * cells.reduce((t, k) => { const w = wetBand(k.d1, k.d2, h); return t + 2 * w.wet * w.depth * (w.depth / here) ** (2 / 3); }, 0);
 }
-const BAY_BIN = 50, BAY_CELL = 25; // (lines across a bay every 50 m; the water sampled every 25 m)
+// (w051) lines across a bay every 50 m, the chart's depth grid's own cells (depth-grid.json, 50.3–50.7 m: a finer
+// line reads the same cell again); and the water sampled every 25 m, four samples in each of those cells, so a cell
+// cut by the bay's outline or by dry ground counts by its share
+const BAY_BIN = 50, BAY_CELL = 25;
 /** A bay's water, sampled once: each sample's line (how far in, in 50 m steps) and charted band. */
 const WATER = new Map<Bay, { bin: Int32Array; d1: Float64Array; d2: Float64Array; bins: number }>();
 function bayWater(B: Bay) {
