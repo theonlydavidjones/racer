@@ -76,7 +76,7 @@ import { installDevHandles } from './app/devHandles';
 import { canEnterSeason } from './club/membership';
 import { startPageQuiet, startPageReady } from './app/firstRun';
 import { seasonRaceFor } from './club/practice';
-import { mountBoatLesson } from './app/boatLesson';
+import { SHOW_CHASE, mountBoatLesson, zoomShowroom } from './app/boatLesson';
 import { mountDrills } from './app/drills';
 import { DrillCoach } from './app/drillCoach';
 import { DrillGuides } from './render/drillGuides';
@@ -529,6 +529,8 @@ function tillerSpring(dt: number): void {
 gl.addEventListener('wheel', e => {
   e.preventDefault();
   if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+  // (her on show, in the boat editor, on her page or in lesson 1: closer to her or farther, within the showroom's limits; r292)
+  if (boatPanel.open || fleet.boatOpen || boatLesson.on) { look.chase = zoomShowroom(look.chase ?? SHOW_CHASE, e.deltaY); return; }
   if (viewMode === 2) zoomOverhead(Math.exp(e.deltaY * 0.0015));
   else if (viewMode === 0) setEye(look.aft + e.deltaY * 0.006); // cockpit: move your eye fore and aft
   else look.chase = Math.max(8, Math.min(90, (look.chase ?? view.chaseDist) * Math.exp(e.deltaY * 0.0015))); // chase: closer or farther (from the framed distance)
@@ -1595,7 +1597,7 @@ function frame(now: number): void {
   // the cold one, her sheets still eased, and she'd flash so before the settled trim arrives: sim/world.ts idle)
   const um = view.userMesh;
   if (um) um.grp.visible = !showing || w.steps > 0;
-  if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
+  if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase ??= SHOW_CHASE; view.render(w, dt, now, 3, look, over); }
   else if (boatLesson.on) { look.shift = 0; view.render(w, dt, now, 3, look, over); } // (lesson 1: her on show, the whole view hers)
   else view.render(w, dt, now, viewMode, look, over);
   const t2 = performance.now();
@@ -1693,7 +1695,7 @@ $('bBoat').onclick = () => nav.go({ k: 'club' });
 /** The showroom: on while one of your boats is on show (her page in the Fleet, or editing her). */
 function showroom(on: boolean): void {
   if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
-  if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; }
+  if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; look.chase = undefined; } // (framed afresh: SHOW_CHASE off her)
   document.body.classList.toggle('showroom', on);
   view.quiet(on); // (her alone on show: the fleet and the course hidden behind her page, as on the start page; render/scene.ts quiet)
   if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = undefined; }

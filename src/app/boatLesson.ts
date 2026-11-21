@@ -14,6 +14,13 @@ import type { AppCtx } from '../app';
 const NOTE_MS = 2600;
 /** How far off her the camera starts (m): far enough to see her whole, the masthead to the waterline; the wheel brings it in. */
 const CHASE = 15;
+/** The showroom's nearest and farthest (m): in close enough to pick out the small fittings at the mast's foot, out far
+ * enough to see her whole with room round her. The lesson and the boat editor zoom within them (r292). */
+export const NEAR = 5, FAR = 24;
+/** How far off her the boat editor's camera starts (m): her whole, beside the panel. */
+export const SHOW_CHASE = 10;
+/** The wheel in the showroom: closer or farther (a notch's `deltaY` of 100 about 16%), kept within NEAR and FAR. */
+export const zoomShowroom = (d: number, deltaY: number): number => Math.min(FAR, Math.max(NEAR, d * Math.exp(deltaY * 0.0015)));
 
 export function mountBoatLesson(app: AppCtx) {
   let on = false, i = 0, note = '', noteUntil = 0, done = false, down: { x: number; y: number } | null = null;
@@ -96,7 +103,7 @@ export function mountBoatLesson(app: AppCtx) {
     /** Each frame: the line (a found part's note gives way to the next cue). */
     tick(): void {
       if (!on) return;
-      app.look.chase = Math.min(24, Math.max(5, app.look.chase ?? CHASE)); paint();
+      app.look.chase = Math.min(FAR, Math.max(NEAR, app.look.chase ?? CHASE)); paint();
       // (the keel and the rudder are under the water: her shape below it shown faintly while one is asked for)
       const k = !done && PARTS[i].key; app.view.showUnderwater(k === 'keel' || k === 'rudder');
     },
