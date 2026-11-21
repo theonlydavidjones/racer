@@ -15,7 +15,18 @@ A trace of D6 at 8 and 14 kt (the sim's own run, 120 s):
 ## What a real crew does
 In a slip with a finger on one side and a finger or pile on the other, the crew doesn't lie on one side's lines. The bow and stern lines go to both sides, crossed or straight, and the springs go on the finger. That way she's held in the middle of the slip whichever side the wind comes from, off both fingers.
 
-This is the standard slip tie-up. It still needs checking against a source before the review: BoatUS's "Docking Lines" guide and Chapman Piloting & Seamanship's chapter on docking are the likely ones. Neither was fetched in this pass.
+This is the standard slip tie-up. BoatUS, "Tying up at the dock" (https://www.boatus.com/expert-advice/expert-advice-archive/2014/january/tying-up-at-the-dock):
+
+> Tying up in a slip typically works best with four docklines: two bow lines, and two stern lines.
+
+It adds springs for boats over 35 ft, or in strong wind or current.
+
+**This is from a search snippet only, not yet checked on the page:**
+- boatus.com, westmarine.com and boatingmag.com don't resolve from this session.
+- The search tool may have paraphrased the quote.
+- Chapman wasn't reached.
+
+No source was found on how a boat lies with lines on the finger side only, pressed onto the finger by the wind. The diagnosis above is the sim's own trace.
 
 The DOCKING-PROPOSAL's three lines are the alongside-a-dock set. In a slip they're half of it.
 
