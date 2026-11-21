@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 // @ts-ignore node:fs for the source text
 import { readFileSync } from 'node:fs';
-import { shortTip, TIP_MAX, PREP_TIP } from '../src/ui/hoverText';
+import { shortTip, TIP_MAX, PREP_TIP, uncertainTip, doubtTip, courseFromTip } from '../src/ui/hoverText';
 
 // A hover is one short line (the owner's rule on copy; the in-race audit's item 10). Long ones are cut at a sentence or a
 // clause, else at a word; the detail that matters is in the page.
@@ -52,5 +52,20 @@ describe('the preparatory flags keep their penalty in the hover', () => {
   it('each hand-written line is short and says what happens', () => {
     for (const [k, v] of Object.entries(PREP_TIP)) expect(v.length, k).toBeLessThanOrEqual(TIP_MAX);
     expect(PREP_TIP.Z).toMatch(/20%/); expect(PREP_TIP.U).toMatch(/disqualified/); expect(PREP_TIP.I).toMatch(/go round an end/);
+  });
+});
+
+describe('the past-race caveats and the swell, by hand', () => {
+  const unc = "Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Point (9 kt from 249°) and NOAA's ebb takes about 53 min, slower than every real finisher (47–52 min). It would need about 11 kt to make 47.";
+  it('uncertain keeps the wind and the time', () => { const t = uncertainTip(unc); expect(t).toBe('Course 3 as drawn: a perfect boat takes 53 min in 9 kt, slower than every finisher (47–52 min)'); expect(t.length).toBeLessThanOrEqual(TIP_MAX); });
+  it('the distance line', () => { expect(doubtTip("The results give course 3 as 6.1 nm; the 2026–27 course sheet, drawn here, has it as 3.7 nm (that season's own sheet couldn't be checked). 6.1 nm in …")).toBe('Results say 6.1 nm; the sheet, drawn here, says 3.7 nm'); });
+  it('the course from a sailor never says "the owner"', () => {
+    const t = courseFromTip('the owner, who sailed it: "it was a last minute course change. we sailed course #2" (the results give no course)');
+    expect(t).toBe('A sailor who raced it: "it was a last minute course change"'); expect(t).not.toMatch(/owner/);
+  });
+  it('the swell cell is one short line', () => {
+    const s = readFileSync('src/app/setup.ts', 'utf8') as string;
+    expect(s).toContain('Swell ${ft(here)} ft here · ');
+    expect(s).not.toContain("the ocean's own wind waves, which the sea here makes for itself");
   });
 });

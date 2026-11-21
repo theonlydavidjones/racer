@@ -25,3 +25,18 @@ export const PREP_TIP: Record<string, string> = {
   U: 'U (30.3): in the triangle in the last minute, disqualified',
   black: 'Black (30.4): in the triangle in the last minute, disqualified, even after a general recall'
 };
+
+/** The past-race caveats' hovers by hand (the Coordinator's rulings, 21 Nov): the figures stay, the explanation goes. A string
+ *  in a shape not seen here falls back to the plain cut. */
+export function uncertainTip(s: string): string {
+  const m = s.match(/course (\d+) as the sheet draws it, a perfect boat in the wind observed at [^(]*\((\d+) kt[^)]*\)[^.]*?takes about (\d+) min, slower than every real finisher \((\d+–\d+) min\)/);
+  return m ? `Course ${m[1]} as drawn: a perfect boat takes ${m[3]} min in ${m[2]} kt, slower than every finisher (${m[4]} min)` : shortTip(s);
+}
+export function doubtTip(s: string): string {
+  const m = s.match(/course (\d+) as ([\d.]+) nm; the [^,]*sheet, drawn here, has it as ([\d.]+) nm/);
+  return m ? `Results say ${m[2]} nm; the sheet, drawn here, says ${m[3]} nm` : shortTip(s);
+}
+export function courseFromTip(s: string): string {
+  const q = s.match(/"([^"]+?)[."]?"?(?:\s*\(|$)/);
+  return q ? `A sailor who raced it: "${q[1].replace(/\.\s.*$/, '')}"` : shortTip('The course from ' + s);
+}

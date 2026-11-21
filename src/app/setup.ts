@@ -287,7 +287,7 @@ function drawTideGraph(): void {
   // 14 ft at the Cityfront, where the race said glassy)
   const sw = app.w.sea.swell, at = cruise ? { x: app.w.user.x, y: app.w.user.y } : p, here = sw ? sw.hs * swellReach(at, true, sw.from).k : 0, ft = (m: number) => Math.round(m / 0.3048);
   if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (sw) { strip.sea = `${ft(here)} ft`; strip.seaSub = `${Math.round(sw.tp)} s swell`; }
-  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${sw ? `${ft(here)} ft of swell here, ${ft(sw.hs)} ft, ${Math.round(sw.tp)} s outside the Gate${sw.total ? ` (the buoy reads ${Math.round(sw.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
+  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${sw ? `Swell ${ft(here)} ft here · ${ft(sw.hs)} ft, ${Math.round(sw.tp)} s outside the Gate${sw.total ? ` · buoy ${Math.round(sw.total / 0.3048)} ft with wind waves` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(app.w.gunUtc * 60000), sp = sunPosition(app.w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
