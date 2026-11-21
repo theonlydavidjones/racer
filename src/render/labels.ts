@@ -86,14 +86,14 @@ export class Labels {
   private sizeOf(el: HTMLElement): { w: number; h: number } {
     const key = el.className + '|' + el.textContent, c = this.sizes.get(el);
     if (c && c.key === key) return c;
-    const n = { key, w: el.offsetWidth, h: el.offsetHeight }; this.sizes.set(el, n); return n;
+    const n = { key, w: el.offsetWidth || 0, h: el.offsetHeight || 0 }; this.sizes.set(el, n); return n;
   }
   /** The inset map and its credit line, which no tag may cover (in-race audit #4), read once a second. */
   private keepOut: [number, number, number, number][] = []; private keepOutAt = '';
   private keepOutRects(): [number, number, number, number][] {
     const k = innerWidth + 'x' + innerHeight + '@' + Math.floor(performance.now() / 1000); // (and once a second: the inset grows when it's zoomed)
     if (k !== this.keepOutAt) { this.keepOutAt = k; this.keepOut = [];
-      for (const id of ['map', 'mapCredit']) { const e = document.getElementById(id); if (!e) continue; const r = e.getBoundingClientRect(); if (r.width && r.height) this.keepOut.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8]); } }
+      for (const id of ['map', 'mapCredit']) { const e = typeof document.getElementById === 'function' ? document.getElementById(id) : null; /* (none in a test's stand-in page) */ if (!e) continue; const r = e.getBoundingClientRect(); if (r.width && r.height) this.keepOut.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8]); } }
     return this.keepOut;
   }
   /**
