@@ -38,6 +38,14 @@ describe('the beat angle in chop holds steady through a puff', () => {
   // (the v214 review: the chop is raised by the day's mean wind, the angle read in the wind at her, so a lull puts her in
   // 1–2 kt over 0.5 m: it gave 75° at 1.5 kt in 0.5 m where she's stopped, and 90.2° at 0.25 kt in 0.2 m, and in no wind
   // the flat-water lean, −43°, ran it 50–90° by the chop's depth)
+  // (the v215 review: the first wider angle with any way on was taken, not a useful one)
+  it('where the top found is one she\'s stopped at, the best she makes good footing off from it: 3 kt in 0.76 m and in 0.96 m', () => {
+    for (const [kt, hs, tp] of [[3, 0.76, 2.5], [3, 0.96, 3]]) {
+      const a = beatInChop(kt, hs, tp), got = speedInChop(kt, a, hs, tp) * Math.cos(a * D2R);
+      let top = 0; for (let t = 25; t <= 90; t += 0.25) top = Math.max(top, speedInChop(kt, t, hs, tp) * Math.cos(t * D2R));
+      expect(got / top, `${kt} kt, ${hs} m at ${a.toFixed(1)}`).toBeGreaterThan(0.95);
+    }
+  });
   it('in light air in a chop, an angle she makes way at wherever one exists, and within 30–90°', () => {
     for (let kt = 0; kt <= 2; kt += 0.125) for (let hs = 0.04; hs <= 1.2; hs += 0.04) {
       const tp = 2 + 2 * hs, a = beatInChop(kt, hs, tp);

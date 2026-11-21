@@ -130,12 +130,14 @@ function beatSearch(kt: number, hs: number, tp: number): number {
   let a: number;
   if (best <= 0 || best >= BN - 1) a = B0 + best * 0.5;
   else { const l = beatSm[best - 1], m = beatSm[best], r = beatSm[best + 1], d = l - 2 * m + r; a = B0 + (best + (d < 0 ? clamp(0.5 * (l - r) / d, -0.5, 0.5) : 0)) * 0.5; }
-  // (the smoothed top at an angle she's stopped at, in light air in a chop: the nearest wider angle she makes way at,
-  // footing off from it; the fastest of all only if there's none, as with no headway. Straight to the fastest, it
-  // jumped over 10° on 2 cm more chop)
+  // (the smoothed top at an angle she's stopped at, in light air in a chop: the best she makes good, unsmoothed, footing
+  // off from it, at or wider than it; the fastest of all only if she makes none there, as with no headway. Straight to
+  // the fastest, it jumped over 10° on 2 cm more chop; and the first wider angle with any way on was no use, 78.5° at
+  // 3 kt in 0.76 m with nothing made good where 84° makes 0.021 m/s: the v215 review)
   if (speedInChop(kt, a, hs, tp) > 0) return a;
-  for (let t = Math.ceil(a * 2) / 2; t <= B1; t += 0.5) if (speedInChop(kt, t, hs, tp) > 0) return t;
-  return fastest(kt, hs, tp);
+  let bt = -1, bv = 0;
+  for (let t = Math.ceil(a * 2) / 2; t <= B1; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bv) { bv = v; bt = t; } }
+  return bt >= 0 ? bt : fastest(kt, hs, tp);
 }
 const beatCache = new Map<number, number>();
 /** The smoothed top's lean toward the wind in flat water, by the wind (beatSearch): what's taken off it. None where
