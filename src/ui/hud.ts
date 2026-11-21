@@ -44,7 +44,8 @@ function shapeWords(u: Boat): string {
   one('main', u.shape.main); one('jib', u.shape.jib);
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
-import { toast } from './feedback';
+import { headline, toast } from './feedback';
+import { boatLabel, racingLine } from './racingLine';
 import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
@@ -354,7 +355,7 @@ export class Hud {
       sl.title = `${ww.kt.toFixed(1)} kt of wind on the water here${why ? ', ' + why : ''}`;
       sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
-    this.situation(w, u); this.lineBox(w, u); this.navStrip(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
+    this.situation(w, u); this.lineBox(w, u); this.navStrip(w, u); this.strategist(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
   }
 
   /** How each sail is drawing, in words, with what to do about it. */
@@ -433,8 +434,34 @@ export class Hud {
     }
   }
 
-  /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
+  /** The situation as the Strategist card shows it (r298): its headline, one line, beside the rule's chip (R10); the
+   *  whole sentence on a hover. Written only when it changes. */
+  private sFull = ''; private sRule = ''; private sShown = '';
+  /** The line card's last-minute numbers, for the Strategist card's racing line (lineBox). */
+  private startNums: { burn: number | null; toLine: number | null } = { burn: null, toLine: null };
+  /** The C view's strategist's call on her leg, if it has worked the day out (app.ts, from courseView). */
+  legCall: (() => { name: string; best: 'left' | 'right' | 'middle'; certainty: 'clear' | 'likely' | 'open' } | null) | null = null;
+  private rShown = ''; private titleShown = '';
+  /** The card's title and its racing line (r298): Strategist in a race, its line the situation's or, with none, the next
+   *  most pertinent (ui/racingLine.ts); Trim coach cruising, no racing line. */
+  private strategist(w: SimView, u: Boat): void {
+    const title = w.freeSail ? 'Trim coach' : 'Strategist';
+    if (title !== this.titleShown) { this.titleShown = title; $('tpTitle').textContent = title; }
+    const line = w.freeSail || !$('situ').hidden ? null : racingLine({ over: !!u.ocs && w.t >= 0, penalty: u.penalty ?? 0, penaltyDeg: w.penaltyDeg ?? 360,
+      toGun: -w.t, burnS: this.startNums.burn, toLineS: this.startNums.toLine, leg: u.started && !u.finished ? this.legCall?.() ?? null : null });
+    const key = line ? `${line.tag}|${line.text}|${line.kind}` : ''; if (key === this.rShown) return; this.rShown = key;
+    const row = $('tpRace'); row.hidden = !line; if (!line) return;
+    row.className = 'tp-race ' + line.kind; $('tpRaceTag').textContent = line.tag; $('tpRaceMsg').textContent = line.text;
+  }
   private situation(w: SimView, u: Boat): void {
+    this.situationFull(w, u);
+    const el = $('situ'); if (el.hidden) return;
+    const key = this.sFull + '|' + this.sRule; if (key === this.sShown) return; this.sShown = key;
+    $('situMsg').textContent = headline(this.sFull).head; el.title = this.sFull;
+    $('situRule').textContent = this.sRule.replace(/^Rule\s+/, 'R');
+  }
+  /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
+  private situationFull(w: SimView, u: Boat): void {
     let best: { o: Boat; r: ReturnType<SimView['rights']>; c: { t: number; d: number }; d: number; risk: boolean } | null = null, bestScore = -1e9;
     for (const o of w.boats) {
       if (o.isUser) continue;
@@ -450,50 +477,50 @@ export class Hud {
     // Rule 17: whoever got the leeward overlap from astern may not luff above her proper course
     const r17 = w.t > 0 ? w.pairRecord(u, o)?.r17 : null;
     const note17 = r17 === u.id ? ' Rule 17: you came from astern, so sail no higher than your proper course.'
-      : r17 === o.id ? ` ${o.name} came from astern: they may not luff you above their proper course (Rule 17).` : '';
+      : r17 === o.id ? ` ${boatLabel(o)} came from astern: they may not luff you above their proper course (Rule 17).` : '';
     const hail = w.pairRecord(u, o)?.hail;
     if (hail && hail.kind === 'room') {
       // a hail for room to tack trumps everything else
       const key = this.hailKey();
       if (hail.replyAt != null) {
         // (the room passes, not right of way: WS Case 101. So the colour follows who keeps clear, as everywhere else)
-        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now${kc ? ' and keep clear of them' : ''}: they must give you room to do it.`;
+        this.sFull = hail.by === o.id ? `You replied "You tack". Give ${boatLabel(o)} room to tack and pass astern of you.` : `${boatLabel(o)} replied "You tack". Tack now${kc ? ' and keep clear of them' : ''}: they must give you room to do it.`;
         el.className = kc ? 'kc' : 'row';
       } else if (hail.by === o.id && hail.passedOn) {
         // Rule 20.3: you passed the hail on to the boat to windward of you
         const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
         const left = po.respondedAt != null ? Math.max(0, po.respondedAt + HAIL_RESPONSE - w.t) : null;
-        $('situMsg').textContent = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
+        this.sFull = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
           : left == null ? `You passed the hail on to ${nm}. Tack as soon as they respond (Rule 20.3).` : `${nm} has responded. Tack now (Rule 20.3): ${left.toFixed(0)} s.`;
         el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
         const passTo = !youTackPays(o, u) ? w.canPassOn(u, o) : null, blocked = !!passTo;
-        $('situMsg').textContent = blocked
-          ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
-          : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        this.sFull = blocked
+          ? `${boatLabel(o)} hailed "Room to tack!" With ${boatLabel(passTo!)} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          : `${boatLabel(o)} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
       } else if (hail.passedOn && hail.clearAt == null) {
-        const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
-        $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
+        const nm = (() => { const p = w.boats.find(b => b.id === hail.passedOn!.to); return p ? boatLabel(p) : undefined; })() ?? 'the boat to windward';
+        this.sFull = `${boatLabel(o)} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
         el.className = 'row';
       } else if (hail.clearAt != null) {
         const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
         const tacked = (u.headToWindT ?? -Infinity) >= hail.at; // (a gybe isn't the tack rule 20.2(d) asks for)
-        $('situMsg').textContent = tacked ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
+        this.sFull = tacked ? `You're tacking: ${boatLabel(o)} is giving you room.` : `${boatLabel(o)} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
         el.className = tacked ? 'row' : 'kc alarm';
       } else if (hail.respondedAt != null) {
-        $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
+        this.sFull = `${boatLabel(o)} is tacking to give you room. Tack as soon as she's through the wind.`;
         el.className = 'kc';
       } else {
-        $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
+        this.sFull = `You hailed "Room to tack!" ${boatLabel(o)} must tack or reply "You tack".`;
         el.className = 'row';
       }
-      $('situRule').textContent = 'Rule 20'; el.hidden = false;
+      this.sRule = 'Rule 20'; el.hidden = false;
       return;
     }
-    $('situMsg').textContent = situationText(r.rule, kc, o.name) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
-    $('situRule').textContent = 'Rule ' + r.rule;
+    this.sFull = situationText(r.rule, kc, boatLabel(o)) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
+    this.sRule = 'Rule ' + r.rule;
     el.className = (kc ? 'kc' : 'row') + (kc && risk && c.t < 6 && c.d < 8 ? ' alarm' : '');
   }
 
@@ -651,6 +678,7 @@ export class Hud {
       const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, driveCurveFor(u.ww.kt, u.twa, vtL)) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
+      this.startNums = { burn: w.t < 0 && isFinite(tl) ? Math.max(0, -w.t - tl) : null, toLine: isFinite(tl) ? tl : null };
       this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0, callIx));
       // in the last minute, the time to burn matters more than which end is favoured
       // (no "sailing away" or favored-end words: the gold marks the end, the strip the way; the owner, 20 Nov)

@@ -192,7 +192,7 @@ const closeAll = async p => {
       }
       await p.mouse.move(700, 300); await p.waitForTimeout(300);
       // Coach card, the band's tabs, the crew pop-up, view, next card, flags, tools
-      for (const [q, name] of [['#bCoach', 'coach'], ['.sb-all', 'band-all-lines'], ['.sb-pole', 'band-pole'], ['#tpMore', 'sail-controls-fold'], ['.sb-motor .mo-n', 'band-motor'], ['.sb-hail', 'band-hail'], ['#bCrew', 'crew-pop'], ['#bView', 'view-next'], ['#bCourse', 'course-nav-button'], ['#nextCard', 'next-card'], ['#sigPanel', 'flag-index'], ['#bTools', 'tools-tray'], ['#bBand', 'band-toggle'], ['#bPilot', 'pilot'], ['#bOrient', 'orient'], ['#msgLog .ml-all', 'messages-all']]) {
+      for (const [q, name] of [['#trimPanel .tp-head', 'coach'], ['.sb-all', 'band-all-lines'], ['.sb-pole', 'band-pole'], ['#tpMore', 'sail-controls-fold'], ['.sb-motor .mo-n', 'band-motor'], ['.sb-hail', 'band-hail'], ['#bCrew', 'crew-pop'], ['#bView', 'view-next'], ['#bCourse', 'course-nav-button'], ['#nextCard', 'next-card'], ['#sigPanel', 'flag-index'], ['#bTools', 'tools-tray'], ['#bBand', 'band-toggle'], ['#bPilot', 'pilot'], ['#bOrient', 'orient'], ['#msgLog .ml-all', 'messages-all']]) {
         await closeAll(p);
         if (!(await shown(p, q))) { unreached.push(`${sc}/${name}: ${q} not shown`); continue; }
         await click(p, q); await p.waitForTimeout(1200); await sweep(p, sc, name);
