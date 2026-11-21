@@ -59,8 +59,8 @@ function seat(m: Member, boats: BoatSpec[]): { line: string; kind: 'skipper' | '
   for (const b of boats) {
     const ids = b.crewIds ?? [], i = ids.indexOf(m.id); if (i < 0) continue;
     const name = named(b);
-    if (ids.length === 1) return { line: `Crew on ${name} (main and jib)`, kind: 'middle' };
-    return i === 0 ? { line: `Middle crew on ${name} (the main)`, kind: 'middle' } : { line: `Forward hand on ${name} (the jib and the pole)`, kind: 'forward' };
+    if (ids.length === 1) return { line: `Crew on ${name}`, kind: 'middle' };
+    return i === 0 ? { line: `Middle crew on ${name}`, kind: 'middle' } : { line: `Forward hand on ${name}`, kind: 'forward' };
   }
   return m.roles.includes('skipper') && !m.roles.includes('crew') ? { line: 'Skipper, not on a boat of yours', kind: 'skipper' } : { line: 'Free: not on a boat', kind: 'free' };
 }
