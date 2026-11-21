@@ -2084,14 +2084,18 @@ export class World {
     }
     return this.dockPointAbeam(b, at, side);
   }
-  /** The free berths near her: empty slips, end ties and guest docks (her own slip is always hers), nearest first. */
-  freeBerthsNear(p: Vec, within = 16): Slip[] {
+  /**
+   * The free berths near her: empty slips, end ties and guest docks (her own slip is always hers), nearest first, but her
+   * own slip ahead of the rest when it's in reach (r239: G in her own fairway, beside a nearer empty slip, is coming home),
+   * unless `nearest`: the berth she's actually at.
+   */
+  freeBerthsNear(p: Vec, within = 16, nearest = false): Slip[] {
     const H = harborAt(p); if (!H) return [];
     const mine = this.homeSlip?.id;
     // (her own slip from further off: lines got ready as she turns into its fairway, as a crew does coming home, not only
     // once she's at its mouth: the owner, 18 Nov 2026, "the tie-up option never appeared" coming home to slip 572, where
     // its fairway square lies 16 m off and G there said "no free berth here")
-    return slipsIn(H.id).filter(s => s.id === mine ? dist(s.p, p) < HOME_REACH : !slipTaken(s) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
+    return slipsIn(H.id).filter(s => s.id === mine ? dist(s.p, p) < HOME_REACH : !slipTaken(s) && dist(s.p, p) < within).sort((a, b) => (nearest ? 0 : (a.id === mine ? -1 : 0) - (b.id === mine ? -1 : 0)) || dist(a.p, p) - dist(b.p, p));
   }
   /**
    * Lines ready (the Crew panel, or G coming in): a hand goes to the shrouds on the dock's side with the line coiled (the bow
@@ -2119,7 +2123,7 @@ export class World {
   /** Coming in: the hand stepping off, the first line snubbed round a cleat, the rest going on, and made fast. */
   private mooringStep(b: Boat, dt: number): void {
     const m = b.mooring!; m.t += dt;
-    const berth = slipById(m.berth), sp = hypot(b.vx, b.vy);
+    let berth = slipById(m.berth); const sp = hypot(b.vx, b.vy);
     const hand = m.solo ? b.crew?.spec.helm : b.crew?.spec.crew[0], skill = hand ? skillOf(hand) : 0.6;
     if (m.phase === 'ready') {
       // (the hand goes to whichever side the dock comes up on: from outside a slip there's none yet either side)
@@ -2128,6 +2132,10 @@ export class World {
       const gap = Math.min(gp, gs);
       if (gap > stepGap(skill)) { this.cue(m, 'Closer'); return; }
       if (sp > STEP_SPEED) { this.cue(m, 'Too fast'); return; }
+      // (the berth she's at as the hand steps off, not the one by her when G was pressed: lines readied far off and brought
+      // alongside elsewhere, or readied for her own slip in its fairway and taken into the empty one beside it, lie where
+      // she is: r239)
+      const here = this.freeBerthsNear(b, 16, true)[0]; if (here && here.id !== m.berth) { m.berth = here.id; berth = here; }
       // step: the line from her bow cleat (alone: her midships cleat), round the dock cleat abeam her shrouds
       const at = m.solo ? 0 : 3.4, to = this.dockCleat(b, berth, at, m.side); if (!to) return;
       const p = cleatOf(b, { at, side: m.side });
