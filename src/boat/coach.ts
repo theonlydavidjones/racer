@@ -678,7 +678,9 @@ function rigLessons(b: Boat, s: Situation, cruising = false): Lesson[] {
   // (racing the class rules fix them (CR 7.40, 6.1.5); cruising nobody retunes under way, so no rule to cite)
   const atDock = cruising ? 'The forestay, shrouds and mast foot are set at the dock' : 'The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5)';
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
-    head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind. Backstay on hard.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Backstay off, and sail a little lower.`,
+    // (no word of the backstay: the cost is already with the backstay where it pays best (tuneLoss), so no backstay wins it
+    // back, and the crew have it, at their own setting: "Backstay on hard" read as an order they then didn't follow)
+    head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Sail a little lower.`,
     why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. ${atDock}; the backstay is free.`
       : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. ${atDock}.`,
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];

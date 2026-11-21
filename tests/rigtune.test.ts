@@ -129,6 +129,19 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     expect(c.why).not.toMatch(/CR /); expect(c.why).toMatch(/set at the dock/);
   });
 
+  it('the rig note tells no one to work the backstay: the crew have it, set as far as it pays, and the cost is after that', () => {
+    // (the audit, 21 Nov 2026: in 12 kt on the light tune it said "Backstay on hard" while the helm set it at 0.3 and
+    // eased it again; the cost it names is already with the crew's best backstay, so no backstay wins it back)
+    for (const [kt, tune] of [[12, 'light'], [18, 'light'], [6, 'strong']] as const) {
+      const b = testBoat({ heading: 42, kt: 5, windKt: kt }); b.tune = { ...TUNE_PRESETS[tune] };
+      sail(b, 30);
+      const l = lessons(b).list.find(x => x.id.startsWith('rig:'));
+      if (!l) continue;
+      expect(l.head, `${kt} kt, ${tune}`).not.toMatch(/[Bb]ackstay/);
+      expect(l.head).toMatch(/set for (less|more) wind than this/);
+    }
+  });
+
   it('a change of conditions mid-sail leaves her tune as it is: only the crew\'s turns change it', () => {
     const w = new World(COURSES[0], S({ windKt: 8, fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 }), 3, { freeSail: true });
     const before = { ...w.user.tune! };
