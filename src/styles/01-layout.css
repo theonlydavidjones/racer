@@ -6,7 +6,6 @@ body{margin:0}
 /* Layout: full-bleed 3D water; instrument pods docked to the edges like a racing compass and a tactician's display */
 :root{
   --ink:#0a1520;
-  --target:#3ad1c1; /* where a line should go: the trim coach's and the lessons' target (shared with Learn to sail) */
   --pod:rgba(9,22,33,.84);
   --pod-solid:#0f2130;
   --rule:rgba(150,196,218,.2);
@@ -38,9 +37,6 @@ body{
 .tag.kc{border-color:var(--giveway)} .tag.kc b{color:var(--giveway)}
 .tag.row{border-color:var(--row)} .tag.row b{color:var(--row)}
 .tag.mk{background:rgba(9,22,33,.6);color:var(--accent);font-weight:500}
-.tag.mk.pin{background:none;border:0;padding:0 0 3px}
-.tag.mk.pin b{display:block;position:relative;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);border:2px solid rgba(9,22,33,.85);box-sizing:border-box}
-.tag.mk.pin b::after{content:'';position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:rgba(9,22,33,.85)}
 .tag.mk.next{background:var(--accent);color:#1a1205;font-weight:700}
 .tag.cue{background:rgba(9,22,33,.72);color:var(--text);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
 
@@ -55,15 +51,12 @@ body{
 .val{font:700 23px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#e9f1f3;text-align:right}
 .sub{font:600 9px/1.2 var(--f-inst);letter-spacing:.08em;color:#8ea2ac;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 .pod.clock .val{color:var(--accent)}
-.sub.lift{color:var(--row)} .sub.head{color:var(--giveway)} .sub .code{color:var(--giveway)}
+.sub.lift{color:var(--row)} .sub.head{color:var(--giveway)}
 
 #dial{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);left:max(16px,env(safe-area-inset-left,0px));
   width:96px;height:96px;background:var(--pod);border:1px solid var(--rule);border-radius:50%;pointer-events:none}
 #map{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);right:max(16px,env(safe-area-inset-right,0px));
   width:132px;height:168px;background:var(--pod);border:1px solid var(--rule);border-radius:6px;cursor:pointer}
-/* the data credit ODbL asks for (OpenStreetMap: the coast, piers and harbors), small, under the inset, always shown with it */
-#mapCredit{position:fixed;top:calc(env(safe-area-inset-top,0px) + 246px);right:max(16px,env(safe-area-inset-right,0px));width:132px;text-align:center;font:500 8px/1.2 var(--f-inst);color:var(--muted);opacity:.75;text-decoration:none}
-#mapCredit:hover{opacity:1;text-decoration:underline}
 #mapHint{position:fixed;top:calc(env(safe-area-inset-top,0px) + 246px);right:max(16px,env(safe-area-inset-right,0px));
   width:132px;text-align:center;font:600 10px/1 var(--f-inst);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;pointer-events:none}
 

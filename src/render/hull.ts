@@ -356,7 +356,7 @@ export const HOLLOW = { z1: L / 2 - 0.41 };
 /** `y`: the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
 export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
 /** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
-export const footrestWall = (z: number) => innerAt(1, uAtZ(z), FOOTREST.y) - 0.03;
+export const footrestWall = (z: number) => hullInnerHalf(uAtZ(z), FOOTREST.y) - 0.03;
 /** The plank's half-width at z, slid back: cut to the hull there, as far out as the rails' middle. */
 export const footrestEdge = (z: number) => footrestWall(z) - FOOTREST.rail / 2 - 0.004;
 export const COCKPIT_FIT = {
@@ -373,13 +373,9 @@ export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.
  * the cabin, and another, with a little less room, between it and the thwart (the owner, and Josephine's profile photo).
  */
 export const JIB_WINCH_Z = 1.64;
-/** The thwart's underside (m over the waterline) at x: deepest in the middle, shallower at the ends (COCKPIT_FIT.thwart
- * depth and depthEnd: ESTIMATES, uncited), the same curve the thwart's drawn with (thwartGeometryBuild). Open below it:
- * there's no post under the thwart. */
-export const thwartBottom = (x: number) => { const { depth, depthEnd, z } = COCKPIT_FIT.thwart, w = cockpitHalf(zU(z)) + COAMING_T; return thwartTop() - (depthEnd + (depth - depthEnd) * (1 - Math.min(1, (x / w) ** 2))); };
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
-export const benchOut = (u: number) => Math.min(innerAt(0, u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
+export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
 /**
  * The companionway in the after end of the cabin, drawn open (as she's sailed): the sliding hatch 550 mm wide and
  * 460 mm long, from the after bulkhead forward (the construction plan's deck plan, "sliding hatch"), slid forward over
@@ -419,9 +415,8 @@ function deckGeometryBuild(): THREE.BufferGeometry {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  // texture coordinates for laid decks: planks run fore and aft (u across the boat, a plank to 0.07 m, sixteen to a tile:
-  // boatMesh teakTexture; v along it)
-  const uv: number[] = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] / 1.12, pos[i + 2] / 2.4);
+  // texture coordinates for laid decks: planks run fore and aft (u across the boat, a plank to 0.07 m; v along it)
+  const uv: number[] = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] / 0.28, pos[i + 2] / 2.4);
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
   return g;
@@ -657,7 +652,7 @@ export function lazaretteLids(): { x0: number; x1: number; z0: number; z1: numbe
 /** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
 function thwartGeometryBuild(): THREE.BufferGeometry[] {
   const { z, half, depth, depthEnd } = COCKPIT_FIT.thwart, top = thwartTop(), w = cockpitHalf(zU(z)) + COAMING_T, N = 16;
-  const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2)); // (thwartBottom)
+  const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2));
   const pos: number[] = [], P = (x: number, y: number, zz: number) => pos.push(x, y, zz);
   const q = (a: number[], b: number[], c: number[], d: number[]) => { P(a[0], a[1], a[2]); P(b[0], b[1], b[2]); P(c[0], c[1], c[2]); P(a[0], a[1], a[2]); P(c[0], c[1], c[2]); P(d[0], d[1], d[2]); };
   for (let i = 0; i < N; i++) {
@@ -694,51 +689,6 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  * heel, z aft. Put the group at HEEL rotated by RUDDER_RAKE about x; turn it about its y axis to steer.
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
-/**
- * The tiller (CR 5.50: wood, removable, above the deck, not divided or hooped): a rigid, straight spar on a horizontal
- * pin through the rudder head's cheeks (the owner's photo of a Folkboat at the dock, her tiller stood up on its pin with
- * the extension lashed along it). At rest it lies 4° above level, its end just over the coaming's top (the owner's photo
- * of hers); its only motions are turning with the rudder about her hinge (raked 46°: the class profile, the transom top
- * to the keel's heel, about 45° on both drawings) and lifting on the pin. Turned far over, a tiller hung on that hinge
- * would come down onto the deck, so past about 45° it rides up on the pin over the coaming and the rail (tillerLift), to
- * about 20° at 75°. ESTIMATES: its length, rest angle and the pin's height (the rudder head's top, 12 cm above the
- * transom), measured against the photos, not a drawing (tests/tillerClear.test.ts).
- */
-export const TILLER = { rest: 4, len: 1.2 };
-/** In the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft): the pin, and the tiller's way from it at
- * rest (`deg` above level in the boat's frame, amidships). */
-export function tillerPivot(): THREE.Vector3 { const toWL = -HEEL.y / Math.cos(RUDDER_RAKE); return new THREE.Vector3(0, toWL - 1.528 + 2.62, 0.06); }
-export function tillerRestDir(): THREE.Vector3 {
-  const r = RUDDER_RAKE, up = TILLER.rest * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up);
-  return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
-}
-const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0);
-/** How far up off the deck a point `s` m along the tiller is (m, its round less), turned `turn` rad and lifted `lift`
- * rad on its pin: the least, all along it, over the deck, the toerail (3.5 cm on the sheer), the coaming and, out past the
- * rail, the deck's edge. */
-export function tillerClearance(turn: number, lift: number, n = 40): number {
-  const piv = tillerPivot(), d = tillerRestDir().applyAxisAngle(_X, lift), c1 = -L / 2 + COCKPIT.u1 * L; let w = 9;
-  for (let i = 0; i <= n; i++) {
-    const p = piv.clone().addScaledVector(d, TILLER.len * i / n).applyAxisAngle(_Y, turn).applyAxisAngle(_X, RUDDER_RAKE).add(new THREE.Vector3(0, HEEL.y, HEEL.z));
-    const u = uAtZ(p.z); if (u > 1) continue; // (aft of the transom: the rudder head, over the water)
-    const hb = halfBeam(u), a = Math.abs(p.x), rad = 0.028 - 0.01 * i / n;
-    let f = a < hb ? deckY(u, a) : sheer(u);
-    if (a > hb - 0.08) f = Math.max(f, sheer(u) + 0.035);
-    if (p.z < c1 + 0.02 && a > cockpitHalf(u) - 0.02 && a < cockpitHalf(u) + 0.06) f = Math.max(f, deckY(u, a) + COAMING_H(p.z));
-    w = Math.min(w, p.y - rad - f);
-  }
-  return w;
-}
-/**
- * How far the tiller's lifted on its pin (rad) when turned `turn` rad: not at all. It turns about the raked rudder line,
- * so its end comes down as it swings out, and it stops where it meets the after deck, the same both sides (the owner,
- * 18 Nov 2026: "the tiller path is on a slight arc, so it's up off the deck at center, but travels slightly down and
- * touches the deck at the extremes of its travel path"; "the staff doesn't block the tiller. The deck does, equally on
- * both sides"). That stop is HARD_OVER (boat/balance.ts), about 46.5° on this geometry (tests/tillerpath.test.ts). It
- * used to ride up on its pin past the deck, to 75°, which no tiller does.
- */
-export function tillerLift(_turn: number): number { return 0; }
-
 function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
   // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the
   // blade's lower edge, ±20 mm; 1528 mm up is at the waterline, and the head runs on, 160 mm wide, to 2700 mm
@@ -753,9 +703,12 @@ function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.Buf
   // shape (x, y) → (z, y); extrusion → x, centred
   blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.018, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
   blade.computeVertexNormals();
-  // the tiller: a straight, tapered spar from its pin (the origin: boatMesh.ts puts it at tillerPivot and lifts it there)
-  const tl = TILLER.len, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 10);
-  tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tillerRestDir()));
+  // tiller (CR 5.50, above the deck): from the rudder head, forward over the after deck and a little up into the
+  // cockpit, about 12° above level in the boat's frame (worked back into the rudder's raked frame)
+  const up = 12 * Math.PI / 180, r = RUDDER_RAKE, wy = Math.sin(up), wz = -Math.cos(up);
+  const dir = new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
+  const head = new THREE.Vector3(0, s0 + 2.62, 0.06), tl = 1.3, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 8);
+  tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)); tiller.translate(head.x, head.y, head.z);
   return { blade, tiller };
 }
 
@@ -780,21 +733,6 @@ export function hullInnerHalf(u: number, y: number): number {
   let lo = 0, hi = 0.8;
   for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (sectionPoint(u, m).y > y) lo = m; else hi = m; }
   return sectionPoint(u, (lo + hi) / 2).x;
-}
-/**
- * hullInnerHalf at one height all along her, tabulated once and read by linear interpolation: the crew's figures ask it
- * of the bench's and the footrest's edges hundreds of times a frame, and each call bisects her section 30 times (the
- * owner's Mac, about 0.5 ms a frame: Capacity's profile, 15 Nov 2026). The table every 4 mm over her after half, where
- * the cockpit is (forward, near the stem, her sections step, and the bisection's kept); within 0.1 mm of the bisection
- * (tests/hullHalfTable.test.ts). `row` names the height, one table each.
- */
-const IN_U0 = 0.5, IN_N = 1000, inRows: Float64Array[] = [], inYs: number[] = [];
-export function innerAt(row: number, u: number, y: number): number {
-  if (!(u >= IN_U0 && u < 1)) return hullInnerHalf(u, y);
-  let t = inRows[row];
-  if (!t || inYs[row] !== y) { t = inRows[row] = new Float64Array(IN_N + 1); inYs[row] = y; for (let i = 0; i <= IN_N; i++) t[i] = hullInnerHalf(IN_U0 + (1 - IN_U0) * i / IN_N, y); }
-  const f = (u - IN_U0) / (1 - IN_U0) * IN_N, i = Math.min(IN_N - 1, Math.floor(f)), w = f - i;
-  return t[i] + (t[i + 1] - t[i]) * w;
 }
 /** p (girth position) at station u for a height y on the topsides (between the sheer and the turn of the bilge). */
 function pAtY(u: number, y: number): number {

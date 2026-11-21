@@ -5,7 +5,7 @@
 /** A protest as the World records it (sim/world.ts Protest). */
 export interface ProtestRec {
   by: number; vs: number;
-  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | 'mark' | null;
+  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
   hailT: number; flagT: number | null;
   owed: boolean | null; turnsT: number | null;
   exonerated?: boolean;
@@ -63,9 +63,9 @@ export function decide(p: ProtestRec, vs: Protestee): Decision {
 export function hearings(ps: ProtestRec[], boat: (id: number) => Protestee): { decisions: Decision[]; dsq: Map<number, string> } {
   const seen = new Set<string>(), decisions: Decision[] = [], dsq = new Map<number, string>();
   for (const p of ps) {
-    const key = `${p.vs}@${p.t}${p.kind === 'mark' ? ':31' : ''}`; // (a mark touch and a foul by her in the same step: two hearings)
+    const key = `${p.vs}@${p.t}`;
     if (seen.has(key)) continue;
-    const ds = ps.filter(q => q.vs === p.vs && q.t === p.t && (q.kind === 'mark') === (p.kind === 'mark')).map(q => decide(q, boat(q.vs)));
+    const ds = ps.filter(q => q.vs === p.vs && q.t === p.t).map(q => decide(q, boat(q.vs)));
     const dd = ds.find(x => x.outcome !== 'invalid') ?? ds[0];
     seen.add(key); decisions.push(dd);
     if (dd.outcome === 'DSQ') dsq.set(p.vs, dd.rule ?? '');

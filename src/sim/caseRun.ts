@@ -1,4 +1,4 @@
-import { V, type Vec, hypot } from '../core/math';
+import { V, type Vec } from '../core/math';
 import { CASES, poseAt, type CaseFrame, type RulesCase } from '../rules/cases';
 import { RULES } from '../rules/explain';
 import type { RuleId } from '../rules/types';
@@ -71,7 +71,7 @@ export class CaseRun {
 function speedAt(F: CaseFrame[], t: number): number {
   for (let i = 1; i < F.length; i++) if (t <= F[i].t || i === F.length - 1) {
     const a = F[i - 1], b = F[i], dt = b.t - a.t;
-    return dt > 0 ? hypot(b.x - a.x, b.y - a.y) / dt : b.v ?? 2.5;
+    return dt > 0 ? Math.hypot(b.x - a.x, b.y - a.y) / dt : b.v ?? 2.5;
   }
   return F[0].v ?? 2.5;
 }

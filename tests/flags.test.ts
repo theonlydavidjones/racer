@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensignStep, flagAngle, flagDrawn, flagExtension, flagHang, flagHz, flagRow } from '../src/render/flagWave';
+import { ensignStep, flagAngle, flagDrawn, flagExtension, flagHz, flagRow } from '../src/render/flagWave';
 
 const KT = 0.5144;
 describe('a flag in the wind (Chen et al. 2014)', () => {
@@ -56,16 +56,5 @@ describe('striking the ensign', () => {
     expect(s.out).toBeCloseTo(0, 5); expect(s.slide).toBeCloseTo(1, 5);
     for (let i = 0; i < 30; i++) s = ensignStep(s.down, false, 0.1);
     expect(s.slide).toBeCloseTo(0, 5);
-  });
-});
-
-describe('a boat\'s flag hanging in light air keeps its shape (owner: "the ensign now has a pennant shape?")', () => {
-  it('its fly keeps at least 90% of the hoist\'s depth, in any wind', () => {
-    for (const h of [0.3, 0.6]) for (const fly of [h * 1.5, h * 1.9]) for (let aws = 0; aws <= 12; aws += 0.5) {
-      const sag = (1 - flagExtension(aws)) * 1.3, cs = Math.cos(sag), sn = Math.sin(sag); // (as boatMesh's syncBoatMesh)
-      const top = flagHang(fly, 0, h, fly, cs, sn), foot = flagHang(fly, -h, h, fly, cs, sn);
-      expect(top[1] - foot[1]).toBeGreaterThanOrEqual(0.9 * h - 1e-9);
-      expect(Math.abs(top[0] - foot[0])).toBeLessThan(1e-9); // (the fly's edge stays straight up and down)
-    }
   });
 });

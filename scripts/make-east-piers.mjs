@@ -6,13 +6,7 @@
  *   open to anglers 1937–2015 (Wikipedia, "Berkeley Pier"). The deck as mapped is about 6.6 m wide.
  * - Its abandoned outer part (way 28844087, a line): 3.2 km more out toward the old ferry terminal, piles and broken
  *   deck "still emerging in places" (Wikipedia), past a gap of about 45 m at the end of the usable deck. Solid along
- *   its line, 4 m wide: a boat can't sail between the piles. The gap is left open, as OSM has it (reviewed 19 Nov
- *   2026): no chart or notice gives a passage there, and Coast Pilot 7 (ch. 7, para. 322) says only "the outer 1.7
- *   miles of the pier is in ruins"; but sailors use it. In Latitude 38's "Is There a Safe Break in the Berkeley Pier?"
- *   one long-time Berkeley Marina sailor advises against the cut, others report using it regularly, boats drawing up to
- *   7 ft among them, and Wikipedia's article mentions a gap for small boats; and the owner has sailed a Folkboat through it without trouble (first-hand, 19 Nov 2026; the tide then not recalled). A Folkboat
- *   draws 1.2 m. It's navigable here: the tiller pilot sails it (sim/helmPlan.ts hands her over only before a gap
- *   narrower than her turning room).
+ *   its line, 4 m wide: a boat can't sail between the piles.
  * - Chevron's Long Wharf at Richmond (way 35442255, an area): the causeway from the shore by Point Richmond and its
  *   T-head of tanker berths.
  *
@@ -29,8 +23,6 @@ const WAYS = [
   { id: 35442255, name: 'Long Wharf (Chevron, Richmond)', kind: 'pier', area: true }
 ];
 const r7 = x => Math.round(x * 1e7) / 1e7;
-/** The gap at the deck's end, as the data says it (see above). */
-const GAP = 'about 45 m open between the usable deck and the ruin, as OSM maps it: sailors use it (Latitude 38, "Is There a Safe Break in the Berkeley Pier?": boats drawing up to 7 ft; Wikipedia: a gap for small boats), one long-time Berkeley Marina sailor advises against it, the owner has sailed a Folkboat through it without trouble (first-hand, 19 Nov 2026; the tide then not recalled), and no chart or notice gives a passage (Coast Pilot 7, ch. 7, para. 322: "the outer 1.7 miles of the pier is in ruins")';
 const piers = [], lines = [];
 for (const w of WAYS) {
   let xml = null;
@@ -42,7 +34,7 @@ for (const w of WAYS) {
   const nodes = new Map([...xml.matchAll(/<node id="(\d+)"[^>]*?lat="([-\d.]+)" lon="([-\d.]+)"/g)].map(m => [m[1], [r7(+m[2]), r7(+m[3])]]));
   const pts = [...xml.matchAll(/<nd ref="(\d+)"\/>/g)].map(m => nodes.get(m[1]));
   if (w.area) piers.push({ name: w.name, kind: w.kind, pts: pts.slice(0, -1) }); // (closed: the last node repeats the first)
-  else lines.push({ name: w.name, kind: w.kind, width: w.width, pts, ...(w.kind === 'ruin' ? { gap: GAP } : {}) });
+  else lines.push({ name: w.name, kind: w.kind, width: w.width, pts });
   console.log(w.name, pts.length, 'nodes');
 }
 await writeFile(new URL('../src/geo/data/east-piers.json', import.meta.url), JSON.stringify({

@@ -29,8 +29,7 @@ export interface CoachView {
   user: { x: number; y: number; h: number; v: number; vx: number; vy: number; twa: number; tack: 'P' | 'S'; ww: { from: number; kt: number }; cur?: Pt; astern?: number };
   drill?: { list: { scored: boolean; lostM: number; goodM: number; kind: 'tack' | 'gybe' }[] } | null;
   rounding?: { marks: { p: Pt }[]; leg?: number; list: { scored: boolean; lostM: number; goodM: number; kind: 'windward' | 'leeward'; provisional?: boolean }[] } | null;
-  /** The start: its line, and the other boats (to find the clear stretch). */
-  start?: { pin: Pt; committee: Pt; others?: Pt[]; call?: 'pin' | 'committee' | null; read?: boolean; names?: [string, string] } | null;
+  start?: { pin: Pt; committee: Pt } | null;
 }
 export interface CoachOut { spec: GuideSpec | null; key: string; wake: Pt[] | null; cue: Cue | null }
 
@@ -73,10 +72,9 @@ export class DrillCoach {
   private setDoneT = -Infinity;
   private round: Round | null = null;
   private lastT = -Infinity;
-  private spotF: number | null = null;
 
   /** A new session (or a restart): nothing carried over. */
-  reset(): void { this.rep = null; this.round = null; this.set = []; this.setDoneT = -Infinity; this.lastT = -Infinity; this.spotF = null; }
+  reset(): void { this.rep = null; this.round = null; this.set = []; this.setDoneT = -Infinity; this.lastT = -Infinity; }
 
   /** Each frame: what to draw and say. `mode`: the drill being sailed (null: none). */
   tick(w: CoachView, mode: 'manoeuvres' | 'roundings' | 'start' | null): CoachOut {
@@ -195,37 +193,11 @@ export class DrillCoach {
     if (w.t > 5) return { spec: null, key: '', wake: null, cue: null }; // (after the gun: the start's own debrief)
     // the line, pin to committee boat, and which side of it she's on: the course side is to windward
     const lx = L.committee.x - L.pin.x, ly = L.committee.y - L.pin.y, ll = Math.hypot(lx, ly) || 1;
-    const k = Math.max(0, Math.min(1, ((pos.x - L.pin.x) * lx + (pos.y - L.pin.y) * ly) / (ll * ll))), Qn = { x: L.pin.x + lx * k, y: L.pin.y + ly * k };
-    const up = dir(u.ww.from), side = (pos.x - Qn.x) * up.x + (pos.y - Qn.y) * up.y; // (+: to windward of the line)
-    // where to cross at the gun (the owner, 15 Nov 2026, asked whether the lane was the ideal start point: now it is): the
-    // favored end's third, by the debrief's own read of the line (sim/startDebrief.ts: the end nearer the wind, favored
-    // from 2° of bias), or the middle with neither end favored; along it the spot with the most room from the other boats,
-    // kept unless another has a good deal more (so it doesn't hop about as they move)
-    const sk = ((L.pin.x - L.committee.x) * up.x + (L.pin.y - L.committee.y) * up.y) / ll, bias = Math.asin(Math.min(1, Math.abs(sk))) / D2R;
-    const truth = bias >= 2 && bias < 30 ? (sk > 0 ? 'pin' : 'committee') : null; // (past 30° the line's a reach: no end to favor; judgment)
-    // (the favored end is the player's to find (8za, the owner): the lane goes to the line's middle till they call an end,
-    // then to the end they called, right or wrong; the gun tells them)
-    const fav = 'call' in L ? L.call ?? null : truth; void truth;
-    const [f0, f1] = fav === 'pin' ? [0.06, 1 / 3] : fav === 'committee' ? [2 / 3, 0.94] : [0.2, 0.8], fPref = fav === 'pin' ? 1 / 6 : fav === 'committee' ? 5 / 6 : 0.5;
-    const near = (L.others ?? []).filter(o => Math.abs((o.x - L.pin.x) * ly - (o.y - L.pin.y) * lx) / ll < 200) // (boats within 200 m of the line)
-      .map(o => ((o.x - L.pin.x) * lx + (o.y - L.pin.y) * ly) / (ll * ll));
-    const room = (f: number) => Math.min(3 * LOA, ...near.map(g => Math.abs(f - g) * ll)); // (room along the line, up to 3 lengths)
-    const score = (f: number) => room(f) - Math.abs(f - fPref) * ll * 0.05;
-    let best = fPref; for (let i = 0; i <= 12; i++) { const f = f0 + (f1 - f0) * i / 12; if (score(f) > score(best)) best = f; }
-    if (this.spotF == null || this.spotF < f0 - 0.01 || this.spotF > f1 + 0.01 || score(best) > score(this.spotF) + LOA) this.spotF = best;
-    const Q = { x: L.pin.x + lx * this.spotF, y: L.pin.y + ly * this.spotF };
+    const k = Math.max(0, Math.min(1, ((pos.x - L.pin.x) * lx + (pos.y - L.pin.y) * ly) / (ll * ll))), Q = { x: L.pin.x + lx * k, y: L.pin.y + ly * k };
+    const up = dir(u.ww.from), side = (pos.x - Q.x) * up.x + (pos.y - Q.y) * up.y; // (+: to windward of the line)
     const d = dist(pos, Q), toQ = n360(Math.atan2(Q.x - pos.x, Q.y - pos.y) / D2R);
-    // the approach: the lane from her to that spot, arrowheads in it pointing at the line, and the gate lying along the
-    // line at the spot ("Cross here at the gun" on a hover)
-    const lineH = n360(Math.atan2(lx, ly) / D2R), ahead = Math.min(d - 4, 26), arrowsAt = add(Q, dir(toQ), -ahead);
-    const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: lineH - 90, half: 12, hint: 'Cross here at the gun' }, ...(ahead > 6 ? { arrows: { p: arrowsAt, h: toQ, n: 3 } } : {}) };
-    // the read, as sailors make it (8za): head to wind near the line, her bow (the wind's direction) against the line's
-    // square; the bow leans toward the favored end by the bias. Drawn on the water while she's head to wind within 150 m
-    // below it, for the player's first calls (L.read)
-    const sq90 = n360(lineH + 90), sqUp = Math.cos((sq90 - u.ww.from) * D2R) >= 0 ? sq90 : n360(sq90 + 180); // (square to the line, toward the wind)
-    const htw = Math.abs(wrap(u.h - u.ww.from)) < 10 && side < 0 && -side < 150 && w.t < 0;
-    if (L.read && htw) spec.read = { o: pos, bow: u.h, sq: sqUp, ends: [{ p: L.pin, name: L.names?.[0] ?? 'Pin', ring: true }, { p: L.committee, name: L.names?.[1] ?? 'Committee', ring: false }] };
-    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}${spec.read ? `:r${Math.round(u.h)}` : ''}`; // (the lane redrawn as she moves: about once a second)
+    const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: toQ, half: 9 } };
+    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}`; // (the lane redrawn as she moves: about once a second)
     const left = -w.t;
     if (side > 1 && left > 0) return { spec, key, wake: null, cue: { word: 'Dip back', sub: `over the line · ${Math.round(left)} s` } };
     // her time to the line: at her speed for that course, the stream along it, and the time to get up to speed (a

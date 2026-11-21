@@ -13,10 +13,9 @@ import type { LineKey, Boat } from '../boat/boat';
 import type { PlaceAcross, PlaceFore } from '../boat/crewPhys';
 import { allToCrew, moveLazyCar, takeLine } from '../boat/physics';
 import { carFree } from '../boat/crewWork';
-import { HELM_MAX } from '../boat/balance';
 import { wantJumpers } from '../boat/condition';
 import { guideTune } from '../boat/rigTune';
-import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, liftOff as pilotLift, type PilotMode } from '../boat/autopilot';
+import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
 import type { Settings } from '../settings';
 import type { BoatSpec } from '../boat/spec';
 import type { Moment } from './debrief';
@@ -34,9 +33,7 @@ export type Command =
   /** The tiller's handle, −1 (pushed to port) … +1 (to starboard); a lashed tiller is lashed where it's put. */
   | { k: 'tiller'; v: number }
   /** Lash the tiller where it is, or take the lashing off. */
-  /** `at`: the tiller angle to lash it at (the page's intended angle: its own copy of the race can be a frame or two
-   * behind, app.ts lash); without it, where the tiller is. */
-  | { k: 'lash'; on: boolean; at?: number }
+  | { k: 'lash'; on: boolean }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
   /** Hand Back (the band's tab): every line and both jib cars back to the crew (the pole stays yours). */
@@ -57,8 +54,6 @@ export type Command =
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
   /** Set or stow the whisker pole (always yours: your call only). */
   | { k: 'pole'; want: boolean }
-  /** Paddle her with the boom crutch on that side (or back-paddle), or stop (null). Yours until you stop or the crew stops of itself. */
-  | { k: 'paddle'; side: 'P' | 'S' | null; back?: boolean }
   /** Strike or hoist the ensign. */
   | { k: 'ensign'; struck: boolean }
   /** Navigation lights off or on. */
@@ -71,19 +66,14 @@ export type Command =
   | { k: 'pilot'; op: 'engage'; mode: Exclude<PilotMode, 'off'> }
   | { k: 'pilot'; op: 'standby' }
   | { k: 'pilot'; op: 'tack' }
-  /** Lift the ram off the tiller pin (on standby it still holds the tiller): the tiller's free. */
-  | { k: 'pilot'; op: 'lift' }
   | { k: 'pilot'; op: 'adjust'; d: number }
-  /** The navigator's plan for Nav to steer (World.planTarget): where it was planned to, and its plotted course's corners. */
-  | { k: 'navPlan'; to: Vec; pts: Vec[] }
   /** The outboard. */
-  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
+  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' }
   | { k: 'motor'; op: 'start'; retireFirst: boolean }
   | { k: 'motor'; op: 'gear'; gear: 'F' | 'N' | 'R' }
   | { k: 'motor'; op: 'throttle'; v: number }
   | { k: 'castOff' }
   | { k: 'pushOff' }
-  | { k: 'turn' }
   /** Coming in to a berth: lines ready (again: stand down), or let go her lines lying along a dock (sim/world.ts). */
   | { k: 'lines' } | { k: 'letGo' }
   | { k: 'hail' }
@@ -120,22 +110,19 @@ export function applyCommand(w: World, c: Command): CommandResult {
   const u: Boat = w.user;
   switch (c.k) {
     case 'helm':
-      if (c.steer && w.pilot.mode === 'off') w.pilot.onPin = false; // (taking the helm on standby: you lift the ram off the pin)
       u.steer = c.steer; u.luff = c.luff;
       u.ctlCmd = c.ctl; u.sheetCmd.main = c.ctl.mainsheet ?? 0; u.sheetCmd.jib = c.ctl.jibsheet ?? 0;
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
-    case 'tiller': if (w.pilot.mode === 'off') w.pilot.onPin = false; // (your hand on the tiller: the ram lifted off its pin)
-      u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': if (w.pilot.mode === 'off') w.pilot.onPin = false; // (a tiller the ram holds can't be lashed: it comes off first)
-      if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.at)); u.lashed = c.on ? u.tiller : null; return;
+    case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
+    case 'lash': u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;
     case 'ctlTarget': (u.ctlTarget ??= {})[c.key] = c.v; takeLine(u, c.key); return;
     case 'ctlTargetClear': if (u.ctlTarget) for (const key of c.keys) delete u.ctlTarget[key]; return;
     case 'jumpers': wantJumpers(u, c.turns); return;
-    case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? Math.round((u.tune ?? guideTune(u.ww.kt)).jumperTurns * 2) / 2) + c.d); return; // (from the half turn the band shows)
+    case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? (u.tune ?? guideTune(u.ww.kt)).jumperTurns) + c.d); return;
     case 'lazyCarTo': {
       // (as the band did it: from where she'd been asked to put the car, or where the lazy car is; moveLazyCar works from the same)
       // (a side: the leeward car too, with the jib down and no load on it, crewWork.ts carFree)
@@ -144,31 +131,26 @@ export function applyCommand(w: World, c: Command): CommandResult {
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
     case 'pole': w.poleCall(c.want); return;
-    case 'paddle': w.paddle(c.side, !!c.back, false); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
     case 'lessonReady': w.lesson?.ready(w.isNight()); return;
     case 'sail': w.setSail(c.sail, c.up); return;
-    case 'navPlan': w.setNavPlan(c.to, c.pts); return;
     case 'pilot':
-      if (c.op === 'engage') { pilotEngage(u, w.pilot, c.mode); w.setNavPlan(null); } // (engaged afresh: the page sends the plan from where she is now)
-      else if (c.op === 'standby') { pilotStandby(w.pilot); w.setNavPlan(null); }
-      else if (c.op === 'lift') pilotLift(w.pilot);
-      else if (c.op === 'tack') w.pilotTack();
+      if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
+      else if (c.op === 'standby') pilotStandby(w.pilot);
+      else if (c.op === 'tack') pilotTack(u, w.pilot);
       else pilotAdjust(u, w.pilot, c.d);
       return;
     case 'motor':
       if (c.op === 'tilt') w.motorTilt();
       else if (c.op === 'stop') w.motorStop();
       else if (c.op === 'swivel') w.motorSwivel();
-      else if (c.op === 'stow') w.motorStow();
       else if (c.op === 'start') return w.motorStart(c.retireFirst);
       else if (c.op === 'gear') w.motorGear(c.gear);
       else if (c.op === 'throttle') w.motorThrottle(c.v);
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
-    case 'turn': { const ok = w.callTurn(); if (ok && w.pilot.mode === 'off') w.pilot.onPin = false; return ok; } // (putting her about yourself: your hand on the tiller, the ram lifted off)
     case 'lines': return w.linesReady();
     case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;

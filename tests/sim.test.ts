@@ -4,8 +4,8 @@ import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
 import { buildCourse } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { DT, World, startPenalty } from '../src/sim/world';
-import { V, brg, n360, wrap } from '../src/core/math';
+import { DT, World } from '../src/sim/world';
+import { V, brg } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
 
@@ -19,7 +19,7 @@ describe('courses load from JSON', () => {
       ['A:s', 'X(pass):s', '6:s', 'X(pass):p', 'A:s', 'X(pass):s', '6:s']);
     expect(C.obstruction).toBe(true);
     expect(C.pinKind).toBe('mark');
-    expect(C.lineLen).toBeGreaterThan(200); // Dorado YC flagpole to X
+    expect(C.lineLen).toBeGreaterThan(200); // GGYC flagpole to X
     // first leg (to A) is a beat into the westerly; leg to 6 is downwind
     expect(C.marks[0].beat).toBe(true);
     expect(C.marks[2].beat).toBe(false);
@@ -168,7 +168,7 @@ describe('laylines and course description', () => {
     expect(legs[0]).toBe('Start → A: beat (upwind). Round A leaving it to starboard (clockwise).');
     expect(legs[1]).toBe("A → X: run (downwind). Pass X leaving it to starboard. Don't round it.");
     expect(legs[3]).toContain('Pass X leaving it to port');
-    expect(legs[7]).toBe('6 → Finish: cross the line between Dorado YC flagpole and X.');
+    expect(legs[7]).toBe('6 → Finish: cross the line between GGYC flagpole and X.');
   });
 });
 
@@ -499,48 +499,5 @@ describe('Exoneration (Rule 43.1(a))', () => {
     (w as unknown as { checkPairs(): void }).checkPairs();
     for (const e of w.drainEvents()) if (e.type === 'incident') incidents.push({ fouler: e.incident.fouler.id, rule: e.incident.rule, ex: e.incident.exoneratedBy });
     expect(incidents.find(i => i.fouler === fox.id)).toMatchObject({ rule: '11', ex: undefined });
-  });
-});
-
-describe('Rule 21.2 starts when her turns begin (Perry: "clearly beginning to make a penalty turn")', () => {
-  it('owing a turn, a 35° duck while getting clear that she comes back from isn\'t her turns: she keeps her Section A rights; a turn she carries on is', () => {
-    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
-    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
-    const h0 = u.h; startPenalty(u, 360);
-    const off = () => wrap(u.h - h0);
-    // (the helm over, as you steer: until she's turned `to` degrees off where she began, or back)
-    const helm = (dir: 1 | -1, until: (d: number) => boolean) => { for (let i = 0; i < 60 * 20 && !until(off()); i++) { u.steer = dir; w.step(DT); } u.steer = 0; };
-    helm(1, d => d > 35); // (the duck)
-    expect(u.penaltyDir).not.toBe(0);
-    helm(-1, d => d < 3); // (back on her course)
-    for (let i = 0; i < 60; i++) w.step(DT);
-    expect(u.penaltyDir).toBe(0); expect(u.penalty).toBe(360);
-    helm(1, d => d > 90); // (now the turn, carried on)
-    expect(u.penaltyDir).not.toBe(0);
-  });
-
-  it('her turns are done with the last tack or jibe they need (44.2), not 720° round: from a reach, two turns end short of two full circles', () => {
-    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
-    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
-    u.h = n360(w.wind.from + 100); u.desired = u.h; for (let i = 0; i < 60 * 15; i++) { u.steer = 0; w.step(DT); } // (settled on a reach)
-    startPenalty(u, 720); let turned = 0, last = u.h;
-    for (let i = 0; i < 60 * 240 && u.penalty > 0; i++) { u.steer = -1; w.step(DT); turned += wrap(u.h - last); last = u.h; }
-    u.steer = 0;
-    expect(u.penalty).toBe(0);
-    expect(u.penaltyMoves).toBe(4); expect(u.tacking).toBe(false); // (two tacks and two jibes; a final tack complete, close-hauled)
-    expect(Math.abs(turned)).toBeLessThan(700); // (the last jibe, not all the way back round to her reach)
-  });
-
-  it('falling back across the wind, or waggling across it, isn\'t a tack of her turns: only new ground in her direction counts', () => {
-    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
-    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
-    u.h = n360(w.wind.from + 45); u.desired = u.h; for (let i = 0; i < 60 * 15; i++) { u.steer = 0; w.step(DT); } // (close-hauled)
-    startPenalty(u, 720); const from = w.wind.from;
-    const off = () => wrap(u.h - from); // (her heading off the wind: + to starboard of it)
-    let flips = 0, was = u.tack;
-    const helm = (dir: 1 | -1, until: () => boolean) => { for (let i = 0; i < 60 * 30 && !until(); i++) { u.steer = dir; w.step(DT); if (u.tack !== was) { flips++; was = u.tack; } } u.steer = 0; };
-    for (let k = 0; k < 4; k++) { helm(-1, () => off() < -8); helm(1, () => off() > 8); } // (through head to wind and back, four times)
-    expect(flips).toBeGreaterThanOrEqual(6); // (she did cross it, each way)
-    expect(u.penaltyMoves).toBeLessThanOrEqual(1); expect(u.penalty).toBeGreaterThan(0);
   });
 });

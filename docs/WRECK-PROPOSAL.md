@@ -71,8 +71,8 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
 3. **Towing and repairs** (left to the Coordinator):
    - Towing: yes, optional. It ends the outing as "towed in".
    - Repairs: she's laid up for a few real days. No money.
-4. **Season scoring:** a wreck in a season race is RET only. Not answered by the owner; the Coordinator's call for now.
-5. **Who can be wrecked:** only your boat, not the AI boats. Not answered by the owner; the Coordinator's call for now.
+4. **Season scoring:** a wreck in a season race is RET only (the owner confirmed, 14 Nov 2026: "Ok").
+5. **Who can be wrecked:** only your boat, not the AI boats (the owner confirmed, 14 Nov 2026: "Ok").
 
 ## 8. As built (14 Nov 2026)
 
@@ -85,7 +85,7 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
 - Fort Mason's piles;
 - a pier, wharf, breakwater or seawall, as concrete;
 - a floating dock, a scrape at most;
-- the open shore, as mud and sand for now: no damage. Which stretches are seawall, riprap or beach isn't in the sim's data yet, nor are the charted rocks.
+- the open shore, by what NOAA's chart says its edge is made of (geo/shoreKind.ts, from the ENC's COALNE and SLCONS categories): a seawall, wharf or pier as concrete, riprap, revetment, breakwater rubble or rocky coast as rock, beach, marsh, or natural coast the chart gives no category as mud (no damage). Every charted edge competes and the nearest is what she hit; a construction always under water is the bottom, not the edge. Known gap: rocky natural shore (Angel Island's, the Headlands') is mostly uncategorized on the chart, so it reads as mud; Bay East's charted rocks and bottom quality may close it. The bottom and its charted rocks, obstructions and wrecks are Bay East's grounding, graded by the same measure.
 
 **Pinned on Fort Mason's piles.** Kept on them for 30 s by a set her crew can't fend off: about 0.23 m/s, a hand's 250 N against the water's drag on her beam on (ESTIMATES).
 - End on for most of it: a wreck.
@@ -99,6 +99,5 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
 - **Repairs:** she's laid up 3 days after a wreck and 1 after damage (ESTIMATES), on your own clock. A laid-up boat can't be taken out, and the Yacht Club shows it.
 
 **Still to source:**
-- the shore's kinds, and the charted rocks, from the NOAA chart;
 - the bands;
 - the pinning numbers.

@@ -1,5 +1,5 @@
 import { shoreRelief } from './current';
-import { KT, V, type Vec, hypot } from '../core/math';
+import { KT, V, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import depthGrid from './data/depth-grid.json';
 import bayTides from './data/bay-tides.json';
@@ -32,8 +32,6 @@ export interface TideStation {
 }
 
 const STEP = 6; // minutes between harmonic predictions
-/** CurrentField.cover's window (minutes): predicted afresh when less than COVER_AHEAD is left, from COVER_BACK back to COVER_ON on. */
-const COVER_AHEAD = 8 * 60 + 15, COVER_BACK = 4 * 60, COVER_ON = 14 * 60;
 
 /** Times (minutes since epoch) of slack and peak events in a regular series: [t, v, kind]. kind: 0 max flood, 1 slack before ebb, 2 max ebb, 3 slack before flood. */
 export function events(t: number[], v: number[]): [number, number, number][] {
@@ -67,13 +65,9 @@ function build(def: StationDef, from: number, to: number, cache: Map<string, Tid
 }
 
 /** All stations, predicted for a window of race time (minutes since epoch, UTC). */
-export function stationsFor(from: number, to: number, near?: { at: readonly Vec[]; within: number }): TideStation[] {
+export function stationsFor(from: number, to: number): TideStation[] {
   const cache = new Map<string, TideStation>();
-  // (`near`: only the stations within so far of any of these places, for a field asked only there: the stream at a
-  // point is its nearest stations' almost entirely, CurrentField.at's 1/d³, and predicting all of them costs ten times
-  // as much)
-  const by = (d: StationDef) => { if (!near) return true; const p = LL(d.lat, d.lon); return near.at.some(q => hypot(p.x - q.x, p.y - q.y) < near.within); };
-  return DEFS.filter(d => (d.kind !== 'harmonic' || (!d.refOnly && !d.flowOnly)) && by(d)).map(d => build(d, from, to, cache));
+  return DEFS.filter(d => d.kind !== 'harmonic' || (!d.refOnly && !d.flowOnly)).map(d => build(d, from, to, cache));
 }
 
 /** Signed speed (kt, + flood) at a station at time `tMin` (minutes since epoch, UTC). */
@@ -209,7 +203,7 @@ interface Bay {
   inflows: { station: string; c: Vec; across: Vec; mouth: Vec }[];
 }
 const bay = (name: string, station: string, poly: Vec[], q: Vec, m: Vec, hand: number, inflows: Bay['inflows'] = []): Bay => {
-  const L = hypot(m.x - q.x, m.y - q.y); let into = { x: -(m.y - q.y) / L, y: (m.x - q.x) / L };
+  const L = Math.hypot(m.x - q.x, m.y - q.y); let into = { x: -(m.y - q.y) / L, y: (m.x - q.x) / L };
   const cx = poly.reduce((t, p) => t + p.x, 0) / poly.length, cy = poly.reduce((t, p) => t + p.y, 0) / poly.length;
   if ((cx - q.x) * into.x + (cy - q.y) * into.y < 0) into = { x: -into.x, y: -into.y };
   return { name, station, poly, q, m, into, hand, inflows };
@@ -229,9 +223,7 @@ export const BAYS: Bay[] = [
 /** How far into a bay a point is (m) from its mouth. */
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
 const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
-/** Each bay's box (round its outline): a quick no, as the race water is kilometers from both. */
-const BAY_BOX = BAYS.map(B => ({ x0: Math.min(...B.poly.map(q => q.x)), x1: Math.max(...B.poly.map(q => q.x)), y0: Math.min(...B.poly.map(q => q.y)), y1: Math.max(...B.poly.map(q => q.y)) }));
-const bayAt = (p: Vec): Bay | null => { for (let i = 0; i < BAYS.length; i++) { const b = BAY_BOX[i]; if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue; if (inPolyV(BAYS[i].poly, p)) return BAYS[i]; } return null; };
+const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
 /**
  * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
  * bay's depth grid (depthBand) it's that bay's own station's, the one the bay's stream fills it by (BAYS), so the water
@@ -328,7 +320,7 @@ export class CurrentField {
     this.vecs = stations.map(() => ({ x: 0, y: 0 }));
     this.soft2 = Float64Array.from(stations, (s, i) => {
       let dn = Infinity;
-      stations.forEach((o, j) => { if (j !== i) dn = Math.min(dn, hypot(s.p.x - o.p.x, s.p.y - o.p.y)); });
+      stations.forEach((o, j) => { if (j !== i) dn = Math.min(dn, Math.hypot(s.p.x - o.p.x, s.p.y - o.p.y)); });
       return Math.max(10, Math.min(150, dn / 4)) ** 2; // (10 m at least: two stations at one spot would otherwise divide by zero)
     });
   }
@@ -341,26 +333,10 @@ export class CurrentField {
    * from 4 hours back (the conditions graph and the strategist look back) to 14 hours on.
    */
   cover(tMin: number): void {
-    if (!this.stations.length || (tMin >= this.from && tMin + COVER_AHEAD <= this.to)) return;
-    const fresh = new Map(stationsFor(tMin - COVER_BACK, tMin + COVER_ON).map(x => [x.id, x]));
+    if (!this.stations.length || (tMin >= this.from && tMin + 8 * 60 + 15 <= this.to)) return;
+    const fresh = new Map(stationsFor(tMin - 4 * 60, tMin + 14 * 60).map(x => [x.id, x]));
     for (const st of this.stations) { const n = fresh.get(st.id); if (n) { st.t = n.t; st.v = n.v; } }
     this.span(); this.epoch++;
-  }
-  /**
-   * The field for a race or a sail over [from, to] (minutes, UTC) that starts at `now`. The World asks for its window
-   * and at once calls cover(now), which predicts every station afresh whenever less than 8¼ hours are left ahead. For a
-   * window ending a few hours after the gun, that was always so: every station was predicted twice at load, the first
-   * set thrown away (Capacity's profile, 18 Nov 2026: ~20 ms on the page and again in the worker). When cover would
-   * certainly predict afresh, the stations are predicted once over cover's own window: the same call cover makes, so the
-   * same series to the bit. ("Certainly": some harmonic station's predictions end within one STEP after `to` and start
-   * within one STEP before `from`, so the field's span lies inside [from − STEP, to + STEP]. That needs a harmonic station
-   * in the field, as there always is: the Gate's and the Bay's are; with subordinates alone it would not hold, so then
-   * the old way.) It ends with cover(now), as the World's load did: a no-op when predicted afresh, else what cover does.
-   */
-  static covering(now: number, from: number, to: number): CurrentField {
-    const fresh = DEFS.some(d => d.kind === 'harmonic' && !d.refOnly && !d.flowOnly) && (now < from - STEP || now + COVER_AHEAD > to + STEP);
-    const f = new CurrentField(fresh ? stationsFor(now - COVER_BACK, now + COVER_ON) : stationsFor(from, to));
-    f.cover(now); return f;
   }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
@@ -392,7 +368,7 @@ export class CurrentField {
       let low = 0;
       for (let i = 0; i < n; i++) {
         if (!seen[i]) continue;
-        const s = this.stations[i].p, d = hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
+        const s = this.stations[i].p, d = Math.hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
         hi[i] = 1 / (dmin * dmin + this.soft2[i]) ** 1.5; low += 1 / (dmax * dmax + this.soft2[i]) ** 1.5;
       }
       // the weakest go, for as long as all that's gone could weigh no more than 0.1% of the rest
@@ -406,7 +382,7 @@ export class CurrentField {
     this.lastKey = key; this.lastList = l;
     return l;
   }
-  at(p: Vec, B: Bay | null = bayAt(p)): Vec {
+  at(p: Vec): Vec {
     let wx = 0, wy = 0, ws = 0;
     const list = this.near(p), sx = this.sx, sy = this.sy, soft2 = this.soft2, stamp = this.stamp, epoch = this.epoch;
     for (let k = 0; k < list.length; k++) {
@@ -416,11 +392,12 @@ export class CurrentField {
       wx += v.x * w; wy += v.y * w; ws += w;
     }
     const c = ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
+    const B = bayAt(p);
     if (!B) return c;
     // (the open water's stream hands over to the bay's own across its mouth; and round where another channel comes in,
     // its stream, the stations', to the bay's across the same distance)
     let f = Math.min(1, Math.max(0, bayIn(B, p) / B.hand));
-    for (const k of B.inflows) f = Math.min(f, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B.hand);
+    for (const k of B.inflows) f = Math.min(f, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B.hand);
     const u = this.bayStream(B, p);
     return { x: c.x * (1 - f) + B.into.x * u * f, y: c.y * (1 - f) + B.into.y * u * f };
   }
@@ -468,36 +445,10 @@ export class CurrentField {
     // (not in the bays filled by continuity, whose stream already runs slower over their shallower edges)
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
-    for (const k of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
+    for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
+    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
     return { x: c.x * k, y: c.y * k };
   }
-  /**
-   * atShore for a point asked about again and again as the tide turns (the passage planner's 100 m grid, afresh each half
-   * minute of its clock): the shore's share doesn't change with the tide, so it's kept by p's exact coordinates, the
-   * same number worked out once, as atShore works it out (tests/current-kept.test.ts holds them equal to the bit). Not
-   * for a boat's own current, which is never at the same spot twice: atShore itself is left as it was for the step.
-   */
-  atShoreKept(p: Vec, cell: number): Vec {
-    // (two maps of numbers by the point's own cell number, no object per point: kept as objects, ~100,000 of them in a
-    // plan, they're the likely cause of the plan's slices running past their budget now and then, the collector's work)
-    let k = this.keptK.get(cell), bi: number;
-    if (k === undefined) {
-      let dn = Infinity;
-      { const list = this.near(p); for (let n = 0; n < list.length; n++) { const i = list[n], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } }
-      dn = Math.sqrt(dn);
-      const B = bayAt(p);
-      let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
-      for (const m of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - m.mouth.x, p.y - m.mouth.y) / B!.hand);
-      k = 1 - (1 - shoreRelief(p, false)) * Math.min(1, dn / 600) * (1 - bay); bi = B ? BAYS.indexOf(B) : -1;
-      if (this.keptK.size >= 200000) { this.keptK.clear(); this.keptB.clear(); }
-      this.keptK.set(cell, k); this.keptB.set(cell, bi);
-    } else bi = this.keptB.get(cell)!;
-    const c = this.at(p, bi < 0 ? null : BAYS[bi]);
-    return { x: c.x * k, y: c.y * k };
-  }
-  private keptK = new Map<number, number>();
-  private keptB = new Map<number, number>();
 }
 
 /* ---------- local time in San Francisco ---------- */

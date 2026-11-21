@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { DT, World, startPenalty } from '../src/sim/world';
-import { V, dist, wrap } from '../src/core/math';
+import { DT, World } from '../src/sim/world';
+import { V, dist } from '../src/core/math';
 import { onLand } from '../src/geo/shore';
 import { LL } from '../src/geo/geo';
 import { bow, stern, type Boat } from '../src/boat/boat';
@@ -42,9 +42,6 @@ function sailHome(s: Partial<Settings>, seed: number, far = false) {
 describe('the AI boats after racing is called off', () => {
   for (const [name, s, seed, far] of [
     ['a westerly over the limit', { windKind: 'west', windKt: 26 }, 7, false],
-    // (Seed 9 too, 18 Nov 2026: before main's crowded-mark AI, seed 7's race went differently and had Red clip the shore
-    // for about 0.7 s on her way home, ai.ts homeCourse. Skipper Model has that repro; a second westerly keeps watch)
-    ['a westerly over the limit, seed 9', { windKind: 'west', windKt: 26 }, 9, false],
     ['a northerly over the limit (the harbour on a lee shore)', { windKind: 'north', windKt: 26 }, 7, false],
     ['from north of Alcatraz in a flood (the island between them and home, the current setting onto it)', { windKind: 'west', windKt: 20, current: 'flood' }, 4, true]
   ] as const) it(name, () => {
@@ -54,22 +51,4 @@ describe('the AI boats after racing is called off', () => {
     expect(r.close, 'boats within 3 m of each other (samples)').toBeLessThan(20);
     expect(r.tacks, 'tacks in the 20 minutes after, the most of any boat').toBeLessThanOrEqual(8);
   }, 1_200_000);
-});
-
-describe('Penalties when racing is called off (Definitions, Abandon and Racing; 44.1)', () => {
-  it('a boat mid-way through her turns at the abandonment stops turning and sails home; yours is cleared too', () => {
-    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', tideDate: '2026-11-14', traffic: 0, fleet: 2 } as Settings, 3);
-    while (w.t < 60) w.step(DT);
-    const b = w.boats[1]; for (const o of w.boats) if (o !== b) o.x += 400; // (clear water: she turns at once)
-    startPenalty(b, 720); startPenalty(w.user, 360);
-    for (let i = 0; i < 20 / DT; i++) w.step(DT);
-    expect(b.penaltyDir).not.toBe(0); // (into her turns)
-    w.cancelled = { t: w.t, kt: 24, up: ['N', 'A'], say: '' }; // (called off, by any signal)
-    w.step(DT);
-    expect(b.penalty).toBe(0); expect(b.penaltyDir).toBe(0); expect(w.user.penalty).toBe(0);
-    let turned = 0, last = b.h;
-    for (let i = 0; i < 30 / DT; i++) { w.step(DT); turned += Math.abs(wrap(b.h - last)); last = b.h; }
-    expect(turned).toBeLessThan(200); // (no more circles: her course home, not a 720)
-    expect(b.ai!.home).toBeTruthy();
-  }, 60000);
 });

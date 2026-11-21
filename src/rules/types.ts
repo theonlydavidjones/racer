@@ -18,9 +18,6 @@ export interface RulesBoat {
    *  rules 18.2(b) and 18.3 turn on it). Undefined: never. */
   headToWindT?: number;
   penalty: number; // degrees of penalty turn still to do
-  /** The direction she's turning her penalty (+1 starboard, −1 port), once her turns have begun (boat/physics.ts: 30° one
-   * way, not counting her getting clear first); 0 while she owes them but hasn't begun. Omitted: taken as begun. */
-  penaltyDir?: number;
   ocs: boolean; // over early and not yet returned
   /**
    * Rule 21.1: after her starting signal, sailing towards the pre-start side of the starting line or one of its
@@ -84,7 +81,7 @@ export interface RulesContext {
   keepsClearOf?: (a: RulesBoat, c: RulesBoat) => boolean;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23' | '42';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {

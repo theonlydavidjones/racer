@@ -1,4 +1,4 @@
-import { D2R, KT, V, brg, clamp, dot, n360, wrap, type Vec, hypot } from '../core/math';
+import { D2R, KT, V, brg, clamp, dot, n360, wrap, type Vec } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import { onLand } from '../geo/shore';
 import { HARBORS, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
@@ -91,10 +91,10 @@ const fineHarbor = (p: Vec): Harbor | null => harborAt(p) ?? HARBORS.find(h => p
  * of the fine map (`out`), from where they're open water again.
  */
 function basinRay(p: Vec, from: number, H = fineHarbor(p)!): { d: number; out: Vec | null } {
-  const u = V(from), m = wallMap(H), q = { x: 0, y: 0 }; // (one point walked along the ray, not one every 2 m: walled only reads it)
+  const u = V(from), m = wallMap(H);
   for (let d = 2; d < 4000; d += 2) {
-    q.x = p.x + u.x * d; q.y = p.y + u.y * d;
-    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: { x: q.x, y: q.y } };
+    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
+    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: q };
     if (walled(H, q)) return { d, out: null };
   }
   return { d: 4000, out: null };
@@ -110,10 +110,9 @@ export function fetchRay(p: Vec, from: number, fine = fineFetch(p)): number {
   // (`fine` false: open water's fetch, measured coarsely as it always was, even from a point that's in a basin)
   const H = fine ? fineHarbor(p) : null; // (none: a point just past the fine map's edge, traced coarsely after all)
   if (H) { const r = basinRay(p, from, H); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
-  const u = V(from), q = { x: 0, y: 0 }; // (one point walked along the ray, as basinRay: landAt only reads it)
+  const u = V(from);
   for (let d = 50; d < MAX_FETCH; d += 100) {
-    q.x = p.x + u.x * d; q.y = p.y + u.y * d;
-    const l = landAt(q);
+    const l = landAt({ x: p.x + u.x * d, y: p.y + u.y * d });
     if (l === null) return MAX_FETCH; // out past the map: open water
     if (l) return Math.max(50, d - 50);
   }
@@ -221,7 +220,7 @@ export function swellReach(p: Vec, shadow = true, from = 270): { k: number; towa
   // (the size of that is a judgement: neither paper's numbers could be reached)
   const own = n360(from + 180), north = clamp(wrap(from - (INTO_BAY + 180)), 0, 85), dirK = Math.sqrt(Math.cos(north * D2R));
   if (p.x < OUTSIDE.x) return { k: 1, toward: own };
-  const dx = p.x - BRIDGE.x, dy = p.y - BRIDGE.y, d = hypot(dx, dy);
+  const dx = p.x - BRIDGE.x, dy = p.y - BRIDGE.y, d = Math.hypot(dx, dy);
   if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: (1 - 0.45 * t) * (1 - t + t * dirK), toward: n360(own + wrap(80 - own) * t) }; }
   if (d < 1) return { k: 0.55 * dirK, toward: INTO_BAY };
   // right by the bridge the swell is still all around; further in, it spreads out along the channel
@@ -243,38 +242,22 @@ export function waveLength(T: number, h: number): number {
 }
 
 /** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
-/** The chart's depth areas as the sim's coordinates, each polygon with its bounding box, and the soundings: worked out
- * once (chartDepth converted every ring of every polygon on each call, 5–9 ms). */
-let ENC_DEPTH: { mid: number; polys: { rings: Vec[][]; x0: number; y0: number; x1: number; y1: number }[] }[] | null = null, ENC_SOUND: { q: Vec; d: number }[] = [];
-function encDepth() {
-  if (ENC_DEPTH) return ENC_DEPTH;
+export function chartDepth(p: Vec): number | null {
   const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[]; soundings: number[] };
   const bands = E.depth.map(b => b.d).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => a - b);
-  ENC_DEPTH = E.depth.map(band => {
-    const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10;
-    return { mid: Math.max(0, (band.d + deep) / 2), polys: band.p.map(poly => {
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      const rings = poly.map(enc1 => { let x = 0, y = 0; const ring: Vec[] = [];
-        for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; const q = LL(y / 1e5, x / 1e5); ring.push(q); x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y); }
-        return ring; });
-      return { rings, x0, y0, x1, y1 };
-    }) };
-  });
-  for (let i = 0; i < E.soundings.length; i += 3) ENC_SOUND.push({ q: LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d: E.soundings[i + 2] / 10 });
-  return ENC_DEPTH;
-}
-export function chartDepth(p: Vec): number | null {
-  for (const band of encDepth()) {
-    for (const poly of band.polys) {
-      if (p.x < poly.x0 || p.x > poly.x1 || p.y < poly.y0 || p.y > poly.y1) continue;
+  for (const band of E.depth) {
+    for (const poly of band.p) {
       let inside = false;
-      for (const ring of poly.rings)
+      for (const enc1 of poly) {
+        let x = 0, y = 0; const ring: Vec[] = [];
+        for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); }
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
-      if (inside) return band.mid;
+      }
+      if (inside) { const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10; return Math.max(0, (band.d + deep) / 2); }
     }
   }
   let best: number | null = null, bd = 200;
-  for (const s of ENC_SOUND) { const d = hypot(s.q.x - p.x, s.q.y - p.y); if (d < bd) { bd = d; best = s.d; } }
+  for (let i = 0; i < E.soundings.length; i += 3) { const q = LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = E.soundings[i + 2] / 10; } }
   return best;
 }
 
@@ -310,7 +293,7 @@ function outlineGaps(H: Harbor): Gap[] {
   const ring = H.basin, n = ring.length, open: { p: Vec; out: Vec }[][] = [], gaps: Gap[] = [];
   let run: { p: Vec; out: Vec }[] = [];
   for (let i = 0; i < n; i++) {
-    const a = ring[i], b = ring[(i + 1) % n], len = hypot(b.x - a.x, b.y - a.y);
+    const a = ring[i], b = ring[(i + 1) % n], len = Math.hypot(b.x - a.x, b.y - a.y);
     if (len < 1e-6) continue;
     const t = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
     for (let s = 0; s < len; s += 2) {
@@ -324,10 +307,10 @@ function outlineGaps(H: Harbor): Gap[] {
   }
   if (run.length) open.push(run);
   for (const r of open) {
-    const a = r[0].p, b = r[r.length - 1].p, B = hypot(b.x - a.x, b.y - a.y);
+    const a = r[0].p, b = r[r.length - 1].p, B = Math.hypot(b.x - a.x, b.y - a.y);
     if (r.length < 3 || B < 4) continue; // (a crack of a few metres between rocks: none to speak of)
     let nx = 0, ny = 0; for (const s of r) { nx -= s.out.x; ny -= s.out.y; }
-    const m = hypot(nx, ny) || 1, c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, u = { x: nx / m, y: ny / m };
+    const m = Math.hypot(nx, ny) || 1, c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, u = { x: nx / m, y: ny / m };
     // (and a clear way out through its middle: a stretch of edge with a breakwater just beyond it is no entrance)
     let clear = true;
     for (let d = -10; d <= 0 && clear; d++) { const q = { x: c.x + u.x * d, y: c.y + u.y * d }; if (inBasin(q) ? hitsWall(q) : onLand(q)) clear = false; }
@@ -353,9 +336,9 @@ export function harborGaps(H: Harbor): Gap[] {
     if (!gap) {
       outline ??= outlineGaps(H);
       let bd = 150;
-      for (const o of outline) { const d = hypot(o.c.x - e.x, o.c.y - e.y) - o.B / 2; if (d < bd) { bd = d; gap = o; } }
+      for (const o of outline) { const d = Math.hypot(o.c.x - e.x, o.c.y - e.y) - o.B / 2; if (d < bd) { bd = d; gap = o; } }
     }
-    if (gap && !g.some(x => hypot(x.c.x - gap!.c.x, x.c.y - gap!.c.y) < 20)) g.push(gap);
+    if (gap && !g.some(x => Math.hypot(x.c.x - gap!.c.x, x.c.y - gap!.c.y) < 20)) g.push(gap);
   }
   // each entrance's two heads (the ends of the span across it), and the way the wall runs on from each: toward the walls
   // within 30 m of it, on the side away from the entrance
@@ -369,7 +352,7 @@ export function harborGaps(H: Harbor): Gap[] {
         if ((q.x - gap.c.x) * u.x * side + (q.y - gap.c.y) * u.y * side < gap.B / 2) continue; // (not back across the entrance)
         if (inBasin(q) ? hitsWall(q) : onLand(q)) { sx += q.x - h.x; sy += q.y - h.y; }
       }
-      const m = hypot(sx, sy);
+      const m = Math.hypot(sx, sy);
       return { h, b: m > 0 ? { x: sx / m, y: sy / m } : { x: u.x * side, y: u.y * side } };
     });
   }
@@ -399,7 +382,7 @@ export function gapKd(bl: number, rl: number, deg: number): number {
   // (narrower than the table's narrowest gap, 0.05 L: a slit radiates as a line source whose strength falls only as the
   // log of its width, Kd ∝ 1/|1 + (2i/π)(ln(kB/8) + γ)| (Lamb 1932; Morse & Rubenstein 1938); the solver agrees to 3
   // figures down to B/L 0.005)
-  const slit = (b: number) => { const a = (2 / Math.PI) * (Math.log(Math.PI * b / 4) + 0.5772156649); return 1 / hypot(1, a); };
+  const slit = (b: number) => { const a = (2 / Math.PI) * (Math.log(Math.PI * b / 4) + 0.5772156649); return 1 / Math.hypot(1, a); };
   if (bl < GT.bl[0]) v *= slit(bl) / slit(GT.bl[0]);
   return rl > r ? v * Math.sqrt(r / rl) : v;
 }
@@ -431,14 +414,14 @@ export function breakwaterKd(h: Vec, b: Vec, t: Vec, p: Vec, L: number): number 
   if (Math.abs(det) < 1e-9) return 0;
   const hx = h.x - p.x, hy = h.y - p.y, back = (hx * -b.y + b.x * hy) / det, along = (-t.x * hy + t.y * hx) / det;
   if (back <= 0 || along <= 0) return 0;
-  const e2 = { x: -b.y, y: b.x }, dx = p.x - h.x, dy = p.y - h.y, r = hypot(dx, dy), kr = 2 * Math.PI * r / L;
+  const e2 = { x: -b.y, y: b.x }, dx = p.x - h.x, dy = p.y - h.y, r = Math.hypot(dx, dy), kr = 2 * Math.PI * r / L;
   const th = Math.atan2(dx * e2.x + dy * e2.y, dx * b.x + dy * b.y), th0 = Math.atan2(-(t.x * e2.x + t.y * e2.y), -(t.x * b.x + t.y * b.y)); // (the way the waves come from, as the solution is written)
   const F = (s: number): [number, number] => { const [C, S] = fresnel(s), a = C + 0.5, c = -(S + 0.5); return [(a - c) / 2, (a + c) / 2]; };
   const s1 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th - th0) / 2), s2 = -2 * Math.sqrt(kr / Math.PI) * Math.cos((th + th0) / 2);
   const [a1, b1] = F(s1), [a2, b2] = F(s2), p1 = kr * Math.cos(th - th0), p2 = kr * Math.cos(th + th0);
   const re = a1 * Math.cos(p1) - b1 * Math.sin(p1) + a2 * Math.cos(p2) - b2 * Math.sin(p2);
   const im = a1 * Math.sin(p1) + b1 * Math.cos(p1) + a2 * Math.sin(p2) + b2 * Math.cos(p2);
-  return hypot(re, im);
+  return Math.hypot(re, im);
 }
 
 /**
@@ -456,7 +439,7 @@ export function harborSwell(p: Vec, T: number, from = 270): { k: number; toward:
     // (the swell outside it, without the 50 m terrain grid's shadow, which can land on the wrong side of a breakwater)
     const out = { x: g.c.x - g.n.x * (g.B / 2 + 10), y: g.c.y - g.n.y * (g.B / 2 + 10) }, r = swellReach(out, false, from);
     if (r.k <= 0 || (g.depth !== null && g.depth < 0.3)) continue; // (an entrance that dries: none gets in at the chart's datum)
-    const L = waveLength(T, g.depth ?? 1e3), dx = p.x - g.c.x, dy = p.y - g.c.y, d = hypot(dx, dy);
+    const L = waveLength(T, g.depth ?? 1e3), dx = p.x - g.c.x, dy = p.y - g.c.y, d = Math.hypot(dx, dy);
     // a swell's waves don't all run one way: spread about it as cos^2s(θ/2), s = 75 for a swell come from far off
     // (Mitsuyasu's spreading function with Goda's s_max for swell, Goda 1985, as the Coastal Engineering Manual II-2 gives
     // it), so one running along the entrance still sends some in; each direction through as wide as the gap looks
@@ -506,10 +489,6 @@ export class SeaField {
   private cache = new Map<string, number>();
   /** `swell` outside the Gate; null for flat water (no waves at all). `chop`: the wind sea × this (the conditions adjuster). */
   constructor(readonly swell: Swell | null, readonly chop = 1) {}
-  /** Where the chop on the water comes from (deg), when a wave field is drawing it (the World's wave field, held here: waveField.ts chopFrom; a plain reference, so the page's mirror holds its own):
-   *  the boat's wave drag meets the sea that's drawn, through a shift too, while the old sea fades and the new one grows.
-   *  Without one, the wind's own direction. */
-  field: { chopFrom: number } | null = null;
 
   get flat(): boolean { return !this.swell; }
 
@@ -565,7 +544,7 @@ export class SeaField {
     // worked out where `p` is
     const H = fineHarbor(p)!, i = Math.floor(p.x / g), j = Math.floor(p.y / g), fx = p.x / g - i, fy = p.y / g - j;
     const seen = (ni: number, nj: number) => {
-      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(hypot(dx, dy) / 1);
+      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(Math.hypot(dx, dy) / 1);
       for (let k = 0; k <= n; k++) if (walled(H, { x: p.x + dx * k / Math.max(1, n), y: p.y + dy * k / Math.max(1, n) })) return false;
       return true;
     };
@@ -576,45 +555,10 @@ export class SeaField {
   }
 
   /**
-   * fetch made ready a ray at a time, for the planner's slices (sim/outlook.ts chopSteps): each cell fetch would read, its
-   * number worked out by fetchAt's sum in fetchAt's order and kept under fetch's key, so fetch then finds them all and
-   * answers the same to the last bit. Cold, a cell held one slice for up to 44 ms from Mile Rock (by Gashouse Cove, the
-   * fine map's 43 rays at each of four nodes), against the page's 20.
-   */
-  *fetchSteps(p: Vec, from: number): Generator<void, void, void> {
-    const fine = fineFetch(p), basin = inBasin(p), g = fine ? 10 : 150, w = Math.round(from / 2) * 2, step = fine ? 2 : 6;
-    const self = this;
-    function* warm(key: string, at: Vec): Generator<void, void, void> {
-      if (self.cache.get(key) !== undefined) return;
-      let num = 0, den = 0;
-      for (let a = -42; a <= 42; a += step) { const c = Math.cos(a * D2R); num += fetchRay(at, w + a, fine) * c * c; den += c; yield; }
-      if (self.cache.get(key) !== undefined) return; // (filled meanwhile, by a fetch between the slices)
-      if (self.cache.size > 60000) self.cache.clear();
-      self.cache.set(key, num / den);
-    }
-    // (the nodes fetch reads: the same tests, in the same order)
-    const node = (i: number, j: number): { key: string; at: Vec } | null => {
-      const c = { x: i * g, y: j * g };
-      return fineFetch(c) !== fine || inBasin(c) !== basin ? null : { key: `${w}:${g}:${i}:${j}`, at: c };
-    };
-    const x = Math.round(p.x), y = Math.round(p.y), here = { key: `${w}:1:${x}:${y}`, at: { x, y } };
-    if (!fine) { const n = node(Math.round(p.x / g), Math.round(p.y / g)); if (n) yield* warm(n.key, n.at); return; } // (no node: fetch works it out at p, uncached)
-    const H = fineHarbor(p)!, i = Math.floor(p.x / g), j = Math.floor(p.y / g);
-    const seen = (ni: number, nj: number) => {
-      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(hypot(dx, dy) / 1);
-      for (let k = 0; k <= n; k++) if (walled(H, { x: p.x + dx * k / Math.max(1, n), y: p.y + dy * k / Math.max(1, n) })) return false;
-      return true;
-    };
-    const ns = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]].map(([a, b]) => seen(a, b) ? node(a, b) : null);
-    for (const n of ns) if (n) yield* warm(n.key, n.at);
-    if (ns.some(n => n === null)) yield* warm(here.key, here.at);
-  }
-
-  /**
    * The sea at `p`, for the wind over the water there (`ww`, i.e. relative to the current) and the current
    * (`cur`, m/s). `currentAt` gives the current elsewhere (to see what the waves have come through).
    */
-  at(p: Vec, ww: Wind, cur: Vec, currentAt: (q: Vec) => Vec, duration = this.duration, windSeaOnly = false): SeaHere {
+  at(p: Vec, ww: Wind, cur: Vec, currentAt: (q: Vec) => Vec, duration = this.duration): SeaHere {
     if (!this.swell) return FLAT_SEA;
     // the wind sea, made by the wind over the water across the fetch
     const U = ww.kt * KT, to = V(ww.from + 180), Uc = dot(cur, to);
@@ -635,9 +579,6 @@ export class SeaField {
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina: what comes in through its entrances, spreading from them; its walls stop the rest)
-    // (`windSeaOnly`: the chop alone, its height and period, for the passage planner, which reads only that: the swell's
-    // reach, its shadows behind the islands and points, is no part of it and costs up to 100 ms a point, uncached)
-    if (windSeaOnly) return { hsW, tpW: w.tp, fromW: ww.from, hsS: 0, tpS: this.swell.tp, fromS: 0, steep: hsW / Math.max(1, wc.L), white: 0, fetch: F };
     const s = this.swell, reach = inBasin(p) ? harborSwell(p, s.tp, s.from) : swellReach(p, true, s.from);
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
@@ -648,7 +589,7 @@ export class SeaField {
     // summarized). (It was scaled by the chop's steepness too, unsourced, which halved it in a breeze.)
     const steep = hsW / Math.max(1, wc.L);
     const white = clamp(3.84e-6 * Math.pow(U, 3.41) * (wc.blocked ? 2 : 1), 0, 0.1);
-    return { hsW, tpW: w.tp, fromW: this.field ? this.field.chopFrom : ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
+    return { hsW, tpW: w.tp, fromW: ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
   }
 }
 

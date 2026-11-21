@@ -12,8 +12,7 @@ import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { SyncMirror, SyncSource } from '../src/sim/sync';
 // @ts-expect-error (a plain .mjs script, no types)
-import { AI_RACES, BUDGET_MAX, BUDGET_REF, measure } from '../scripts/check/perf-pair.mjs';
-import { HUNG, PLAN_S, SLICE_MAX, pct, sailHomeFromMileRock } from './helpers/mileRock';
+import { BUDGET_MAX, BUDGET_REF, measure } from '../scripts/check/perf-pair.mjs';
 
 /** A fixed workload like the sim's (trig, square roots, small arrays). */
 /**
@@ -39,22 +38,16 @@ describe('performance budget: the sim', () => {
   it('a full fleet of eight steps fast enough: paired against v168 in one process, at most 1.9% slower (the owner\'s 43.1)', () => {
     // The step's budget, measured without the machine's drift (scripts/check/perf-pair.mjs; the owner's method, 14 Nov
     // 2026): this tree's sim and v168's (425a5eb, the commit the budget was set on) loaded in one process and sailed in
-    // alternating 10-second pieces, timed on this thread, twice (each loaded first once), six races each (the owner, 14 Nov 2026: twelve
-    // ratios, not six; one run of six could land 1–1.5% from the next on the shared host, and twelve halve that). A shared
+    // alternating 10-second pieces, timed on this thread, twice (each loaded first once), three races each. A shared
     // machine's speed drifts by several per cent within the hour; paired, the drift lands on both alike.
     // The budget, unchanged: 43.1 in this thread's CPU time against the reference workload, and v168 measured 42.31 in the
     // same units (twelve runs), so 43.1 is v168 × 43.1 / 42.31 = v168 × 1.019. (Before: the ratio to a fixed arithmetic
     // workload in the same process, which a shared machine's memory and caches moved by ±5–6% within a day, more than
     // the room the budget leaves. The derivations of 54.7 and 43.1 are in docs/CAPACITY.md §1.1a.)
-    // A change to how boats sail or are judged (the physics, src/ai, src/rules) is judged on the ten races' mean instead
-    // (PERF_BUDGET_AI=1, perf-pair's --budget --ai): it changes the race itself, so the one race's ratio says as much
-    // about where that race now goes as about the code (#437 against v168: 1.025 on the one race, its mean over ten 1.006
-    // above main; the owner, 18 Nov 2026). The budget figure is the same. The ten races run twice, each once in each load
-    // order (twenty ratios): one run's mean is ±0.9%, and two quiet runs of one tree read 2% apart (docs/CAPACITY.md §8d).
-    const ai = !!(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.PERF_BUDGET_AI, m = ai ? measure(BUDGET_REF, AI_RACES, 2) : measure(BUDGET_REF, 6);
-    console.log(`full fleet${ai ? ', the ten races (PERF_BUDGET_AI)' : ''}, paired against v168: ${m.runs.map((r: { here: number; there: number }) => `${r.here.toFixed(0)}/${r.there.toFixed(0)} µs`).join(', ')}: ratio ${m.ratio.toFixed(4)} (budget ${BUDGET_MAX})`);
+    const m = measure(BUDGET_REF, 3);
+    console.log(`full fleet, paired against v168: ${m.runs.map((r: { here: number; there: number }) => `${r.here.toFixed(0)}/${r.there.toFixed(0)} µs`).join(', ')}: ratio ${m.ratio.toFixed(4)} (budget ${BUDGET_MAX})`);
     expect(m.ratio).toBeLessThan(BUDGET_MAX);
-  }, 1_800_000); // (twelve races of both trees: about 12 minutes on the shared host)
+  }, 900_000);
 
   it('keeping the page\'s mirror in step costs little on either side (CPU µs per 4× frame, against the reference)', () => {
     // (docs/CAPACITY.md step 3: with the race in its worker, each frame the worker works out what changed and the page
@@ -82,15 +75,4 @@ describe('performance budget: the sim', () => {
     expect(page).toBeLessThan(PAGE_BUDGET);
     expect(worker).toBeLessThan(WORKER_BUDGET);
   }, 180_000);
-
-  // The page's thread held no longer than SLICE_MAX at the 99.9th percentile by the live plan's slices, Sail Home from
-  // Mile Rock (sailHome-mileRock.test.ts's notes): a wall-clock bar, so it's here, with this file's rerun-alone rule.
-  it('Sail Home from Mile Rock: the live plan\'s slices within SLICE_MAX (99.9th percentile, ms on the wall)', async () => {
-    const r = await sailHomeFromMileRock({ panel: false, hungPlanS: HUNG * PLAN_S, hungPanelS: 0 });
-    console.log(`Mile Rock's slices: 99.9th percentile ${pct(r.slices, 99.9).toFixed(1)} ms, the longest ${pct(r.slices, 100).toFixed(1)} (the plan in ${r.planS.toFixed(0)} s)`);
-    expect(r.plan, 'the plan came in').not.toBeNull();
-    // (a percentile, not the longest: on a shared host a collection or the machine's other work can land in one slice)
-    expect(pct(r.slices, 99.9), 'the slices, 99.9th percentile (ms)').toBeLessThan(SLICE_MAX);
-  }, 1_000_000);
 });
-

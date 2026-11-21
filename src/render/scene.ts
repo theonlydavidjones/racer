@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import { setVisibility } from '../environment/weather';
-import { D2R, V, ZONE, easeAngle } from '../core/math';
+import { D2R, V, ZONE } from '../core/math';
 import type { Vec } from '../core/math';
 import type { SimView } from '../sim/host';
 import type { MarkShape } from '../courses/course';
@@ -13,11 +13,10 @@ import { rainLevel } from '../environment/rain';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
-import { FittingCull, boatShadows, farShadows } from './fittings';
+import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
-import type { Boat, Tack } from '../boat/boat';
-import { partShape, underwaterGhost, type PartId, type ScreenPart } from './boatParts';
+import type { Boat } from '../boat/boat';
 import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
@@ -29,14 +28,11 @@ import { Wakes } from './wake';
 import { setRestrictedVisibility } from './navLights';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
-import { Harbor } from './marina';
-import { L, deckY, halfBeam } from './hull';
+import { Harbor, harborLights, lightOn } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
-import { MOUTH_REFS } from '../environment/harborMouth';
 import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
-import { EnvelopeFrame, FOAM_ACROSS, FOAM_ALONG, FoamFrame, turnTexture } from './waterFrame';
 import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
 
@@ -58,19 +54,10 @@ export function fogBankAmount(tMin: number): number {
 
 /** Wind map on the water: PUFF_N × PUFF_N texels over PUFF_SPAN metres around the camera. */
 const PUFF_N = 160, PUFF_SPAN = 3200;
-/** Beyond this (m) from the camera, a boat's crew and sail cloth are posed every third frame (syncBoatMesh hold): the
- * owner's Mac spent about 1.8 ms a frame posing them on every boat (Capacity's profile, 15 Nov 2026). */
-const FAR_SYNC = 150;
 /** Sea map resolution (samples per side). */
 const SEA_N = 24;
 /** Current map resolution (samples per side), for the flowing texture and tidelines. */
 const CUR_N = 56;
-/**
- * The current round a harbor's mouth, drawn finer: the map above has its points some 58 m apart, and Gashouse Cove's
- * mouth is 37 m wide, its eddies a couple of dozen meters across (environment/harborMouth.ts), so they'd fall between
- * them. Within FINE_FAR m of a mouth, the water there reads a patch FINE_N × FINE_N of FINE_CELL m round it.
- */
-const FINE_N = 64, FINE_CELL = 4, FINE_FAR = 1500, FINE_EVERY = 4, FINE_NEAR = 300;
 
 /**
  * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
@@ -83,69 +70,11 @@ float vhash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), f.x), mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), f.x), f.y); }
 `;
-/** Her deck's half-breadth at HULL_N + 1 stations, stem to transom (hullUni): the outline the sea's kept out of. */
-/** The protest flag's hoist (m: boatMesh), and the least it's drawn on the screen (px). */
-const PROTEST_H = 0.2, PROTEST_MIN_PX = 12;
-const HULL_N = 24;
-const HULL_DECL = `uniform float uHullOn; uniform mat4 uHullInv; uniform float uHullHalf[${HULL_N + 1}];\n`;
-/** (the sea's world place, in her frame: inside her outline, with the camera down in her, it isn't drawn) */
-const HULL_CUT = `if (uHullOn > 0.5) { vec3 hl = (uHullInv * vec4(vPuffXZ.x, 0.0, vPuffXZ.y, 1.0)).xyz; float hu = (hl.z + ${(L / 2).toFixed(4)}) / ${L.toFixed(4)};
-  if (hu > 0.0 && hu < 1.0) { float hf = hu * ${HULL_N}.0; int hi = int(min(floor(hf), ${HULL_N - 1}.0)); if (abs(hl.x) < mix(uHullHalf[hi], uHullHalf[hi + 1], hf - float(hi))) discard; } }
-`;
-/** The points of sail and the wind on the water round her (render/windRose.ts sets it): drawn in the water itself, so the
- * waves carry it right up to her hull. Off unless uRoseOn. Bands by her true wind angle: uRoseE, the edges between in
- * irons (0), close-hauled (1), close reach (2), beam reach (3), broad reach (4) and run (5). */
-const ROSE_DECL = `uniform float uRoseOn; uniform vec2 uRoseC; uniform float uRoseFrom; uniform float uRoseE[5]; uniform vec3 uRoseR; uniform vec2 uRoseLit; uniform float uRoseTgt;
-float roseChev(vec2 rp, float ang, float rad, float size, float way) { // a chevron at radius rad on compass bearing ang, pointing out along it (way 1) or in toward her (−1)
-  vec2 d = vec2(sin(radians(ang)), cos(radians(ang))), n = vec2(-d.y, d.x); vec2 q = vec2((dot(rp, d) - rad) * way, dot(rp, n));
-  return (1.0 - smoothstep(0.12 * size, 0.2 * size, abs(q.x - size * 0.5 + abs(q.y)))) * step(abs(q.y), size);
-}
-`;
-const ROSE_FRAGMENT = `
-#ifdef ROSE
-  if (uRoseOn > 0.5) {
-    vec2 rp = vWaveP - uRoseC; float rr = length(rp);
-    if (rr > uRoseR.x && rr < uRoseR.y + 16.0) {
-      float ra = degrees(atan(rp.x, rp.y)), rel = mod(uRoseFrom - ra + 540.0, 360.0) - 180.0, twa = abs(rel), side = rel >= 0.0 ? 1.0 : -1.0;
-      vec4 rc = vec4(0.0);
-      if (rr < uRoseR.y) {
-        float idx = twa < uRoseE[0] ? 0.0 : twa < uRoseE[1] ? 1.0 : twa < uRoseE[2] ? 2.0 : twa < uRoseE[3] ? 3.0 : twa < uRoseE[4] ? 4.0 : 5.0;
-        float de = 180.0; for (int i = 0; i < 5; i++) de = min(de, abs(twa - uRoseE[i])); // (to the nearest edge between points, °)
-        bool tgt = abs(idx - uRoseTgt) < 0.5, mine = abs(idx - uRoseLit.x) < 0.5 && side == uRoseLit.y;
-        // (on the target, her own sector stays amber with the teal as a ring round it, 0.8 m wide: a hit, not her marker
-        // gone; the Coordinator for the owner, 15 Nov 2026)
-        float edge = min(min(rr - uRoseR.x, uRoseR.y - rr), radians(de) * rr);
-        if (idx < 0.5) rc = vec4(0.78, 0.27, 0.23, 0.3); // (the no-go)
-        else if (tgt && mine) rc = edge < 0.8 ? vec4(0.23, 0.82, 0.76, 0.8) : vec4(1.0, 0.71, 0.15, 0.42);
-        else if (tgt) rc = vec4(0.23, 0.82, 0.76, 0.42); // (the lesson's target: --target)
-        else if (mine) rc = vec4(1.0, 0.71, 0.15, 0.36); // (her point, on her side: --accent)
-        // the dashed white rays between the points (a quarter of a meter wide, dashes 1.8 m in 3)
-        float ray = (1.0 - smoothstep(0.16, 0.3, radians(de) * rr)) * step(fract((rr - uRoseR.x) / 3.0), 0.6);
-        // a chevron on each point, both sides, pointing the way she'd sail on it
-        float ch = 0.0;
-        for (int i = 0; i < 5; i++) { float hi = i < 4 ? uRoseE[i + 1] : 180.0, mid = 0.5 * (uRoseE[i] + hi);
-          ch = max(ch, max(roseChev(rp, uRoseFrom - mid, uRoseR.z, 2.4, 1.0), roseChev(rp, uRoseFrom + mid, uRoseR.z, 2.4, 1.0))); }
-        rc = mix(rc, vec4(1.0, 1.0, 1.0, 0.8), max(ray, ch * 0.9));
-        rc.a *= smoothstep(uRoseR.x, uRoseR.x + 1.0, rr) * (1.0 - smoothstep(uRoseR.y - 1.0, uRoseR.y, rr));
-      }
-      // the wind: gold chevrons coming in from where it blows from, pointing at her
-      float wc = 0.0; for (int i = 0; i < 3; i++) wc = max(wc, roseChev(rp, uRoseFrom, uRoseR.y + 5.0 + 5.0 * float(i), 3.0, -1.0) * (1.0 - 0.2 * float(i)));
-      rc = mix(rc, vec4(1.0, 0.85, 0.29, 0.95), wc);
-      diffuseColor.rgb = mix(diffuseColor.rgb, rc.rgb * 0.55, rc.a);
-      totalEmissiveRadiance = mix(totalEmissiveRadiance, rc.rgb * 0.85 * max(uDay, 0.35), rc.a);
-    }
-  }
-#endif
-`;
 const WATER_FRAGMENT = `
   // the current where you are: the ripples drift with it (two-phase flow mapping), relative to the mean drift
   vec2 cuv = ((vWaveP - uCurO) / uCurCell + 0.5) / ${CUR_N}.0;
   float cIn = smoothstep(0.0, 0.08, min(min(cuv.x, 1.0 - cuv.x), min(cuv.y, 1.0 - cuv.y)));
   vec4 cs = texture2D(uCur, clamp(cuv, 0.0, 1.0));
-  // (round a harbor's mouth, the finer patch, faded in over its outer eighth so its edge never shows)
-  vec2 fcuv = ((vWaveP - uCurFO) / ${FINE_CELL}.0 + 0.5) / ${FINE_N}.0;
-  float fIn = uCurFOn * smoothstep(0.0, 0.12, min(min(fcuv.x, 1.0 - fcuv.x), min(fcuv.y, 1.0 - fcuv.y)));
-  if (fIn > 0.0) cs = mix(cs, texture2D(uCurF, clamp(fcuv, 0.0, 1.0)), fIn);
   vec2 dflow = (mix(uCurMean, (cs.rg - 0.5) * 4.0, cIn) - uCurMean) * 6.0;
   vec2 fuv = (uFlowM * vec3(dflow, 0.0)).xy;
   float ph0 = fract(uTime / 6.0), ph1 = fract(uTime / 6.0 + 0.5);
@@ -173,9 +102,8 @@ const WATER_FRAGMENT = `
   diffuseColor.rgb *= 1.0 - 0.34 * max(gust, 0.0) + 0.26 * max(-gust, 0.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.95, 1.08), max(gust, 0.0) * 0.6);
   // tidelines: where the current converges, a smooth slick band collects foam and debris (thinned to its ridge)
-  float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0, fdx = 1.0 / ${FINE_N}.0;
+  float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0;
   float tlG = length(vec2(texture2D(uCur, cuv + vec2(tdx, 0.0)).b - texture2D(uCur, cuv - vec2(tdx, 0.0)).b, texture2D(uCur, cuv + vec2(0.0, tdx)).b - texture2D(uCur, cuv - vec2(0.0, tdx)).b));
-  if (fIn > 0.0) tlG = mix(tlG, length(vec2(texture2D(uCurF, fcuv + vec2(fdx, 0.0)).b - texture2D(uCurF, fcuv - vec2(fdx, 0.0)).b, texture2D(uCurF, fcuv + vec2(0.0, fdx)).b - texture2D(uCurF, fcuv - vec2(0.0, fdx)).b)), fIn);
   // the front: a thin line where the convergence crosses ~4.5e-4 /s (distance to that level, in texels, from the
   // local slope), a few meters of foam and debris; inside it the water is a little smoother (a slick)
   float tlD = (tlI - 0.28) / max(0.5 * tlG, 1e-3), far = 1.0 - smoothstep(800.0, 2500.0, length(vPuffXZ - cameraPosition.xz));
@@ -200,14 +128,13 @@ const WATER_FRAGMENT = `
   // the waves or the puffs. The threshold is the noise field's own quantile for that fraction (fitted from its
   // distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W), so the area that shows white is the area the law says
   float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
-  // (its streaks lie down the wind here, uFoamDir, and turn with it where they lie by you: uFoamQ, waterFrame.ts FoamFrame)
-  vec2 fadv0 = vWaveP - uFoamOff, wdc = uFoamDir;
+  vec2 fadv0 = vWaveP - uFoamOff, wdc = normalize(uPuffV + vec2(1e-5, 0.0));
   float caps = 0.0;
   if (Wc > 1e-4) for (int k = 0; k < 2; k++) {
     float a = uTime / 8.0 + 0.5 * float(k), ph = fract(a), seed = floor(a) + 3.7 * float(k);
     // (uFoamOff carries it on the course's stream; over its life each patch also moves with the water here's difference
     // from that, dflow / 6 (m/s): in a harbor's still basin, or off South Beach with the Cityfront's ebb, it lies still)
-    vec2 fadv = fadv0 - dflow / 6.0 * (ph * 8.0), frel = vWaveP - uWaveO - dflow / 6.0 * (ph * 8.0), fq = vec2(dot(frel, wdc) / ${FOAM_ALONG.toFixed(1)}, dot(frel, vec2(-wdc.y, wdc.x)) / ${FOAM_ACROSS.toFixed(1)}) + uFoamQ;
+    vec2 fadv = fadv0 - dflow / 6.0 * (ph * 8.0), fq = vec2(dot(fadv, wdc) / 3.0, dot(fadv, vec2(-wdc.y, wdc.x)) / 1.6);
     float life = ph < 0.1 ? ph / 0.1 : 1.0 - (ph - 0.1) / 0.9; // (white at once as it breaks, then fading)
     vec2 q = fq + seed * vec2(37.1, 17.3);
     float cf = 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + vec2(7.1, 3.3)) + 0.06 * (vnoise(q * 7.0 + 2.0) - 0.5);
@@ -261,39 +188,8 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
-  /** Frames drawn, for staggering the far boats' crew and cloth (FAR_SYNC). */
-  private syncN = 0;
-  /** The perf meter's test switches (ui/perfMeter.ts): the sun's shadows, and the boats' sails, each on unless switched off for a reading. */
-  readonly test = { shadows: true, sails: true };
-  /** Shadows on or off for a reading: off, no shadow pass and no shadow sampling (every material recompiles once). */
-  setTestShadows(on: boolean): void {
-    this.test.shadows = on; this.renderer.shadowMap.enabled = on;
-    this.scene.traverse(o => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true; });
-  }
-  /** Crew overboard: the person in the water (made when first needed). */
-  private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
-  /**
-   * Lesson 1 (The boat; render/boatParts.ts): one of your boat's named parts where it's drawn on the screen this frame, in
-   * the page's px (as a click's clientX and clientY), or null where she has none or it's out of sight. Read only.
-   */
-  /** Lesson 1: her shape under the water shown faintly through the sea (render/boatParts.ts underwaterGhost), or hidden. */
-  showUnderwater(on: boolean): void {
-    const m = this.boatMeshes[0]; if (!m) return;
-    let g = m.grp.getObjectByName('underwaterGhost');
-    if (!g) { if (!on) return; g = underwaterGhost(m); }
-    g.visible = on; if (g.userData.blade) (g.userData.blade as THREE.Object3D).visible = on;
-  }
-  projectPart(key: PartId, tack: Tack): ScreenPart | null {
-    const m = this.boatMeshes[0]; if (!m) return null;
-    const cam = this.camera; cam.updateMatrixWorld(); m.grp.updateWorldMatrix(true, false);
-    const near = m.grp.worldToLocal(cam.position.clone()).x; // (the side of her the camera's on: + starboard)
-    const shape = partShape(m, key, tack, near); if (!shape) return null;
-    const r = this.renderer.domElement.getBoundingClientRect(), q = new THREE.Vector3();
-    const pts = shape.pts.map(poly => poly.flatMap(p => { q.copy(p).project(cam); return q.z > 1 || q.z < -1 ? [] : [[r.left + (q.x + 1) / 2 * r.width, r.top + (1 - q.y) / 2 * r.height] as [number, number]]; })).filter(p => p.length);
-    return pts.length ? { kind: shape.kind, pts } : null;
-  }
   /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
   private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
   /** Her dock lines ashore (up to six), drawn as rope: off-white, as a dock line usually is. */
@@ -351,10 +247,7 @@ export class SceneView {
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
   private puffSum = new Float32Array(PUFF_N * PUFF_N);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
-  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() }, uFoamOff: { value: new THREE.Vector2() }, uFoamDir: { value: new THREE.Vector2(0, 1) }, uFoamQ: { value: new THREE.Vector2() } };
-  private foamFrame = new FoamFrame();
-  private envFrame = new EnvelopeFrame();
-  private waveE = new Float32Array(N_WAVES * 2);
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() }, uFoamOff: { value: new THREE.Vector2() } };
   private puffT: number | null = null;
   private puffAcc = 1;
   private terrain: TerrainGrid | null = null;
@@ -378,26 +271,7 @@ export class SceneView {
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
   private waveA = new Float32Array(N_WAVES * 4);
   private waveB = new Float32Array(N_WAVES * 4);
-  /**
-   * Her hull's inside, kept clear of the sea when the camera's down in it: her cabin sole is below the waterline (cabinInterior
-   * INTERIOR.sole), so from the cabin the sea's surface lies between the eye and the floor and was drawn over it (the lids
-   * at deck level only hide it from above). With the camera inside her hull below the deck, the water leaves out what falls
-   * inside her deck's outline, in her own frame (the waterline lies within it, at any heel she sails at).
-   */
-  private hullUni = { uHullOn: { value: 0 }, uHullInv: { value: new THREE.Matrix4() }, uHullHalf: { value: Array.from({ length: HULL_N + 1 }, (_, i) => halfBeam(i / HULL_N) + 0.02) } };
-  /** The points of sail on the water (ROSE_FRAGMENT; set by render/windRose.ts through rose()). */
-  private roseUni = { uRoseOn: { value: 0 }, uRoseC: { value: new THREE.Vector2() }, uRoseFrom: { value: 0 }, uRoseE: { value: [40, 51, 75, 105, 160] }, uRoseR: { value: new THREE.Vector3(9, 26, 19) }, uRoseLit: { value: new THREE.Vector2(-1, 1) }, uRoseTgt: { value: -1 } };
-  /** Show the points of sail round her on the water, or not (null): sim (x, y), the true wind's from (°), the band edges
-   * (TWA, °: no-go | close-hauled | close reach | beam | broad | run), radii (m: inner, outer, the marks), her band
-   * and side (+1 the wind over her starboard side), and the target band (−1, none). */
-  rose(r: { x: number; y: number; from: number; edges: number[]; r0: number; r1: number; rm: number; lit: number; side: number; target: number } | null): void {
-    // (compiled into the water only while it's shown: off, the water's shader is as it was, no cost a frame; the
-    // shader's rebuilt once each time it's turned on or off)
-    const m = this.water.material; if (!!r !== ('ROSE' in (m.defines ?? {}))) { m.defines = { ...(m.defines ?? {}) }; if (r) m.defines.ROSE = ''; else delete m.defines.ROSE; m.needsUpdate = true; }
-    const u = this.roseUni; u.uRoseOn.value = r ? 1 : 0; if (!r) return;
-    u.uRoseC.value.set(r.x, r.y); u.uRoseFrom.value = r.from; u.uRoseE.value = r.edges; u.uRoseR.value.set(r.r0, r.r1, r.rm); u.uRoseLit.value.set(r.lit, r.side); u.uRoseTgt.value = r.target;
-  }
-  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uWaveE: { value: this.waveE }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
+  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
   private wakes!: Wakes;
@@ -411,18 +285,13 @@ export class SceneView {
   /** Current map: the current (m/s) and where it converges (tidelines), around the focus. */
   private curData = new Uint8Array(CUR_N * CUR_N * 4);
   private curTex = new THREE.DataTexture(this.curData, CUR_N, CUR_N, THREE.RGBAFormat);
-  private fineData = new Uint8Array(FINE_N * FINE_N * 4);
-  private fineTex = new THREE.DataTexture(this.fineData, FINE_N, FINE_N, THREE.RGBAFormat);
-  private curUni = { uCur: { value: this.curTex as THREE.Texture }, uCurO: { value: new THREE.Vector2() }, uCurCell: { value: 50 }, uCurMean: { value: new THREE.Vector2() }, uFlowM: { value: new THREE.Matrix3() },
-    uCurF: { value: this.fineTex as THREE.Texture }, uCurFO: { value: new THREE.Vector2() }, uCurFOn: { value: 0 } };
+  private curUni = { uCur: { value: this.curTex as THREE.Texture }, uCurO: { value: new THREE.Vector2() }, uCurCell: { value: 50 }, uCurMean: { value: new THREE.Vector2() }, uFlowM: { value: new THREE.Matrix3() } };
   /** The race committee's signal flags, and the heading of whatever they're mounted on. */
   private signal: { mast: SignalMast; heading: number } | null = null;
   /** Marks, to lean and trail a wake in the current. */
   private markObjs: { p: { x: number; y: number }; float: THREE.Object3D; wake: THREE.Mesh; fixed?: boolean }[] = [];
   private wakeTex: THREE.CanvasTexture | null = null;
   private seaAcc = 0;
-  /** The sea map being worked out, a row a step (seaMapSteps), while the last one is still drawn. */
-  private seaJob: Generator<void, void> | null = null;
   /** Sea map: wind-sea and swell scale and whitecaps on a coarse grid (refreshed every 2 s), sampled into the wind map. */
   private seaGrid: { x0: number; y0: number; cell: number; v: Float32Array } | null = null;
   /** The land (real terrain), once it has loaded, and the month to colour it for. */
@@ -431,12 +300,6 @@ export class SceneView {
 
   constructor(canvas: HTMLCanvasElement) {
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, stencil: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off; the boats mark the stencil (navLights.ts)
-    // (no shader error checks outside the dev server: three.js reads each program's info log as it's first used, which
-    // makes the page wait for that program to finish compiling, so the background compile warmShaders asks for, and the
-    // browser's parallel compiling, can't help: at a cruise's start and when the boat editor opens, the frames wait on
-    // some eighty programs one by one (ROADMAP 8v2, the owner, 18 Nov 2026: "a lot of lag, in boat editor, at beginning
-    // of cruises. it tends to resolve after a while"). The dev server still checks, where a shader we write can fail)
-    renderer.debug.checkShaderErrors = import.meta.env.DEV;
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;
@@ -449,7 +312,7 @@ export class SceneView {
     scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
     const sun = this.sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-300, 500, 200); scene.add(sun); scene.add(sun.target);
     // shadows from the sun: a small, sharp shadow map that follows your boat (sails on the deck and the water)
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; // (three.js r186 dropped PCFSoft: asked for, it warned and switched to PCF on the first shadow drawn, and every material compiled before then compiled again: about fifty programs never drawn)
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 10, far: 1200 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
@@ -488,12 +351,11 @@ export class SceneView {
     wtex.center.set(0.5, 0.5);
     this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
     this.curTex.magFilter = this.curTex.minFilter = THREE.LinearFilter;
-    this.fineTex.magFilter = this.fineTex.minFilter = THREE.LinearFilter;
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni, this.roseUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uFoamDir; uniform vec2 uFoamQ; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM; uniform sampler2D uCurF; uniform vec2 uCurFO; uniform float uCurFOn;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -511,8 +373,8 @@ export class SceneView {
           vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
           vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE + HULL_DECL + ROSE_DECL)
-        .replace('#include <map_fragment>', HULL_CUT + WATER_FRAGMENT + ROSE_FRAGMENT)
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE)
+        .replace('#include <map_fragment>', WATER_FRAGMENT)
         .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
         // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
         // the far water doesn't alias into rows parallel to the horizon
@@ -568,14 +430,9 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
-  private protestAt = new THREE.Vector3();
-  private harborCam = new THREE.Vector3();
-  private hullCam = new THREE.Vector3();
-  private sunLit = true;
-  private readonly farCam = new THREE.Vector3();
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
-    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
     this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
 
@@ -588,7 +445,7 @@ export class SceneView {
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => {
       const m = buildBoatMesh(b); this.scene.add(m.grp);
-      boatShadows(m.grp); // (shadows cast by the parts that show in them: render/fittings.ts)
+      m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       return m;
     });
     this.fittings.set(this.boatMeshes.map(m => m.grp));
@@ -601,15 +458,16 @@ export class SceneView {
    * Have the GPU compile the shaders of everything that's hidden now (the city's and the bridge's lights after dark,
    * the boats' navigation lights, rain, the fog bank) in the background, so the frame they first appear in doesn't
    * stall while it compiles fifty-odd of them (half a second or more when night fell with the city in view). Each is
-   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. (The sun casts
-   * its shadows day and night, faded out once it's down, so one pass covers both.) Programs already compiled are reused,
-   * so after the first race this costs only the walk through the scene.
+   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. Both with
+   * the sun's shadows and without (it stops casting them once it's down, which changes every lit surface's shader).
+   * Programs already compiled are reused, so after the first race this costs only the walk through the scene.
    */
   private warmShaders(): void {
-    const hidden: THREE.Object3D[] = [];
+    const hidden: THREE.Object3D[] = [], shadow = this.sun.castShadow;
     this.scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    try { void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
-    finally { for (const o of hidden) o.visible = false; }
+    try {
+      for (const cast of [shadow, !shadow]) { this.sun.castShadow = cast; void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
+    } finally { this.sun.castShadow = shadow; for (const o of hidden) o.visible = false; }
   }
 
   /** A buoy on the water, leaning and trailing a wake in the current (see update). */
@@ -640,7 +498,7 @@ export class SceneView {
     const old = this.boatMeshes[i], b = w.boats[i]; if (!old || !b) return;
     const m = buildBoatMesh(b);
     m.grp.position.copy(old.grp.position); m.grp.quaternion.copy(old.grp.quaternion); m.grp.rotation.order = old.grp.rotation.order;
-    boatShadows(m.grp);
+    m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.scene.remove(old.grp); this.scene.add(m.grp); this.boatMeshes[i] = m;
     this.fittings.set(this.boatMeshes.map(x => x.grp));
     disposeUnused([old.grp], this.scene);
@@ -650,7 +508,7 @@ export class SceneView {
   refreshCourse(w: SimView): void { this.buildCourse(w); }
   /** New conditions mid-sail (SimView.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
   conditionsChanged(w: SimView): void {
-    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
     this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
 
     // the lee of the land in the puffs' shading, for the new wind's direction
@@ -732,27 +590,17 @@ export class SceneView {
   }
 
   /** The sea map: how big the chop and swell are around `at`, against the wave field's reference sea (as each boat's are), and the whitecaps. */
-  private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void { const g = this.seaMapSteps(w, at, span); while (!g.next().done); }
-  /**
-   * The sea map's work, a row at a time (yielding after each): the whole map was some 3,700 sea and current lookups at
-   * once every 2 s, a long frame each time (about 25–30 ms on the owner's Mac). Worked out over the frames that follow
-   * instead (frame(): about 1.5 ms of it a frame), into its own arrays, and the map and the current's texture both
-   * changed only once it's all done, so what's drawn is never half old and half new.
-   */
-  private *seaMapSteps(w: SimView, at: { x: number; y: number }, span: number): Generator<void, void> {
+  private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void {
     const cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
-    for (let j = 0; j < SEA_N; j++) {
-      for (let i = 0; i < SEA_N; i++) {
-        const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
-        const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
-      }
-      yield;
+    for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
+      const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
+      const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
     }
+    this.seaGrid = { x0, y0, cell, v };
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
     const cc = span / (CUR_N - 1), cx0 = Math.round((at.x - span / 2) / cc) * cc, cy0 = Math.round((at.y - span / 2) / cc) * cc, // (on its own grid, so a sharp edge in the current doesn't slide between updates)
       U = new Float32Array(CUR_N * CUR_N * 2);
-    for (let j = 0; j < CUR_N; j++) { for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; } yield; }
-    this.seaGrid = { x0, y0, cell, v };
+    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
     const d = this.curData, at2 = (i: number, j: number, k: number) => U[(Math.min(CUR_N - 1, Math.max(0, j)) * CUR_N + Math.min(CUR_N - 1, Math.max(0, i))) * 2 + k];
     for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) {
       const o = (j * CUR_N + i) * 4, conv = -((at2(i + 1, j, 0) - at2(i - 1, j, 0)) + (at2(i, j + 1, 1) - at2(i, j - 1, 1))) / (2 * cc);
@@ -761,37 +609,6 @@ export class SceneView {
     }
     this.curTex.needsUpdate = true;
     this.curUni.uCurO.value.set(cx0, cy0); this.curUni.uCurCell.value = cc;
-    // round a harbor's mouth near you, the finer patch: which mouth (its rows are read a few a frame: fineStep)
-    let m: { x: number; y: number } | null = null, best = FINE_FAR;
-    for (const r of MOUTH_REFS) { const d = Math.hypot(r.x - at.x, r.y - at.y); if (d < best) { best = d; m = r; } }
-    if (!m) { this.curUni.uCurFOn.value = 0; this.fine = null; return; }
-    const fx0 = Math.round(m.x / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL, fy0 = Math.round(m.y / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL;
-    if (!this.fine || this.fine.x0 !== fx0 || this.fine.y0 !== fy0) this.fine = { x0: fx0, y0: fy0, row: 0, F: new Float32Array(FINE_N * FINE_N * 2), shown: false };
-  }
-  /** The finer patch round a harbor's mouth (updateSeaMap): read a row every FINE_EVERY frames, as reading the current
-   * there all at once would hold a frame up (some 60 ms, a row about 1 ms); when the last row is in, its current and
-   * convergence go to the texture and the next pass starts. Its water changes over minutes (the eddies pass every few),
-   * so a pass every 4 s is plenty. Farther than FINE_NEAR m from the patch its 4 m detail can't be seen, and what was
-   * read last stays shown, so nothing is read (Capacity). */
-  private fine: { x0: number; y0: number; row: number; F: Float32Array; shown: boolean } | null = null;
-  private fineFrame = 0;
-  private fineStep(w: SimView, at: Vec): void {
-    const f = this.fine; if (!f) return;
-    if ((++this.fineFrame) % FINE_EVERY !== 0) return;
-    const half = (FINE_N / 2) * FINE_CELL, cx = f.x0 + half, cy = f.y0 + half;
-    if (f.shown && Math.hypot(at.x - cx, at.y - cy) > half + FINE_NEAR) return;
-    const j = f.row;
-    for (let i = 0; i < FINE_N; i++) { const c = w.currentDrawn({ x: f.x0 + i * FINE_CELL, y: f.y0 + j * FINE_CELL }); f.F[(j * FINE_N + i) * 2] = c.x; f.F[(j * FINE_N + i) * 2 + 1] = c.y; }
-    if (++f.row < FINE_N) return;
-    f.row = 0;
-    const F = f.F, fa = (i: number, j: number, k: number) => F[(Math.min(FINE_N - 1, Math.max(0, j)) * FINE_N + Math.min(FINE_N - 1, Math.max(0, i))) * 2 + k], fd = this.fineData;
-    for (let j = 0; j < FINE_N; j++) for (let i = 0; i < FINE_N; i++) {
-      const o = (j * FINE_N + i) * 4, conv = -((fa(i + 1, j, 0) - fa(i - 1, j, 0)) + (fa(i, j + 1, 1) - fa(i, j - 1, 1))) / (2 * FINE_CELL);
-      fd[o] = Math.round(Math.min(1, Math.max(0, 0.5 + fa(i, j, 0) / 4)) * 255); fd[o + 1] = Math.round(Math.min(1, Math.max(0, 0.5 + fa(i, j, 1) / 4)) * 255);
-      fd[o + 2] = Math.round(Math.min(1, Math.max(0, conv / 1.6e-3)) * 255); fd[o + 3] = 255;
-    }
-    this.fineTex.needsUpdate = true;
-    this.curUni.uCurFO.value.set(f.x0, f.y0); this.curUni.uCurFOn.value = 1; f.shown = true;
   }
 
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
@@ -890,9 +707,7 @@ export class SceneView {
     this.sun.intensity = 0.75 * Math.PI * up;
     const f = focus;
     this.sun.target.position.set(f.x, 0, -f.y); this.sun.position.copy(this.sun.target.position).addScaledVector(dir.y > 0.05 ? dir : new THREE.Vector3(0, 1, 0), 500);
-    // (the sun casts its shadows always, so no lit surface's shader changes as it sets; below the horizon its shadows are
-    // faded out and the shadow map no longer drawn: one set of programs, not one for day and one for night)
-    { const lit = up > 0.05; this.sun.shadow.intensity = lit ? 1 : 0; this.renderer.shadowMap.autoUpdate = lit; if (lit && !this.sunLit) this.renderer.shadowMap.needsUpdate = true; this.sunLit = lit; }
+    this.sun.castShadow = up > 0.05;
     // twilight sky colours: civil twilight (sun 0–6° down) still glows; darker through nautical twilight
     const tw = 1 - ss(-12, -1, el), glow = ss(-10, -2, el);
     sm.uniforms.uTwi.value = 1 - ss(-1, 4, el);
@@ -922,6 +737,9 @@ export class SceneView {
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
     { const on = ((performance.now() / 1000) % 2) < 0.33; // Sutro Tower's beacons: 30 flashes a minute (landscape.ts sutroBeacons)
       if (sutroBeacons.red) sutroBeacons.red.visible = on && el < 3; if (sutroBeacons.white) sutroBeacons.white.visible = on && el >= 3; }
+    // the harbors' lights, by night, each in its charted character (render/marina.ts lightOn: Iso R 6s at the Gashouse Cove
+    // seawall's end, Q R and Fl G/R 5s at West Harbor's)
+    { const t = performance.now() / 1000; for (const l of harborLights) l.obj.visible = el < 3 && lightOn(l.lit, t); }
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
     const fogAmt = fog === 'real' ? fogBankAmount(tMin) : 0; // set fog replaces the summer fog bank
@@ -972,11 +790,7 @@ export class SceneView {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     { const d = Math.atan2(Math.sin(-w.windModel.base * D2R - this.ripAngle), Math.cos(-w.windModel.base * D2R - this.ripAngle)); // the short way round
-      // (turned where they lie by you, not about the Bay's origin, the texture's center: 14 km out, a degree of turn
-      // swept them 250 m past her, the owner's "rushing water" at the map's edge. waterFrame.ts)
-      const rot = this.ripAngle + d * Math.min(1, dt * 0.2), fo = viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user;
-      const off = turnTexture(this.wtex.offset, this.wtex.repeat, this.wtex.center, this.ripAngle, rot, { x: (fo.x + 60000) / 120000, y: (fo.y + 60000) / 120000 });
-      this.wtex.offset.set(off.x, off.y); this.ripAngle = rot; }
+      this.ripAngle += d * Math.min(1, dt * 0.2); }
     const c = Math.cos(this.ripAngle), s = Math.sin(this.ripAngle);
     this.wtex.rotation = this.ripAngle;
     // the texture drifts with the current: offset in texture space is the rotated displacement
@@ -1002,28 +816,21 @@ export class SceneView {
     // the puffs' texture carried down the wind on the sim's clock (paused, sped up and replayed with it; a jump starts afresh)
     const pdt = this.puffT == null ? 0 : w.t - this.puffT; this.puffT = w.t;
     if (pdt > 0 && pdt < 5) this.puffUni.uPuffOff.value.addScaledVector(this.puffUni.uPuffV.value, pdt);
-    const foamD = foamDrift(w.wind.from, w.wind.kt, w.cvec), foamDt = pdt > 0 && pdt < 5 ? pdt : 0;
-    this.puffUni.uFoamOff.value.x += foamD.x * foamDt; this.puffUni.uFoamOff.value.y += foamD.y * foamDt; // (the foam with the surface water)
+    if (pdt > 0 && pdt < 5) { const fd = foamDrift(w.wind.from, w.wind.kt, w.cvec); this.puffUni.uFoamOff.value.x += fd.x * pdt; this.puffUni.uFoamOff.value.y += fd.y * pdt; } // (the foam with the surface water)
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)
     const focus = viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user;
     this.seaAcc += dt;
-    if (!this.seaRef) { // (the first: all at once, so the first frame's sea is right)
-      this.seaAcc = 0; this.seaRef = w.seaHere(focus); this.seaJob = null;
+    if (!this.seaRef || this.seaAcc > 2) {
+      this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
-    } else if (this.seaAcc > 2) { this.seaAcc = 0; this.seaRef = w.seaHere(focus); this.seaJob = this.seaMapSteps(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
-    if (this.seaJob) { const t0 = performance.now(); do { if (this.seaJob.next().done) { this.seaJob = null; break; } } while (performance.now() - t0 < 1.5); }
-    this.fineStep(w, focus); // (a row of the harbor mouth's finer current every few frames)
+    }
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
     const wo = { x: Math.round(focus.x / 500) * 500, y: Math.round(focus.y / 500) * 500 };
     packWaves(waves, this.waveA, this.waveB, tw, wo); this.waveUni.uWaveO.value.set(wo.x, wo.y);
-    // (the wave groups' light and the foam's streaks, each turned where it lies at the focus: waterFrame.ts)
-    this.envFrame.pack(waves, this.waveE, tw, wo, focus);
-    this.foamFrame.step(this.puffUni.uPuffV.value, foamD, foamDt, wo, focus);
-    this.puffUni.uFoamDir.value.set(this.foamFrame.dx, this.foamFrame.dy); this.puffUni.uFoamQ.value.set(this.foamFrame.qx, this.foamFrame.qy);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(waves.refW, waves.refS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);
@@ -1040,7 +847,6 @@ export class SceneView {
       mo.wake.position.set(mo.p.x + Math.sin(set) * 5 * len, 0.12, -(mo.p.y + Math.cos(set) * 5 * len));
       (mo.wake.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, kt / 1.2);
     }
-    this.syncN++;
     w.boats.forEach((b, i) => {
       // riding her own heave and pitch (boat/seaway.ts waveMotion: the physics', so the sails, flags and heel answer the
       // same motion; roll is her heel's)
@@ -1048,11 +854,8 @@ export class SceneView {
       // her heave, smoothed twice over (about 0.8 s each) for the chase camera to ride: it glides on a swell (90% of a 14 s
       // one) but hardly stirs on the chop (15% of a 2 s one)
       if (b.isUser) { const k = Math.min(1, dt / 0.8); this.heave1 += (mo.heave - this.heave1) * k; this.heaveS += (this.heave1 - this.heaveS) * k; }
-      const bm = this.boatMeshes[i]; bm.hideHelm = b.isUser && viewMode === 0;
-      // (a boat beyond FAR_SYNC of the camera, where it was last frame: her crew and sail cloth posed every third frame,
-      // the boats' turns staggered; at that range a figure is a few pixels tall. Yours, every frame)
-      const hold = !b.isUser && (this.syncN + i) % 3 !== 0 && bm.grp.position.distanceToSquared(this.camera.position) > FAR_SYNC * FAR_SYNC;
-      syncBoatMesh(bm, b, t, mo, hold);
+      this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
+      syncBoatMesh(this.boatMeshes[i], b, t, mo);
     });
     // the ghost: where its run was at this moment of the race, on the same waves (no heel: its track doesn't have it)
     // her dock lines, from her cleats (at her rail, deck height) to the dock's (on the dock's top): boat/dockLines.ts
@@ -1064,10 +867,6 @@ export class SceneView {
         pos.needsUpdate = true; g.geometry.setDrawRange(0, n); g.visible = n > 0;
       }
     }
-    // crew overboard (sim/lessons.ts): the person in the water, their head and life jacket riding the waves
-    { const m = w.lesson?.mob ?? null;
-      if (m && !this.mobMesh) { this.mobMesh = personInWater(); this.scene.add(this.mobMesh); }
-      if (this.mobMesh) { this.mobMesh.visible = !!m; if (m) { this.mobMesh.position.copy(P3(m.x, m.y, waves.height(m, tw, 1, 1))); this.mobMesh.rotation.y = -(w.wind.from + 180) * D2R; } } } // (the sea's height right where they are; facing downwind, their back to the wind and sea, as a person floats: McCurdy, USYRU 1986)
     if (this.ghost) {
       const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
       if (g) {
@@ -1105,11 +904,7 @@ export class SceneView {
       // distance and height are always the framed ones for that direction, so she's framed even while it swings round
       const want = u.h - look.yaw / D2R;
       if (this.lastView !== 1 || !Number.isFinite(this.chaseDir)) this.chaseDir = want;
-      // (close behind her: a third of a second behind, the turn looked later than it was, the owner's "delay" between the
-      // tiller and the boat; a tenth of a second still takes the frame-to-frame jitter out)
-      // the shorter way round, and kept within a turn: unwrapped, after two whole turns one way (penalty turns) the
-      // remainder's sign flipped and the camera swung the long way round, a full circle (the owner, 16 Nov 2026)
-      else this.chaseDir = easeAngle(this.chaseDir, want, Math.min(1, dt * 10));
+      else this.chaseDir += (((want - this.chaseDir + 540) % 360) - 180) * Math.min(1, dt * 3);
       const hv = V(this.chaseDir), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
       const fit = this.chaseFit(this.chaseDir, ratio), dist = look.chase ?? fit.dist;
       this.chaseDist = dist;
@@ -1149,23 +944,7 @@ export class SceneView {
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
-    { const cp = camera.getWorldPosition(this.farCam); for (const m of this.boatMeshes) farShadows(m.grp, m.grp.position.distanceTo(cp)); } // (far boats cast none)
-    // the protest flag "conspicuously display[ed]" (RRS 60.2(a)(1)): true size close by, but never less than PROTEST_MIN_PX
-    // tall on the screen, so it reads to a hundred metres and more as a sailor sees one at that range (a legibility floor,
-    // as the boats' tags have; at most ten times its size)
-    { const k = size.y * this.renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
-      for (const m of this.boatMeshes) { const f = m.protest; if (!f.visible) continue;
-        const d = Math.max(1, f.getWorldPosition(this.protestAt).distanceTo(camera.position)), px = PROTEST_H * k / d;
-        f.scale.setScalar(Math.min(10, Math.max(1, PROTEST_MIN_PX / px))); } }
-    this.harbor.update(camera.getWorldPosition(this.harborCam)); // (the moored boats nearest the camera in detail)
-    // the camera down inside her hull (below her deck, within its outline): the sea kept out of her (hullUni, above)
-    { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
-      if (g) { const c = g.worldToLocal(this.hullCam.copy(camera.position)), uu = (c.z + L / 2) / L;
-        if (uu > 0 && uu < 1 && Math.abs(c.x) < halfBeam(uu) && c.y < deckY(uu, c.x)) { h.uHullOn.value = 1; h.uHullInv.value.copy(g.matrixWorld).invert(); } } }
-    // (the perf meter's sails switch: every boat's main and jib hidden for this draw only, then as they were)
-    const hid = this.test.sails ? null : this.boatMeshes.map(m => { const v = [m.main.mesh.visible, m.jib.mesh.visible]; m.main.mesh.visible = m.jib.mesh.visible = false; return v; });
     this.renderer.render(this.scene, camera);
-    if (hid) this.boatMeshes.forEach((m, i) => { m.main.mesh.visible = hid[i][0]; m.jib.mesh.visible = hid[i][1]; }); // (each as it was: a lowered sail stays down)
   }
 }
 
@@ -1230,19 +1009,4 @@ export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: nu
     if (aM - aT > span) lo = d; else hi = d;
   }
   return { dist: (lo + hi) / 2, near: along, tBot };
-}
-
-/**
- * A person in the water in a life jacket: the head and the jacket's orange collar and shoulders above the surface, the
- * rest below it (as they float, upright, head back: the leeway table's "vertical" person). Sizes of an adult: head about
- * 0.2 m across, shoulders 0.45 m.
- */
-function personInWater(): THREE.Group {
-  const g = new THREE.Group(); g.name = 'personInWater';
-  const skin = new THREE.MeshLambertMaterial({ color: 0xc89a78 }), vest = new THREE.MeshLambertMaterial({ color: 0xff5a1f }), hair = new THREE.MeshLambertMaterial({ color: 0x3a2a1e });
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), skin); head.position.y = 0.2; g.add(head);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.103, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), hair); cap.position.y = 0.21; cap.rotation.x = 0.35; g.add(cap); // (tipped toward +z: the back of the head, to windward once turned)
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.065, 8, 18), vest); collar.rotation.x = Math.PI / 2; collar.position.y = 0.08; g.add(collar);
-  const shoulders = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 0.18, 14), vest); shoulders.scale.z = 0.6; shoulders.position.y = -0.04; g.add(shoulders);
-  return g;
 }

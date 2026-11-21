@@ -1,4 +1,3 @@
-import { hypot } from '../core/math';
 /**
  * Hull fouling and the skin friction it adds.
  *
@@ -68,7 +67,7 @@ export function cfRough(f: Fouling, v: number): number {
   for (let i = 0; i < 16; i++) {
     const ut = v * Math.sqrt(cf / 2), ks = ut / NU;
     const kpS = f.slime * ks, kpC = f.calc * ks, kbar = Math.max(kpS, kpC);
-    const du = hypot(colebrook(kpS) * (f.slime > 0 ? 1 : 0), cebeciBradshaw(kpC)); // slime and hard growth together
+    const du = Math.hypot(colebrook(kpS) * (f.slime > 0 ? 1 : 0), cebeciBradshaw(kpC)); // slime and hard growth together
     const alpha = 0.8 - 0.008 * Math.log(1 + kbar);
     const s = Math.max(2, Math.sqrt(2 / cf0) - alpha * du);
     cf = cf + (2 / (s * s) - cf) * 0.6; // relaxed fixed point

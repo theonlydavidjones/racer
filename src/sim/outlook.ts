@@ -1,9 +1,8 @@
-import { KT, V, brg, clamp, dot, type Vec, hypot } from '../core/math';
+import { KT, V, brg, clamp, dot, type Vec } from '../core/math';
 import { CURRENTS, currentAt, currentVector, windOnWater } from '../environment/current';
 import type { SeaHere } from '../environment/sea';
 import { CurrentField, events, sfClock, type TideStation } from '../environment/tide';
 import { landLee, type Wind } from '../environment/wind';
-import { onGround } from '../geo/shore';
 import type { SimView } from './host';
 
 /**
@@ -27,63 +26,22 @@ export interface Outlook {
   stations: TideStation[] | null;
   /** The wind's chop at p around minute tMin (height m, period s): cached on a 400 m grid, every 10 minutes. */
   chop(p: Vec, tMin: number): { hs: number; tp: number };
-  /** chop's cell made ready a piece at a time, for a plan worked out between frames: the current there and 1 km upwind,
-   * the wind, the fetch and the sea's duration, each its own step, then the chop itself (cold, all at once, a cell held
-   * the page's thread up to 100 ms from Mile Rock). Nothing if the cell's known. The same chop either way. */
-  chopSteps?(p: Vec, tMin: number): Generator<void, void, void>;
-  /** wind's lee at p made ready a cold grid point a step, for a plan worked out between frames (each a cast of the land's
-   * lee, ~1 ms or more). Nothing if they're known. The same wind either way. */
-  windSteps?(p: Vec, tMin: number): Generator<void, void, void>;
   /** The course-wide wind at a time (no place): for the day's timeline. */
   breeze(tMin: number): { kt: number; from: number; gust: number };
 }
 
-/**
- * The lee of the land, remembered on a 25 m grid per 5° of wind and read bilinearly among the grid's water points, in
- * both place and direction. Under a bluff the lee goes from near-calm to the open breeze in 100–200 m, and narrow streaks
- * of it lie off small points (one ~50 m wide, 280 m off the Marin shore below Yellow Bluff, 0.37 beside 0.55): read off
- * 200 m blocks, the router sailed a 20 m strip by the breeze outside it and planned the owner's Horseshoe Bay case 23%
- * quicker than she'd sail it; off a 50 m grid it found the streak's edges 11% out; off this one its plan and the exact
- * wind along its own track agree to 1% (Deep Physics' review of the router, V1). A grid point on land is left out (the
- * hill's own reading isn't the water's beside it). LEE_M is an estimate of that kind, not a measured scale.
- */
-const LEE_M = 25;
-const leeCache = new Map<number, number>();
-const leeKey = (i: number, j: number, a: number) => ((i + 5000) * 10000 + (j + 5000)) * 72 + a;
-function leeNode(i: number, j: number, a: number): number {
-  const k = leeKey(i, j, a);
-  let v = leeCache.get(k);
-  if (v === undefined) { const q = { x: i * LEE_M, y: j * LEE_M }; v = onGround(q) ? NaN : landLee(q, a * 5); if (leeCache.size > 600000) leeCache.clear(); leeCache.set(k, v); }
-  return v;
-}
+/** The lee of the land changes slowly in space and with the wind's direction: cached on a 200 m grid, per 5°. */
+const leeCache = new Map<string, number>();
 function leeAt(p: Vec, from: number): number {
-  const af = (((from / 5) % 72) + 72) % 72, a0 = Math.floor(af), fa = af - a0;
-  const x = p.x / LEE_M, y = p.y / LEE_M, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
-  let s = 0, sw = 0;
-  for (let da = 0; da < 2; da++) {
-    const a = (a0 + da) % 72, wa = da ? fa : 1 - fa; if (wa === 0) continue;
-    for (let dj = 0; dj < 2; dj++) for (let di = 0; di < 2; di++) {
-      const v = leeNode(i + di, j + dj, a), wt = wa * (di ? fx : 1 - fx) * (dj ? fy : 1 - fy);
-      if (v === v) { s += v * wt; sw += wt; }
-    }
-  }
-  return sw > 1e-9 ? s / sw : landLee(p, from); // (all four on land: she's against the shore; the exact reading)
-}
-/** leeAt's grid points made ready a cold one a step (each is a cast of the land's lee, ~1 ms or more: eight cold in one
- * reading held a slice of the page's thread to 16 ms from Mile Rock, the Coordinator's 20.3 ms at the 99.9th, 18 Nov 2026).
- * The same cache, so leeAt reads the same afterward. */
-function* leeSteps(p: Vec, from: number): Generator<void, void, void> {
-  const af = (((from / 5) % 72) + 72) % 72, a0 = Math.floor(af), fa = af - a0;
-  const i = Math.floor(p.x / LEE_M), j = Math.floor(p.y / LEE_M);
-  for (let da = 0; da < 2; da++) {
-    const a = (a0 + da) % 72, wa = da ? fa : 1 - fa; if (wa === 0) continue;
-    for (let dj = 0; dj < 2; dj++) for (let di = 0; di < 2; di++) if (!leeCache.has(leeKey(i + di, j + dj, a))) { leeNode(i + di, j + dj, a); yield; }
-  }
+  // (the angle worked out from the key itself, so 0° and 360° share a slot and its value both ways)
+  const a = ((Math.round(from / 5) % 72) + 72) % 72, k = `${Math.round(p.x / 200)},${Math.round(p.y / 200)},${a}`;
+  let v = leeCache.get(k);
+  if (v == null) { v = landLee({ x: Math.round(p.x / 200) * 200, y: Math.round(p.y / 200) * 200 }, a * 5); leeCache.set(k, v); if (leeCache.size > 60000) leeCache.clear(); }
+  return v;
 }
 
 /** The outlook for a World's day, with its settings (a set wind strength or direction, a practice current) as it sails them. */
-/** `exact`: the wind and current worked out at each point, no grids (slow): what the cached ones are checked against. */
-export function outlookFor(w: SimView, exact = false): Outlook {
+export function outlookFor(w: SimView): Outlook {
   const S = w.settings, wx = w.weather, gun = w.gunUtc;
   const fixedFrom = w.windModel.base, fixedKt = S.windKt;
   const breeze = (t: number) => {
@@ -104,67 +62,42 @@ export function outlookFor(w: SimView, exact = false): Outlook {
   const current = (p: Vec, t: number): Vec => {
     if (!field) return currentAt(p, open);
     const i = Math.round(p.x / 100), j = Math.round(p.y / 100), m = Math.round(t * 2), k = `${i},${j},${m}`;
-    if (exact) { if (m / 2 !== fieldT) { fieldT = m / 2; field.setTime(fieldT); } return field.atShore(p); }
     let v = currents.get(k);
     if (!v) {
       if (m / 2 !== fieldT) { fieldT = m / 2; field.setTime(fieldT); }
-      // (the shore's share kept for each point: the same current. Its cell a small integer, as V8 keeps one unboxed: a
-      // key past 2³¹ is a boxed number, hashed and made afresh at each look; ±1024 points is ±100 km)
-      const cell = Math.abs(i) < 1024 && Math.abs(j) < 1024 ? (i + 1024) * 2048 + (j + 1024) : -1;
-      v = cell >= 0 ? field.atShoreKept({ x: i * 100, y: j * 100 }, cell) : field.atShore({ x: i * 100, y: j * 100 });
+      v = field.atShore({ x: i * 100, y: j * 100 });
       if (currents.size > 200000) currents.clear();
       currents.set(k, v);
     }
     return v;
   };
   // the wind across the course changes over kilometres and the course-wide wind over minutes: worked out on a 150 m
-  // grid each half minute, which keeps a whole briefing (thousands of points) quick. The land's lee changes over tens of
-  // meters under a bluff, so it's read at the point itself (leeAt, its own 25 m grid)
-  const winds = new Map<string, Wind & { gust: number; leeFrom: number }>();
-  const cell = (p: Vec, t: number) => {
+  // grid each half minute, which keeps a whole briefing (thousands of points) quick
+  const winds = new Map<string, Wind & { gust: number }>();
+  const wind = (p: Vec, t: number) => {
     const i = Math.round(p.x / 150), j = Math.round(p.y / 150), m = Math.round(t * 2), k = `${i},${j},${m}`;
     let v = winds.get(k);
     if (!v) {
       const q = { x: i * 150, y: j * 150 }, tt = m / 2, b = breeze(tt), f = wx.field(q, tt, b.from);
-      v = { kt: b.kt * f.k, from: (b.from + f.turn + 360) % 360, gust: b.gust, leeFrom: b.from };
+      v = { kt: b.kt * f.k * leeAt(q, b.from), from: (b.from + f.turn + 360) % 360, gust: b.gust };
       if (winds.size > 200000) winds.clear();
       winds.set(k, v);
     }
     return v;
   };
-  const wind = (p: Vec, t: number) => {
-    if (exact) { const m = Math.round(t * 2), b = breeze(m / 2), f = wx.field(p, m / 2, b.from); return { kt: b.kt * f.k * landLee(p, b.from), from: (b.from + f.turn + 360) % 360, gust: b.gust }; }
-    const v = cell(p, t);
-    return { kt: v.kt * leeAt(p, v.leeFrom), from: v.from, gust: v.gust }; // (the lee at the point itself, off its own grid)
-  };
-  /** wind's lee made ready a cold grid point a step (leeSteps), for a plan worked out between frames. */
-  const windSteps = function* (p: Vec, t: number): Generator<void, void, void> { if (!exact) yield* leeSteps(p, cell(p, t).leeFrom); };
   // (the chop as developed as the day's wind will have made it then: World.seaDurationAt)
   const sea = (p: Vec, t: number) => { const c = current(p, t); return w.sea.at(p, windOnWater(wind(p, t), c), c, q => current(q, t), w.seaDurationAt(t)); };
   const chops = new Map<string, { hs: number; tp: number }>();
   const chop = (p: Vec, t: number) => {
     const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;
     let v = chops.get(k);
-    if (!v) {
-      // (the wind sea alone: the swell's reach isn't the chop's, and costs up to 100 ms a point)
-      const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10, c = current(q, tq);
-      const s = w.sea.at(q, windOnWater(wind(q, tq), c), c, r => current(r, tq), w.seaDurationAt(tq), true); v = { hs: s.hsW, tp: s.tpW }; chops.set(k, v);
-    }
+    if (!v) { const s = sea({ x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, Math.round(t / 10) * 10); v = { hs: s.hsW, tp: s.tpW }; chops.set(k, v); }
     return v;
   };
   return {
     t0: gun, stations: w.tide?.stations ?? null, breeze, wind, current,
     windOnWater: (p, t) => windOnWater(wind(p, t), current(p, t)),
-    sea, chop, windSteps,
-    chopSteps: function* (p: Vec, t: number) {
-      const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;
-      if (chops.has(k)) return;
-      const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10;
-      const c = current(q, tq); yield;
-      yield* windSteps(q, tq); const ww = windOnWater(wind(q, tq), c); yield;
-      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; yield* w.sea.fetchSteps(q, ww.from); w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
-      chop(p, t);
-    }
+    sea, chop
   };
 }
 
@@ -175,7 +108,7 @@ export function tideWord(kt: number): string { return Math.abs(kt) < 0.15 ? 'sla
 
 /** The nearest NOAA current station to a point. */
 export function nearestStation(st: TideStation[], p: Vec): TideStation {
-  return st.reduce((a, s) => (hypot(s.p.x - p.x, s.p.y - p.y) < hypot(a.p.x - p.x, a.p.y - p.y) ? s : a));
+  return st.reduce((a, s) => (Math.hypot(s.p.x - p.x, s.p.y - p.y) < Math.hypot(a.p.x - p.x, a.p.y - p.y) ? s : a));
 }
 
 export interface TideEvent { t: number; kind: 'max flood' | 'slack before ebb' | 'max ebb' | 'slack before flood'; kt: number }
@@ -192,7 +125,7 @@ export function stationEvents(s: TideStation, from: number, to: number): TideEve
 
 /** The current at p as words: "ebb 1.4 kt setting 275°", relative to the flood/ebb of the nearest station. */
 export function currentWords(c: Vec, floodDir: number | null): string {
-  const kt = hypot(c.x, c.y) / KT;
+  const kt = Math.hypot(c.x, c.y) / KT;
   if (kt < 0.15) return 'slack';
   const set = Math.round(brg(c.x, c.y));
   const kind = floodDir == null ? '' : dot(c, V(floodDir)) >= 0 ? 'flood ' : 'ebb ';

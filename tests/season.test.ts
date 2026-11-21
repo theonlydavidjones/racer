@@ -69,7 +69,7 @@ describe('the season', () => {
     const row = () => standings(S, res, live).rows.find(r => r.sail === '113')!;
     expect(row().club).toBe('bvbc'); expect(row().hull).toBe('#123456');
     club = 'stfyc'; expect(row().club).toBe('stfyc');
-    expect(seasonHtml(S, res, [S], live)).toContain('StFelYC');
+    expect(seasonHtml(S, res, [S], live)).toContain('STFYC');
   });
   it('keeps your races (sailing one again replaces it)', () => {
     keepSeasonRace(S.id, 1, real(1)); keepSeasonRace(S.id, 1, real(5));

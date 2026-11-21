@@ -4,7 +4,6 @@ import { DEFAULT_SETTINGS } from '../../src/settings';
 import { DT, World } from '../../src/sim/world';
 import { buildCrew, syncCrew } from '../../src/render/crew';
 import type { CourseFile } from '../../src/courses/course';
-import type { Boat } from '../../src/boat/boat';
 
 /**
  * Settled crew stay settled (the owner, v146: "lots of weird movement from the middle crew. He keeps pumping his knees,
@@ -15,24 +14,6 @@ import type { Boat } from '../../src/boat/boat';
  * called to the cabin top's lines every 20 s for changes of a few per cent, and back to the seat between for a jib
  * tweak; and a short move aft along the deck made by turning right round, then round again for the next job forward.
  */
-/**
- * When the watch starts over (s from now it's steady again): a tack or gybe, the crew rolling her, or the pole's work.
- * As this test has always meant ("downwind, with the pole going out and in, is a busier time, and its own work"), the
- * pole coming down as she hardens up from a reach is pole work too, whatever her angle: the forward hand turning from
- * the mast to walk aft and turning again at the winch to trim for the new course (the Coordinator's ruling, 15 Nov 2026).
- */
-export const SETTLE_S = 10, SPIN_S = 4;
-export const turning = (b: Boat): boolean => !!b.tacking || !!b.crew?.roll || !!b.crew?.people.some(a => a.job?.line === 'pole');
-/** The most a figure's heading (unwrapped, rad, a sample each DT) turned within SPIN_S, in degrees. */
-export function spinOf(turned: number[]): number {
-  let most = 0; const n = Math.round(SPIN_S / DT);
-  for (let i = 0; i < turned.length; i++) {
-    let lo = turned[i]!, hi = lo;
-    for (let j = i; j < Math.min(turned.length, i + n); j++) { lo = Math.min(lo, turned[j]!); hi = Math.max(hi, turned[j]!); }
-    most = Math.max(most, hi - lo);
-  }
-  return most * 180 / Math.PI;
-}
 // (the two breezes run as two test files, tests/crewsettle.test.ts and crewsettle-18.test.ts, on two cores at once)
 export const settledCrew = (kts: number[]) => describe('Settled crew stay settled (render/crew.ts, boat/crewWork.ts)', () => {
   for (const kt of kts) it(`in steady sailing in ${kt} kt: few trips, no pose flicker, no stepping on the spot, no spinning round`, () => {
@@ -46,10 +27,10 @@ export const settledCrew = (kts: number[]) => describe('Settled crew stay settle
       w.step(DT);
       ai.forEach((b, k) => {
         syncCrew(crs[k], b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);
-        if (Math.sign(b.rel) !== side[k] || turning(b)) { lastTurn[k] = w.t; side[k] = Math.sign(b.rel); }
+        if (Math.sign(b.rel) !== side[k] || b.tacking || b.crew!.roll) { lastTurn[k] = w.t; side[k] = Math.sign(b.rel); }
         // (upwind and reaching, as the owner saw it: downwind, with the pole going out and in, is a busier time, and its
         // own work: ROADMAP)
-        const steady = w.t > 0 && b.started && !b.finished && b.twa < 125 && w.t - lastTurn[k] > SETTLE_S;
+        const steady = w.t > 0 && b.started && !b.finished && b.twa < 125 && w.t - lastTurn[k] > 10;
         crs[k].crew.forEach((f, i) => {
           const a = b.crew!.people[i + 1], s = watch[k][i], p = s.prev;
           const now = { pose: a.pose, gx: a.goal?.x ?? a.x, gz: a.goal?.z ?? a.z, yaw: f.cur!.yaw, knee: f.leg.map(l => l.mid.rotation.x) };
@@ -63,7 +44,7 @@ export const settledCrew = (kts: number[]) => describe('Settled crew stay settle
             s.knee += Math.abs(now.knee[0] - p.knee[0]) + Math.abs(now.knee[1] - p.knee[1]);
             // (the body's heading, unwrapped step by step: a reset by whole turns isn't a turn)
             const d = Math.atan2(Math.sin(now.yaw - p.yaw), Math.cos(now.yaw - p.yaw));
-            s.turned += d; s.hist.push(s.turned); if (s.hist.length > SPIN_S / DT) s.hist.shift();
+            s.turned += d; s.hist.push(s.turned); if (s.hist.length > 4 / DT) s.hist.shift();
             s.spin = Math.max(s.spin, Math.max(...s.hist) - Math.min(...s.hist));
           } else s.hist = [];
           s.prev = now;

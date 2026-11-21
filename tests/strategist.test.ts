@@ -145,8 +145,7 @@ describe('the navigator', () => {
     // the Cityfront to Sausalito crosses the deep-water route: the navigator says so, with the rules
     expect(p.marks.some(m => m.kind === 'lane' && /ship/.test(m.label))).toBe(true);
     expect(p.sections[3].items.some(i => i.src === 'rule' && /Rule 9/.test(i.text))).toBe(true);
-  }, 60_000); // (the passage leaving now and up to five times later, each by the isochrone router: a few seconds in all)
-
+  });
   it('no destination, no plan', () => {
     expect(passagePlan(cruise('cityfront', ''))).toBeNull();
   });

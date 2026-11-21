@@ -24,7 +24,7 @@ export function crewWords(u: Boat): string {
   if (pl) {
     const across = pl.across == null ? '' : { lee: `sitting to leeward on the ${lw} side`, mid: 'in the middle', up: `sitting up on the ${ww} side`, hike: `hiking out on the ${ww} rail` }[pl.across];
     const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft', deck: n >= 2 ? 'up on the foredeck' : 'the crew at the mast' }[pl.fore];
-    where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; click Crew for auto`;
+    where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; tap Crew for auto`;
   } else {
     // (with the pole out on a run: where best practice has them, and how far they've followed it: crewPhys.ts chooseLayout)
     const pw = c.poleWhy, pole = pw && {
@@ -78,10 +78,9 @@ const PLACE_TIP: Record<string, string> = {
  */
 export function showCrewRow(u: Boat): void {
   const c = u.crew, pl = c?.place, mine = !!pl, open = mine || crewOpen;
-  // (two crew at their stations, either side of the winch, isn't Aft: no outline; forward of the winch is Fwd)
-  const fore = c?.fore01 ?? 0.5, two = c?.spec.crew.length === 2, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 && !two ? 'aft' : null, autoA = c ? autoAcross(u) : null;
+  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : null, autoA = c ? autoAcross(u) : null;
   // (this runs every frame: touch the page only when something has changed)
-  const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}|${u.tack}|${open}|${two}`; if (key === lastRow) return; lastRow = key;
+  const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}|${u.tack}|${open}`; if (key === lastRow) return; lastRow = key;
   const { ww, lw, wwS, lwS } = sides(u);
   document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => {
     const p = bt.dataset.ca!;
@@ -97,14 +96,12 @@ export function showCrewRow(u: Boat): void {
     bt.classList.toggle('at', !pl?.fore && autoFore === bt.dataset.cf);
     bt.setAttribute('aria-pressed', String(pl?.fore === bt.dataset.cf));
     bt.title = PLACE_TIP[bt.dataset.cf!];
-    // (two crew: no Aft, their stations either side of the winch are as far aft as they go, so it did nothing: the owner)
-    bt.hidden = two && bt.dataset.cf === 'aft';
   });
   const wind = document.getElementById('tpWind'); if (wind) wind.textContent = `Wind over the ${ww} side: ${ww} is windward, ${lw} is leeward`;
   const box = document.getElementById('tpCrewOpen'), line = document.getElementById('tpCrewLine');
   if (box) box.hidden = !open;
-  if (line) { line.setAttribute('aria-expanded', String(open)); line.classList.toggle('open', open); line.title = open ? (mine ? 'Placed by you: click Crew to put them back on auto' : 'Click to fold') : 'Click to see where the crew can sit'; }
-  setWho('whoCrew', mine, mine ? 'You\'ve placed the crew: they stay there. Click Crew to put them back on auto.' : 'On auto: the crew place their own weight. Click You (or a place) to put them somewhere yourself.');
+  if (line) { line.setAttribute('aria-expanded', String(open)); line.classList.toggle('open', open); line.title = open ? (mine ? 'Placed by you: tap Crew to put them back on auto' : 'Tap to fold') : 'Tap to see where the crew can sit'; }
+  setWho('whoCrew', mine, mine ? 'You\'ve placed the crew: they stay there. Tap Crew to put them back on auto.' : 'On auto: the crew place their own weight. Tap You (or a place) to put them somewhere yourself.');
 }
 
 /** A Crew · You switch: green Crew while the crew does it (auto), amber You once it's yours. */

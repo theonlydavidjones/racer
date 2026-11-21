@@ -1,4 +1,4 @@
-import { clamp, n360, wrap, type Vec, hypot } from '../core/math';
+import { clamp, n360, wrap, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
 import { anyShoreDist, onGround } from '../geo/shore';
 import real from './data/sf-real-days.json';
@@ -54,10 +54,7 @@ export const REAL_UPDATED = R.updated;
 
 /** San Francisco local minutes after midnight for a UTC minute. */
 const localFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: 'numeric', minute: 'numeric' });
-// (the clock's hour and minute, and the part of a minute since: read to the whole minute, the wind between the record's
-// samples came on in a step a minute, 0.6 to 2.4° at a time on an observed day, where the record itself (NOAA CO-OPS
-// 9414290, Fort Point: a 2-minute mean every 6 minutes) says nothing of a minute's edge; the zone's offset is whole minutes)
-const localMin = (tMin: number) => { const p = Object.fromEntries(localFmt.formatToParts(new Date(tMin * 60000)).map(x => [x.type, x.value])); return (+p.hour % 24) * 60 + +p.minute + (tMin - Math.floor(tMin)); };
+const localMin = (tMin: number) => { const p = Object.fromEntries(localFmt.formatToParts(new Date(tMin * 60000)).map(x => [x.type, x.value])); return (+p.hour % 24) * 60 + +p.minute; };
 
 /** A day's samples: [local minute, kt, from, gust kt] (open-water kt). */
 type Sample = [number, number, number, number];
@@ -88,7 +85,7 @@ function smoothed(s: Sample[]): Sample[] {
       vx += y[1] * Math.sin(y[2] * Math.PI / 180); vy += y[1] * Math.cos(y[2] * Math.PI / 180); kt += y[1]; w++;
     }
     // (the direction by the vector mean, so it averages the shorter way round; the speed by the plain mean)
-    return [x[0], kt / w, hypot(vx, vy) > 1e-6 ? n360(Math.atan2(vx, vy) * 180 / Math.PI) : x[2], x[3]];
+    return [x[0], kt / w, Math.hypot(vx, vy) > 1e-6 ? n360(Math.atan2(vx, vy) * 180 / Math.PI) : x[2], x[3]];
   });
 }
 function forecastSamples(date: string): Sample[] | null {
@@ -104,7 +101,7 @@ export function classify(samples: Sample[], scale = 1): WindKind {
   if (!race.length) return 'west';
   let vx = 0, vy = 0, sum = 0;
   for (const [, kt, from] of race) { vx += Math.sin(from * Math.PI / 180) * kt; vy += Math.cos(from * Math.PI / 180) * kt; sum += kt; }
-  const mean = sum / race.length / scale, vec = hypot(vx, vy) / race.length / scale, dir = (Math.atan2(vx, vy) * 180 / Math.PI + 360) % 360;
+  const mean = sum / race.length / scale, vec = Math.hypot(vx, vy) / race.length / scale, dir = (Math.atan2(vx, vy) * 180 / Math.PI + 360) % 360;
   if (mean < 4 || vec < 0.5 * mean) return 'light';
   if (dir >= 200 && dir < 330) return 'west';
   if (dir >= 100 && dir < 200) return 'south';
@@ -226,7 +223,7 @@ function forecastField(date: string) {
   function uvOf(q: Vec) {
     let u = 0, v = 0, w = 0;
     for (const c of live) { const wt = c.s / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5; u += c.e * wt; v += c.n * wt; w += wt; }
-    return w > 0 ? { kt: hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
+    return w > 0 ? { kt: Math.hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
   }
   return (p: Vec, tMin: number) => {
     if (tMin !== at) {
@@ -339,7 +336,7 @@ export function visibilityFor(date: string, tMin: number): Visibility | { none: 
       const kk = near.find(x => val(x) != null);
       if (kk != null) {
         const m = val(kk)!, p = LL(st.lat, st.lon), when = kk === k ? '' : `, at ${hs[kk]}:00 (no reading for ${hs[k]}:00)`;
-        return { source: 'observed', cap: st.cap ?? PIER17_CAP, points: [{ p, m }], at: q => hypot(q.x - p.x, q.y - p.y) < 500 ? m : NaN,
+        return { source: 'observed', cap: st.cap ?? PIER17_CAP, points: [{ p, m }], at: q => Math.hypot(q.x - p.x, q.y - p.y) < 500 ? m : NaN,
           says: `observed at NOAA's Pier 17 sensor (${st.id})${when}: one point on the Embarcadero, about 7 km inside the Gate; the Gate's own fog can differ` };
       }
     }
@@ -358,7 +355,7 @@ export function visibilityFor(date: string, tMin: number): Visibility | { none: 
     if (!g.fog) return { none: 'The NWS forecasts visibility only to the next morning.' };
     const W = R.grid.fogWords ?? [], fogs = cells.map((p, i) => ({ p, m: NaN, words: W[Math.max(g.fog![i]?.[h0] ?? 0, g.fog![i]?.[h1] ?? 0)] ?? '' }));
     if (!fogs.some(c => c.words)) return { none: `The NWS forecast (issued ${issued}) has no fog at ${hh}; it forecasts visibility only to the next morning.`, noFog: true };
-    const nearest = (q: Vec) => { let best = fogs[0], bd = Infinity; for (const c of fogs) { const d = hypot(c.p.x - q.x, c.p.y - q.y); if (d < bd) { bd = d; best = c; } } return bd < CELL_REACH ? best : null; };
+    const nearest = (q: Vec) => { let best = fogs[0], bd = Infinity; for (const c of fogs) { const d = Math.hypot(c.p.x - q.x, c.p.y - q.y); if (d < bd) { bd = d; best = c; } } return bd < CELL_REACH ? best : null; };
     return { source: 'outlook', cap: NWS_VIS_CAP, points: fogs.filter(c => c.words), at: () => NaN, words: q => nearest(q)?.words ?? null,
       says: `National Weather Service forecast (issued ${issued}), 2.5 km grid; no visibility figure this far ahead` };
   }

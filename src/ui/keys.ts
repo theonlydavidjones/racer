@@ -1,15 +1,15 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
-  | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'turnHo' | 'luff'
-  | 'mainIn' | 'mainOut' | 'travUp' | 'travDown' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
-  | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft' | 'paddle'
-  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'weatherHelm' | 'restartStart' | 'pointsRose' | 'flowView' | 'perfMeter'
+  | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
+  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
+  | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft'
+  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
-  | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
+  | 'course' | 'log' | 'pause' | 'keys';
 
 /** Actions that last while the key is held (the rest fire once per press). */
-export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'travUp', 'travDown', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
+export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
 
 export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
@@ -17,13 +17,9 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
   { id: 'centreTiller', label: 'Center the tiller', group: 'Helm' },
   { id: 'lashTiller', label: 'Lash the tiller where it is (heaving to) / unlash', group: 'Helm' },
-  { id: 'turnHo', label: 'Call the turn: "Ready to jibe" … "Jibe-ho!" on a run, or "Ready about" … "Tacking!" upwind; the crew turn her', group: 'Helm' },
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
-  // (riding the traveler: the owner, 15 Nov 2026, "a big part of sailing"; beside the mainsheet's keys)
-  { id: 'travUp', label: 'Traveler up to windward (hold)', group: 'Sails' },
-  { id: 'travDown', label: 'Traveler down to leeward (hold)', group: 'Sails' },
   { id: 'jibIn', label: 'Trim the jib in', group: 'Sails' },
   { id: 'jibOut', label: 'Ease the jib', group: 'Sails' },
   { id: 'ctlPrev', label: 'Select the previous line (sail controls)', group: 'Sails' },
@@ -32,13 +28,11 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'ctlUp', label: 'Selected line: more (tighten; ease a sheet; car aft/out)', group: 'Sails' },
   { id: 'pole', label: 'Whisker pole out / in', group: 'Sails' },
   { id: 'sailBand', label: 'Sail controls: show or put away', group: 'Sails' },
-  { id: 'trimNotes', label: 'Trim notes: every line, what it\'s doing and and the ideal (pauses)', group: 'Sails' },
-  { id: 'paddle', label: 'Paddle with the boom crutch: port, then starboard, then stop', group: 'Crew' },
   { id: 'crewLee', label: 'Crew weight a step to leeward (hike → up → middle → leeward)', group: 'Crew' },
   { id: 'crewUp', label: 'Crew weight a step to windward (leeward → middle → up → hike)', group: 'Crew' },
   { id: 'crewFwd', label: 'Crew weight forward a step', group: 'Crew' },
   { id: 'crewAft', label: 'Crew weight aft a step', group: 'Crew' },
-  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby / lift off the tiller pin (cruising only)', group: 'Helm' },
+  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby (cruising only)', group: 'Helm' },
   { id: 'navLights', label: 'Navigation lights on (lit after dark) / off', group: 'Helm' },
   { id: 'pushOff', label: 'At the dock: push off from her berth (the crew walks her out; held head to wind, let her go); coming in, lines ready (again: stand down); lying to her lines, let go', group: 'Helm' },
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
@@ -50,10 +44,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'viewOverhead', label: 'Overhead view', group: 'Views' },
   { id: 'cycleView', label: 'Next view', group: 'Views' },
   { id: 'lookInstrument', label: 'Look at the cabin-top instrument from the helm (press again to look back)', group: 'Views' },
-  { id: 'restartStart', label: 'Start practice: a new countdown from the same start, now (your starts so far kept)', group: 'Racing' },
   { id: 'windLadder', label: 'Wind indicator: the true and apparent wind in the air beside her, at three heights (on / off)', group: 'Views' },
-  { id: 'weatherHelm', label: 'Weather helm at the foot of the tiller guide: the tiller\'s average, teal when balanced, amber past 8° (on / off)', group: 'Views' },
-  { id: 'pointsRose', label: 'Points of sail on the water round her, and the wind (on / off)', group: 'Views' },
   { id: 'flowView', label: 'Flow view: the air over the sails, at three heights (show / put away)', group: 'Views' },
   { id: 'lookLeft', label: 'Look left', group: 'Views' },
   { id: 'lookRight', label: 'Look right', group: 'Views' },
@@ -71,13 +62,13 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 ];
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
-  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'], turnHo: ['Space'],
-  luff: ['s'], mainIn: ['z'], mainOut: ['x'], travUp: ['Shift+Z'], travDown: ['Shift+X'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], paddle: ['/'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
+  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
+  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
-  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], weatherHelm: ['Shift+W'], restartStart: ['Shift+R'], pointsRose: ['Shift+P'], flowView: ['\\'],
+  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],
+  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */
@@ -85,18 +76,10 @@ const RESERVED = new Set(['Escape', 'Tab']);
 const STORE = 'fbsim-keys-v1';
 
 /** A key as we store it: letters lower-case, space spelled out. */
-/**
- * A key press as the key map names it: Shift+letter apart from the letter ("Shift+T"), told by the Shift key itself, so
- * Caps Lock changes nothing. (No function keys: on a Mac F1–F12 are the brightness, volume and Mission Control keys
- * unless Fn is held, the owner, 15 Nov 2026; every plain letter, digit and punctuation key is taken, so new keys are
- * Shift+letter.)
- */
-export function keyOf(e: { key: string; shiftKey?: boolean }): string { return e.shiftKey && /^[a-z]$/i.test(e.key) ? 'Shift+' + e.key.toUpperCase() : e.key; }
 export function normKey(k: string): string { return k === ' ' ? 'Space' : k.length === 1 ? k.toLowerCase() : k; }
 /** A key as people read it. */
 export function keyLabel(k: string): string {
   const names: Record<string, string> = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Space: 'Space', Enter: 'Enter', Backspace: '⌫' };
-  if (k.startsWith('Shift+')) return '⇧' + k.slice(6);
   return names[k] ?? (k.length === 1 ? k.toUpperCase() : k);
 }
 
@@ -113,8 +96,6 @@ export class KeyMap {
   actionFor(key: string): Action | null {
     const k = normKey(key);
     for (const a of Object.keys(this.keys) as Action[]) if (this.keys[a].includes(k)) return a;
-    // (Shift with a letter that has no Shift binding of its own: the letter, as before Shift+letter keys existed)
-    if (k.startsWith('Shift+')) return this.actionFor(k.slice(6).toLowerCase());
     return null;
   }
   /** Bind `key` to `action` (replacing its first key). Takes the key off any other action. Returns that action, if any. */

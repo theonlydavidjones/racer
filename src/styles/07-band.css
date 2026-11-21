@@ -8,7 +8,7 @@
 .sailband.shut{background:none;border-color:transparent;pointer-events:none}
 .sailband.shut .sb-top > :not(.sb-wx),.sailband.shut .sb-tabs,.sailband.shut .sb-pen{visibility:hidden}
 .sailband.shut .sb-bot{visibility:hidden} /* (kept in the layout: the windex stays where it was, not jumping down) */
-.sailband.shut .sb-hail,.sailband.shut .sb-hoist,.sailband.shut .sb-motor{pointer-events:auto}
+.sailband.shut .sb-hail,.sailband.shut .sb-hoist{pointer-events:auto}
 .sb-hoist{color:var(--text)!important}
 .sb-hoist.dim{opacity:.55}
 .sailband.off{opacity:.55}
@@ -51,6 +51,7 @@ body.pilot-on #bHome{display:none}
   body #helmBar #pilot .pl-read{grid-column:span 3;max-width:none;font-size:10px}
 }
 #helmBar #pilot .pl-read{grid-column:span 2;min-width:0;max-width:92px;padding:0 2px;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.sb-tillerslot #motorHead{position:absolute;left:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3;margin:0}
 .sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
@@ -60,45 +61,13 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-pole.mine,.sb-all.mine{color:var(--accent)!important}
 .sb-all.mine{border-color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
-/* the paddle (only when she's all but stopped): P and S, the side being paddled lit */
-.sb-paddle{gap:4px;color:var(--muted)!important}
-.sb-paddle button{font:700 12px/1 var(--f-inst)!important;padding:1px 6px!important;border-radius:4px;color:var(--muted)!important;background:none!important;border:1px solid var(--rule)!important}
-.sb-paddle button:hover{color:var(--text)!important}
-.sb-paddle button.on{color:#1a1205!important;background:var(--accent)!important;border-color:var(--accent)!important}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
 .sb-hail .k{font-size:9.5px;border:1px solid rgba(26,18,5,.5);border-radius:3px;padding:1px 3px}
-/* her outboard (the owner, v193: the floating head hid her hull): a tab, its buttons outlined so they read as buttons */
-.sb-motor{gap:3px;padding:0 4px 0 9px!important;color:var(--text)!important}
-.sb-motor.on .mo-n{color:var(--accent)}
-.sb-motor .mo-n{margin-right:3px}
-.sb-motor .mo-g{display:flex;gap:2px}
-.sb-motor .mo-g[hidden],.sb-motor [hidden]{display:none}
-.sailband .sb-motor button{height:17px;min-width:17px;padding:0 5px;border:1px solid var(--rule);border-radius:4px;color:var(--text);font:700 9.5px/1 var(--f-inst);letter-spacing:.06em}
-.sailband .sb-motor button:hover{border-color:var(--text)}
-.sailband .sb-motor button[aria-pressed="true"],.sailband .sb-motor button.on{border-color:var(--accent);color:var(--accent)}
-.sailband .sb-motor button.refused{border-color:var(--caution);color:var(--caution)}
-.sailband .sb-motor button:disabled{cursor:default;opacity:.5}
-.sailband .sb-motor button.pend{opacity:1;border-color:var(--accent);color:var(--accent)}
-.sb-motor .mo-thr{min-width:30px;text-align:center;font-variant-numeric:tabular-nums}
 .sb-pen{color:var(--accent)!important;cursor:default}
 /* the windex between the two vangs: looking up at the masthead */
-.sb-wx{width:80px;height:80px;flex:none;align-self:center;margin:0 4px;transform:translateY(-3px)}
+.sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
 .sb-wx svg{width:100%;height:100%;display:block}
-/* her heel: a ring over the windex's top, in its coordinates (sailBand.ts heelSvg), on a layer 182/140 its size */
-.sb-wx svg.sb-heel{position:absolute;left:-15%;top:-15%;width:130%;height:130%;overflow:visible;pointer-events:none}
-.sb-heel path{fill:none;stroke-width:3.4;stroke-linecap:butt}
-.sb-heel .hr-base{stroke:#3c5566}
-.sb-heel .hr-amber{stroke:var(--accent)}
-.sb-heel .hr-red{stroke:#e8513f}
-.sb-heel .hr-best{fill:var(--target);stroke:#0a141c;stroke-width:1.6}
-.sb-heel .hr-dot{fill:#f1f6f8;stroke:#0a141c;stroke-width:2.6}
-.sb-heel .hr-dot.amber{fill:var(--accent)}
-.sb-heel .hr-dot.red{fill:#e8513f}
-.sb-heel .hr-deg{fill:#e9f2f5;font:700 15px var(--f-inst);dominant-baseline:middle}
-.sb-heel .hr-deg.amber{fill:var(--accent)}
-.sb-heel .hr-deg.red{fill:#e8513f}
-.sailband.shut .sb-heel{visibility:visible}
 .sb-awa{fill:#cfdbe1;font:700 12px var(--f-inst);letter-spacing:1px}
 .sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
 .sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
@@ -112,11 +81,8 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-a svg{width:12px;height:12px;display:block;margin:0 auto;fill:currentColor}
 .sb-a:hover,.sb-a:active{color:var(--text)!important}
 .sb-well{position:relative;width:12px;height:46px;background:#0a141c;border:1px solid #22384a;border-radius:3px;overflow:hidden}
-/* (a rope's colorway: its color in the braid's twill, a fleck's specks and a tracer's dashes over it, spec.ts ROPES) */
-.sb-rope,.sb-boom{--braid:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px);
-  --marks:radial-gradient(circle,var(--fleck,transparent) 0 1.1px,transparent 1.4px) 0 0/5px 7px,
-    repeating-linear-gradient(135deg,transparent 0 7px,var(--tracer,transparent) 7px 9px,transparent 9px 14px)}
-.sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;background:var(--marks),var(--braid)}
+.sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;
+  background:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px)}
 .mine .sb-rope{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-mark{position:absolute;left:-1px;right:-1px;height:2px;background:#fff;opacity:.9;pointer-events:none}
 /* the rope's inches (the owner's "middle way"): faint hairlines in the well, over the rope, under the marks */
@@ -143,14 +109,14 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-rail{position:relative;height:10px;background:#0a141c;border:1px solid #22384a;border-radius:5px}
 .sb-mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:#3b5163}
 .sb-boom{position:absolute;top:1px;bottom:1px;width:26px;margin-left:-13px;border-radius:3px;
-  background:var(--marks),var(--braid)}
+  background:repeating-linear-gradient(135deg,var(--rope,#3d8bff) 0 4px,color-mix(in srgb,var(--rope,#3d8bff) 70%,#000) 4px 5px)}
 .sb-car{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;border-radius:3px;background:#c7d3db;box-shadow:0 1px 2px rgba(0,0,0,.5)}
 .sb-trk.mine .sb-boom,.sb-trk.mine .sb-car{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-trk .sb-mark{top:-3px;bottom:-3px;width:0;height:auto;border-left:2px dashed #fff;background:none}
 /* the jumpers (when her Rig tune has them adjusted under way): a small dial at each end of the bottom row, steel grey as
    the standing rigging; the row's height, so the band doesn't grow */
 .sb-jd[hidden]{display:none}
-.sb-jd{--steel:#9aa3ab;position:relative;flex:none;min-width:68px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.sb-jd{--steel:#9aa3ab;position:relative;flex:none;width:40px;display:flex;flex-direction:column;align-items:center;gap:1px}
 .sb-jl{font:700 6.5px/1 var(--f-inst);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .sb-jd svg{width:36px;height:36px;display:block}
 .sb-jd .ring{fill:#0a141c;stroke:#22384a;stroke-width:1}
@@ -161,10 +127,10 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-jd circle:not(.ring){fill:var(--steel)}
 .sb-jd .jv{font:700 8px var(--f-inst);fill:var(--steel)}
 .sb-jd.busy .jv{fill:var(--text)}
-.sb-jrow{display:flex;align-items:center}
-.sb-ja{width:14px;height:40px;padding:0;border:0;background:none;cursor:pointer;color:var(--steel)}
-.sb-ja svg{width:14px;height:40px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.sb-ja:hover:not(:disabled){color:var(--text)}.sb-ja:disabled{opacity:.3;cursor:default}
+.sb-jh{position:absolute;top:8px;bottom:0;width:50%}
+.sb-jh.l{left:0;cursor:w-resize!important}.sb-jh.r{right:0;cursor:e-resize!important}
+.sb-jh:hover{background:radial-gradient(circle at var(--x,50%) 55%,rgba(154,163,171,.14),transparent 60%)!important}
+.sb-jh.l:hover{--x:100%}.sb-jh.r:hover{--x:0%}
 /* the jib car's H: two fore-and-aft legs, the crossbar on its row, the car on its pin (forward up, inboard toward the middle) */
 .sb-jc{display:flex;flex-direction:column;align-items:center;gap:2px;width:44px}
 .sb-h-grid{position:relative;display:grid;grid-template-columns:repeat(5,7px);grid-template-rows:repeat(7,7px);gap:1px;padding:2px 3px;
@@ -187,8 +153,7 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 /* (the messages stop above the band while it is open) */
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 
-/* the windex's point of sail (ROADMAP 8j), just below the windex (the owner, 15 Nov 2026) */
-.sb-pos{position:absolute;left:50%;top:calc(100% + 1px);transform:translateX(-50%);white-space:nowrap;pointer-events:none;color:#fff;font:700 10px/1 var(--f-inst);letter-spacing:.04em;text-shadow:0 0 2px #08141e,0 0 2px #08141e}
+.sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px} /* the windex's point of sail (ROADMAP 8j) */
 /* the pilot refused, or sounded its alarm: the reason in a word on its button (or its readout), in the caution color, for
    3 s (app.ts pilotRefused) */
 #bPilot.refused,.sb-tillerslot #bPilot.refused{border-color:var(--caution);color:var(--caution)}

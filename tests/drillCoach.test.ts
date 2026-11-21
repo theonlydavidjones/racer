@@ -59,19 +59,4 @@ describe('The drills\' coach by the boat (app/drillCoach.ts)', () => {
     const kt = FOLKBOAT.speedKt(12, 90), need = 60 / (kt * 0.5144);
     expect(co.tick(view(0, -60, 0, kt, -need, { start }), 'start').cue?.word).toBe('Go');
   });
-
-  it('the favored end, yours to find (8za): the lane to the middle till you call an end, then to the end you called; the read drawn head to wind', () => {
-    // a line laid north-south, its pin end (north) about 8.5° nearer the westerly: the pin end favored
-    const line = { pin: { x: -15, y: 100 }, committee: { x: 15, y: -100 } };
-    const gate = (extra: object, h = 0) => new DrillCoach().tick(view(60, 0, h, 3, -60, { start: { ...line, ...extra } }), 'start').spec!;
-    expect(gate({}).gate!.p.y).toBeGreaterThan(33); // (no call asked for: the favored third, as before)
-    expect(Math.abs(gate({ call: null }).gate!.p.y)).toBeLessThan(15); // (asked, not called: the middle)
-    expect(gate({ call: 'committee' }).gate!.p.y).toBeLessThan(-33); // (called, wrong: where you called)
-    expect(gate({ call: 'pin' }).gate!.p.y).toBeGreaterThan(33);
-    // head to wind near the line: her bow's line against the line's square (toward the wind), drawn while the help lasts
-    const r = gate({ call: null, read: true }, 270).read!;
-    expect(r.bow).toBe(270); expect(Math.abs(((r.sq - 270 + 540) % 360) - 180)).toBeLessThan(15);
-    expect(gate({ call: null, read: false }, 270).read).toBeUndefined();
-    expect(gate({ call: null, read: true }, 0).read).toBeUndefined(); // (not head to wind: no read)
-  });
 });

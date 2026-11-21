@@ -18,14 +18,9 @@ export interface GuideSpec {
   /** The lane to sail (water polylines, sim metres) and its half-width (m). */
   lane?: { pts: Pt[]; half: number }[];
   /** Where to start the turn: a bar across the lane. */
-  gate?: { p: Pt; h: number; half: number; hint?: string };
+  gate?: { p: Pt; h: number; half: number };
   /** A good crew's turn (white). */
   ideal?: Pt[];
-  /** The favored-end read (8za): from her, her bow's line (amber) and the line's square (white, dashed), the arc between
-   *  them and its degrees; the bow leans toward the favored end. */
-  read?: { o: Pt; bow: number; sq: number; ends?: { p: Pt; name: string; ring: boolean }[] };
-  /** Gold arrowheads along the lane toward its end (the start: the approach, pointing at the line). */
-  arrows?: { p: Pt; h: number; n: number };
   /** The course to steer after the turn: chevrons on the water along it. */
   target?: { p: Pt; h: number };
   /** Rounding: the mark's zone, drawn bright; the exit course (dashed, with chevrons). */
@@ -76,26 +71,15 @@ export class DrillGuides {
   private wakeN = -1;
   private cueKey = '';
   private readonly tag: HTMLDivElement;
-  private readonly hit: HTMLDivElement;
-  private gateAt: Pt | null = null;
-  private readAt: { p: Pt; txt: string; ends: { p: Pt; name: string; ring: boolean }[] } | null = null;
-  private readonly endTags: HTMLDivElement[] = [];
-  private readonly readTag: HTMLDivElement;
   constructor(private scene: THREE.Scene, private camera: THREE.Camera) {
     this.tag = document.createElement('div'); this.tag.className = 'dg-cue'; this.tag.hidden = true; this.tag.setAttribute('aria-live', 'polite');
     document.body.appendChild(this.tag);
-    // (the gate's hover: a small invisible patch over it on the screen, its line the gate's hint)
-    this.hit = document.createElement('div'); this.hit.className = 'dg-hit'; this.hit.hidden = true; document.body.appendChild(this.hit);
-    this.readTag = document.createElement('div'); this.readTag.className = 'dg-read'; this.readTag.hidden = true; document.body.appendChild(this.readTag);
-    // (the line's two ends named while the read's drawn: at the end if it's in view, else where the line leaves the view,
-    // an arrow along it; so the bow's lean reads as toward one end or the other)
-    for (let i = 0; i < 2; i++) { const t = document.createElement('div'); t.className = 'dg-end'; t.hidden = true; t.innerHTML = '<i></i><span></span>'; document.body.appendChild(t); this.endTags.push(t); }
   }
   /** The guides on the water: rebuilt only when `key` changes (they're fixed for a rep). */
   set(g: GuideSpec | null, key: string): void {
     if (key === this.key) return; this.key = key;
     this.objs.forEach(o => { this.scene.remove(o); free(o); }); this.objs = [];
-    if (!g) { this.gateAt = null; this.hit.hidden = true; this.readAt = null; this.readTag.hidden = true; return; }
+    if (!g) return;
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.objs.push(o); };
     for (const L of g.lane ?? []) {
       add(ribbon(L.pts, L.half * 2, GOLD, 0.10)); // (the lane itself, faint)
@@ -104,18 +88,8 @@ export class DrillGuides {
         add(ribbon(e, 0.5, GOLD, 0.75, 4));
       }
     }
-    this.gateAt = g.gate?.hint ? g.gate.p : null; this.hit.title = g.gate?.hint ?? '';
     if (g.gate) { const r = dir(g.gate.h + 90), p = g.gate.p; add(ribbon([{ x: p.x - r.x * g.gate.half, y: p.y - r.y * g.gate.half }, { x: p.x + r.x * g.gate.half, y: p.y + r.y * g.gate.half }], 1.4, GOLD, 0.95)); }
     if (g.ideal && g.ideal.length > 1) add(ribbon(g.ideal, 0.8, WHITE, 0.85));
-    if (g.arrows) chevrons(g.arrows.p, g.arrows.h, g.arrows.n, GOLD).forEach(add);
-    this.readAt = null;
-    if (g.read) {
-      const { o, bow, sq } = g.read, R = 90, off = ((bow - sq + 540) % 360) - 180, at = (h: number, r: number) => { const q = dir(h); return { x: o.x + q.x * r, y: o.y + q.y * r }; };
-      add(ribbon([o, at(sq, R)], 0.9, WHITE, 0.85, 4));
-      add(ribbon([o, at(bow, R)], 1.1, AMBER, 0.95));
-      if (Math.abs(off) >= 1) add(ribbon(Array.from({ length: 13 }, (_, i) => at(sq + off * i / 12, R * 0.65)), 0.7, AMBER, 0.9));
-      this.readAt = { p: at(sq + off / 2, R * 0.8), txt: `${Math.round(Math.abs(off))}°`, ends: g.read.ends ?? [] };
-    }
     if (g.target) chevrons(g.target.p, g.target.h, 3, CYAN).forEach(add);
     if (g.zone) { const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.35, ZONE + 0.35, 96), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(g.zone.x, g.zone.y, 0.35)); add(ring); }
     if (g.exit) { const d = dir(g.exit.h), p = g.exit.p; add(ribbon([p, { x: p.x + d.x * g.exit.len, y: p.y + d.y * g.exit.len }], 0.6, CYAN, 0.8, 4)); chevrons({ x: p.x + d.x * (g.exit.len - 14), y: p.y + d.y * (g.exit.len - 14) }, g.exit.h, 2, CYAN).forEach(add); }
@@ -136,57 +110,12 @@ export class DrillGuides {
     const w = document.createElement('div'); w.className = 'w'; w.textContent = c.word; this.tag.appendChild(w);
     if (c.sub) { const s = document.createElement('div'); s.className = 's'; s.textContent = c.sub; this.tag.appendChild(s); }
   }
-  /** Each frame: the cue rides above her masthead (11.5 m up), beside where you're already looking, but always whole on
-   *  the screen: below the dials' row, above the sail band, clear of the sides (the owner, 15 Nov 2026: it "keeps floating
-   *  out of view" in the start practice, up under the top bar), and eased toward where it's going so the boat's pitch and
-   *  the camera's sway don't shake it. */
+  /** Each frame: the cue rides above her masthead (11.5 m up), beside where you're already looking. */
   place(at: Pt | null): void {
-    if (this.readAt) { const g = P3(this.readAt.p.x, this.readAt.p.y, 0.4).project(this.camera), on = g.z <= 1 && Math.abs(g.x) < 1 && Math.abs(g.y) < 1;
-      this.readTag.hidden = !on; if (on) { this.readTag.style.left = `${Math.round((g.x + 1) / 2 * innerWidth)}px`; this.readTag.style.top = `${Math.round((1 - g.y) / 2 * innerHeight)}px`; if (this.readTag.textContent !== this.readAt.txt) this.readTag.textContent = this.readAt.txt; } }
-    else if (!this.readTag.hidden) this.readTag.hidden = true;
-    this.placeEnds();
-    if (this.gateAt) { const g = P3(this.gateAt.x, this.gateAt.y, 0.4).project(this.camera), on = g.z <= 1 && Math.abs(g.x) < 1 && Math.abs(g.y) < 1;
-      this.hit.hidden = !on; if (on) { this.hit.style.left = `${Math.round((g.x + 1) / 2 * innerWidth)}px`; this.hit.style.top = `${Math.round((1 - g.y) / 2 * innerHeight)}px`; } }
     if (this.tag.hidden || !at) return;
     const v = P3(at.x, at.y, 11.5).project(this.camera);
-    if (v.z > 1) { this.tag.style.visibility = 'hidden'; this.held = null; return; } // (behind the camera)
-    const W = innerWidth, H = innerHeight, cw = this.tag.offsetWidth, ch = this.tag.offsetHeight, now = performance.now();
-    if (now - this.edgeT > 1000) { // (the dials' row and the band, measured again each second: they come and go with views)
-      this.edgeT = now;
-      const box = (q: string) => { const r = document.querySelector(q)?.getBoundingClientRect(); return r && r.height > 0 ? r : null; }; // (fixed: no offsetParent)
-      this.edgeTop = Math.max(box('#hud')?.bottom ?? 0, box('#hudRight')?.bottom ?? 0) + 10;
-      this.edgeBot = Math.min(box('.sailband')?.top ?? H, H) - 10;
-      this.sides = ['#leftCol', '#map', '#trimPanel', '#msgLog'].map(box).filter((r): r is DOMRect => !!r);
-    }
-    // (the tag hangs from its point: translate(-50%, -100%), so x is its middle and y its foot)
-    let x = Math.min(Math.max((v.x + 1) / 2 * W, cw / 2 + 16), W - cw / 2 - 16);
-    const y = Math.min(Math.max((1 - v.y) / 2 * H, this.edgeTop + ch), Math.max(this.edgeTop + ch, this.edgeBot));
-    // (and off the panels down the sides, the start line's card, the flags, the inset map: slid toward the middle past them)
-    for (const r of this.sides) if (y > r.top && y - ch < r.bottom && x + cw / 2 > r.left && x - cw / 2 < r.right)
-      x = r.left + r.width / 2 < W / 2 ? r.right + cw / 2 + 10 : r.left - cw / 2 - 10;
-    const k = this.held ? 1 - Math.exp(-(now - this.held.t) / 120) : 1; // (eased over ~0.1 s)
-    const p = this.held ? { x: this.held.x + (x - this.held.x) * k, y: this.held.y + (y - this.held.y) * k } : { x, y };
-    this.held = { ...p, t: now };
-    this.tag.style.visibility = ''; this.tag.style.left = `${Math.round(p.x)}px`; this.tag.style.top = `${Math.round(p.y)}px`;
-  }
-  private held: { x: number; y: number; t: number } | null = null;
-  private edgeT = -1e9; private edgeTop = 0; private edgeBot = 0; private sides: DOMRect[] = [];
-  private placeEnds(): void {
-    const ends = this.readAt?.ends ?? [];
-    this.endTags.forEach((t, i) => {
-      const e = ends[i]; if (!e || ends.length < 2) { if (!t.hidden) t.hidden = true; return; }
-      const o = ends[1 - i].p, mid = { x: (e.p.x + o.x) / 2, y: (e.p.y + o.y) / 2 };
-      const scr = (q: Pt) => { const v = P3(q.x, q.y, 0.4).project(this.camera); return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, ok: v.z <= 1 }; };
-      const inside = (q: { x: number; y: number; ok: boolean }) => q.ok && q.x > 70 && q.x < innerWidth - 70 && q.y > 110 && q.y < innerHeight - 200;
-      const along = (k: number) => scr({ x: mid.x + (e.p.x - mid.x) * k, y: mid.y + (e.p.y - mid.y) * k });
-      let k = 1;
-      if (!inside(scr(e.p))) { if (!inside(along(0))) { t.hidden = true; return; } let lo = 0, hi = 1; for (let n = 0; n < 24; n++) { const m = (lo + hi) / 2; if (inside(along(m))) lo = m; else hi = m; } k = lo; }
-      const p = along(k), q = along(Math.max(0, k - 0.02)), a = Math.atan2(p.y - q.y, p.x - q.x) * 180 / Math.PI;
-      t.hidden = false; t.style.left = `${Math.round(p.x)}px`; t.style.top = `${Math.round(p.y)}px`;
-      const i0 = t.firstElementChild as HTMLElement, s0 = t.lastElementChild as HTMLElement;
-      i0.className = k < 1 ? 'arr' : e.ring ? 'ring' : 'blk'; i0.style.transform = k < 1 ? `rotate(${a.toFixed(0)}deg)` : '';
-      if (s0.textContent !== e.name) s0.textContent = e.name;
-    });
+    if (v.z > 1) { this.tag.style.visibility = 'hidden'; return; } // (behind the camera)
+    this.tag.style.visibility = ''; this.tag.style.left = `${(v.x + 1) / 2 * innerWidth}px`; this.tag.style.top = `${(1 - v.y) / 2 * innerHeight}px`;
   }
   clear(): void { this.set(null, ''); this.wake(null); this.cue(null); }
 }

@@ -1,4 +1,4 @@
-import { inPoly, type Vec, hypot } from '../core/math';
+import { inPoly, type Vec } from '../core/math';
 import { LL } from './geo';
 
 /**
@@ -34,7 +34,7 @@ export function underPier(p: Vec): PileField | null {
  * within `ahead` seconds; null if it doesn't.
  */
 export function setOntoPier(pts: Vec[], vx: number, vy: number, ahead = 30): { pier: PileField; s: number } | null {
-  if (hypot(vx, vy) < 0.03) return null;
+  if (Math.hypot(vx, vy) < 0.03) return null;
   for (let s = 0; s <= ahead; s += 0.5) for (const p of pts) { const f = underPier({ x: p.x + vx * s, y: p.y + vy * s }); if (f) return { pier: f, s }; }
   return null;
 }

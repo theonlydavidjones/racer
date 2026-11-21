@@ -2,9 +2,8 @@
  * The practice drills: the tack and gybe drill and the mark-rounding drill (their lines in the Coach card and the Pause screen), and the start practice's debrief (its panel, the run of attempts, its buttons).
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
-import { fleetChoiceHtml } from '../ui/tiles';
 import { type ReplayClip } from '../replay/replayView';
-import { MAX_OPPONENTS, drillFleetSize, saveSettings } from '../settings';
+import { saveSettings } from '../settings';
 import { windBand, type ManoeuvreScore } from '../sim/drill';
 import { roundingKey, type RoundingScore } from '../sim/roundings';
 import { startDebrief } from '../sim/startDebrief';
@@ -88,7 +87,11 @@ function showDrill(): void {
   if (d.stats) app.drillRuns.push({ ...d.stats, n: app.drillRuns.length + 1, from: app.w.startAt, solo: app.w.boats.length === 1 });
   drillOptions(); drillTable();
   $('dTitle').textContent = d.title;
-  takeaways(d);
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  // one line to act on, the top tip; what happened, and the other tips, folded away (the owner: no paragraphs on the screen)
+  const more = [...d.facts, ...d.tips.slice(1)];
+  $('dTips').innerHTML = d.tips.length ? `<li>${esc(d.tips[0])}</li>` : '';
+  $('dFacts').innerHTML = more.length ? `<li class="dmore"><details class="thow"><summary>What happened</summary>${more.map(f => `<p>${esc(f)}</p>`).join('')}</details></li>` : '';
   $('dVerdict').className = 'verdict' + (d.grade === 'great' || d.grade === 'good' ? ' ok' : '');
   $('drill').hidden = false;
   drillClip = { frames: app.w.rec.slice(), focus: [app.w.user.id], wind: app.w.gun?.windFrom ?? app.w.wind.from, kind: 'start' };
@@ -99,75 +102,25 @@ const closeDrill = () => { $('drill').hidden = true; app.drillView.stop(); };
 function drillOptions(): void {
   const from = app.S.drillFrom ?? app.DRILL_FROM, solo = app.S.drillSolo ?? true;
   $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
-    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">${fleetChoiceHtml(false, 0)}</button><button type="button" data-v="0" aria-pressed="${!solo}">${fleetChoiceHtml(true, drillFleetSize(app.S))}</button>`
-    + (solo ? '' : '<button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button>') + '</div>';
+    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
 }
 $('dOpts').addEventListener('click', e => {
-  const n = (e.target as HTMLElement).closest<HTMLElement>('button[data-fn]');
-  if (n) { app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); saveSettings(app.S); drillOptions(); return; }
   const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
   if (g === 'from') app.S.drillFrom = +b.dataset.v!; else app.S.drillSolo = b.dataset.v === '1';
   saveSettings(app.S); drillOptions();
 });
-/** What cost the most, as 2–3 short lines, biggest loss first, each with its fix (the owner, 15 Nov 2026: "short, sharp
- *  takeaways", not a copy block); a bar for the seconds each one cost. Everything else the debrief says: behind one ⓘ. */
-function takeaways(d: ReturnType<typeof startDebrief>): void {
-  const st = d.stats, rows: { s: number; html: string }[] = [], esc = app.esc;
-  if (st) {
-    // (the seconds each one cost: being late is its own; each 10% of speed short at the gun about 5 s, the time a
-    // Folkboat takes to build it back, the same rule as the table's best; the wrong end is ranked last, its cost not timed)
-    if (st.grade === 'ocs') rows.push({ s: 99, html: `<b>Over by ${Math.round(-st.behindM)} m</b> → a length back at 10 s to go, then sheet in` });
-    else if (st.lateS >= 2) rows.push({ s: st.lateS, html: st.lateS > 60 ? '<b>Over a minute late</b> → start your run in from closer' : `<b>${Math.round(st.lateS)} s late</b> → turn for the line ${Math.round(st.lateS)} s sooner` });
-    if (st.grade !== 'ocs' && st.pct < 90) rows.push({ s: (100 - st.pct) / 2, html: `<b>${st.pct}% speed</b> → sheet in 12 s before the gun` });
-    if (st.fav && !st.onFav && st.grade !== 'ocs') rows.push({ s: 0, html: `<b>Wrong end</b> → start in the ${esc(st.fav === 'pin' ? app.w.C.pinLabel : app.w.C.committeeLabel)} third` });
-  }
-  rows.sort((a, b) => b.s - a.s);
-  if (!rows.length) rows.push({ s: 0, html: '<b>On the line at full speed</b> → the same again' });
-  const more = [...d.facts, ...d.tips].join('\n\n');
-  const info = more ? ` <span class="dtk-i" tabindex="0" title="${esc(more).replace(/"/g, '&quot;')}">ⓘ</span>` : '';
-  const top = rows.slice(0, 3);
-  $('dTips').innerHTML = callLine(st) + top.map((r, i) => `<li class="dtk"><i class="dtk-bar" style="--s:${Math.min(1, r.s / 30).toFixed(2)}"></i><span>${r.html}${i === top.length - 1 ? info : ''}</span></li>`).join('');
-  $('dFacts').innerHTML = '';
-}
-/** The favored-end call (8za), first in the debrief: yours against the line at the gun (the debrief's own read:
- *  startDebrief's stats.fav, the end nearer the wind at the gun, from 2° of bias), with a small picture of why (the
- *  line, its square dashed, the wind leaning toward the favored end), and how many more starts the read's drawn on the
- *  water for. The call's counted here, once a start. */
-function callLine(st: ReturnType<typeof startDebrief>['stats']): string {
-  if (!st) return '';
-  const w = app.w, call = app.favCall, C = w.C, name = (e: 'pin' | 'committee') => app.esc((e === 'pin' ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, ''));
-  if (call) { app.S.favCalls = (app.S.favCalls ?? 0) + 1; saveSettings(app.S); }
-  const left = Math.max(0, 3 - (app.S.favCalls ?? 0));
-  // the bias at the gun, as the debrief reads it (sim/startDebrief.ts)
-  const gw = (w.gun?.windFrom ?? w.wind.from) * Math.PI / 180, k = ((w.pin.x - w.committee.x) * Math.sin(gw) + (w.pin.y - w.committee.y) * Math.cos(gw)) / w.lineLen;
-  const bias = Math.round(Math.asin(Math.min(1, Math.abs(k))) * 180 / Math.PI);
-  const fav = st.fav, ok = call && fav ? call === fav : null;
-  // the picture, seen from below the line as the card's sketch is: the end on the left first
-  const pinLeft = ((w.pin.x - w.center.x) * -w.N.y + (w.pin.y - w.center.y) * w.N.x) > 0, favLeft = fav ? (fav === 'pin') === pinLeft : null;
-  const lean = (favLeft == null ? 0 : favLeft ? -1 : 1) * Math.max(4, Math.min(30, bias)) * Math.PI / 180, wx = 22 + Math.sin(lean) * 16, wy = 22 - Math.cos(lean) * 16;
-  const pic = `<svg class="dcall-pic" viewBox="0 0 44 26" width="66" height="39" aria-hidden="true"><line x1="5" y1="22" x2="39" y2="22"/><circle cx="5" cy="22" r="2.4"/><rect x="36.5" y="19.5" width="5" height="5"/>`
-    + `<line class="sq" x1="22" y1="22" x2="22" y2="4"/><line class="wd" x1="22" y1="22" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}"/></svg>`;
-  const what = fav ? `${name(fav)} favored ${bias}°` : 'a square line: neither end';
-  const head = call ? `Your call: <b class="${ok === false ? 'bad' : 'ok'}">${name(call)} ${ok === false ? '✗' : '✓'}</b> · ${what}` : `No call · ${what}`;
-  const dots = call || left < 3 ? `<span class="dcall-dots" title="The read's drawn on the water for ${left} more start${left === 1 ? '' : 's'}">${'●'.repeat(left)}${'○'.repeat(3 - left)}</span>` : '';
-  return `<li class="dcall">${pic}<span>${head}</span>${dots}</li>`;
-}
-/** The attempts this session, with units in the headings, the latest and the best marked, where on the line as an icon. */
+/** The run of attempts this session: each start's numbers, the best marked, to see the trend. */
 function drillTable(): void {
   if (app.drillRuns.length < 2) { $('dRuns').innerHTML = ''; return; }
   // (a start is as good as it is on time and at speed: each 10% of speed short counts as about 5 s late, the time it
   // takes a Folkboat to build that speed back)
   const score = (r: typeof app.drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 2;
-  const best = app.drillRuns.reduce((a, r) => score(r) < score(a) ? r : a), latest = app.drillRuns[app.drillRuns.length - 1];
-  // where on the line: the line, the pin (a ring) at the left, the committee boat (a block) at the right, her spot a dot,
-  // green when it was the favored end's third
-  const endIcon = (r: typeof best) => { const x = r.end === 'pin' ? 6 : r.end === 'committee' ? 26 : 16, ok = r.fav && r.onFav;
-    return `<svg class="dend" viewBox="0 0 32 12" width="44" height="16" aria-label="${r.end}${ok ? ', favored end' : ''}"><line x1="3" y1="6" x2="29" y2="6"/><circle class="pin" cx="3" cy="6" r="2"/><rect class="rc" x="27" y="3.5" width="4" height="5"/><circle class="me${ok ? ' fav' : ''}" cx="${x}" cy="6" r="3"/></svg>`; };
-  const cells = (r: typeof best) => r.grade === 'ocs' ? `<td class="ocs">over ${Math.round(-r.behindM)}</td><td>—</td>`
-    : r.behindM < 0 ? `<td>past ${Math.round(-r.behindM)}</td><td>0</td>` : `<td>${Math.round(r.behindM)}</td><td>${r.lateS > 60 ? '60+' : Math.round(r.lateS)}</td>`;
-  const rows = app.drillRuns.slice(-10).map(r => `<tr class="${r === best ? 'best' : ''}${r === latest ? ' latest' : ''}"><td>${r.n}${r === best ? ' ★' : ''}</td>${cells(r)}<td>${r.pct}</td><td>${endIcon(r)}</td><td>${r.grade}</td></tr>`).join('');
-  $('dRuns').innerHTML = `<table class="res attempts dstarts"><thead><tr><th>#</th><th>Behind m</th><th>Late s</th><th>Speed %</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`
-    + `<div class="dlegend"><span class="b">★ best</span><span><svg class="dend" viewBox="0 0 12 12" width="12" height="12"><circle class="me fav" cx="6" cy="6" r="3"/></svg> favored end</span></div>`;
+  const best = app.drillRuns.reduce((a, r) => score(r) < score(a) ? r : a);
+  const endW = (e: string) => e === 'pin' ? app.w.C.pinLabel : e === 'committee' ? app.w.C.committeeLabel : 'middle';
+  const rows = app.drillRuns.slice(-10).map(r => `<tr${r === best ? ' class="best"' : ''}><td>${r.n}</td><td>${r.grade === 'ocs' ? `over, ${Math.round(-r.behindM)} m` : r.behindM < 0 ? `past, ${Math.round(-r.behindM)} m` : `${Math.round(r.behindM)} m · ${Math.round(r.lateS)} s`}</td><td>${r.pct}%</td><td>${app.esc(endW(r.end))}${r.fav ? (r.onFav ? ' ✓' : '') : ''}</td><td>${r.grade}</td></tr>`).join('');
+  const last = app.drillRuns.slice(-3), avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const clean = last.filter(r => r.grade !== 'ocs'), trend = app.drillRuns.length >= 4 && clean.length ? ` Your last three averaged ${Math.round(avg(clean.map(r => r.lateS)))} s late at ${Math.round(avg(last.map(r => r.pct)))}% speed${clean.length < last.length ? ` (${last.length - clean.length} over early)` : ''}.` : '';
+  $('dRuns').innerHTML = `<p class="lede">Your starts this session (the best highlighted; ✓ started at the favored end).${trend}</p><table class="res attempts"><thead><tr><th>#</th><th>At the gun</th><th>Speed</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 $('bDReplay').onclick = () => { if (drillClip) app.drillView.play(app.w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); app.beginRace(app.w.seed); };

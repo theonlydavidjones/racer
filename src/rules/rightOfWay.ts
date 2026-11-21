@@ -1,4 +1,4 @@
-import { V, ZONE, brg, markDist, wrap, hypot } from '../core/math';
+import { V, ZONE, brg, markDist, wrap } from '../core/math';
 import { clearAstern } from './geometry';
 import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
 
@@ -8,9 +8,6 @@ import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
  * (Rule 19, room at an obstruction, is settled when there's an incident: see assessPair.) */
 /** Rule 21.1: is she returning to start (the World's judgement, or, if it hasn't made one, her being over early)? */
 export const returning = (b: RulesBoat): boolean => b.returning ?? b.ocs;
-/** Rule 21.2: "a boat taking a penalty", her turns begun. A boat that owes turns but is still getting well clear of the
- * other boats first (rule 44.2) isn't taking it yet: she races under Section A like any other until she begins. */
-export const takingPenalty = (b: RulesBoat): boolean => b.penalty > 0 && b.penaltyDir !== 0;
 
 export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, rec?: PairRecord | null): Verdict<B> {
   const B = B_;
@@ -21,9 +18,8 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   const ret = returning(A), retB = returning(B);
   if (after && ret && !retB) return { kc: A, rule: '21.1' };
   if (after && retB && !ret) return { kc: B, rule: '21.1' };
-  const penA = takingPenalty(A), penB = takingPenalty(B);
-  if (penA && !penB) return { kc: A, rule: '21.2' };
-  if (penB && !penA) return { kc: B, rule: '21.2' };
+  if (A.penalty > 0 && !(B.penalty > 0)) return { kc: A, rule: '21.2' };
+  if (B.penalty > 0 && !(A.penalty > 0)) return { kc: B, rule: '21.2' };
   if (A.backing && !B.backing) return { kc: A, rule: '21.3' };
   if (B.backing && !A.backing) return { kc: B, rule: '21.3' };
   // (Rule 20.2(c), "You tack": the boat that replied owes the hailing boat room to tack and avoid her, but right of way
@@ -89,7 +85,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
 function windward<B extends RulesBoat>(A: B, B: B, ctx: RulesContext): B {
   const ua = V(A.h), ub = V(B.h);
   let mx = ua.x + ub.x, my = ua.y + ub.y;
-  if (hypot(mx, my) < 0.2) { const n = V(ctx.windFrom); mx = n.y; my = -n.x; } // nearly opposite headings: fall back to the wind
+  if (Math.hypot(mx, my) < 0.2) { const n = V(ctx.windFrom); mx = n.y; my = -n.x; } // nearly opposite headings: fall back to the wind
   const stbd = { x: my, y: -mx }, side = A.tack === 'S' ? 1 : -1;
   const aOut = ((A.x - B.x) * stbd.x + (A.y - B.y) * stbd.y) * side;
   return aOut > 0 ? A : B;

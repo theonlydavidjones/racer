@@ -25,7 +25,7 @@ describe('the passage she would sail leaving now', () => {
     const w = at({}), pn = passageNow(w)!, pl = passagePlan(w)!;
     expect(pl.route).toEqual(pn.route); expect(pl.track).toEqual(pn.track);
     expect(passageNow(w)).toBe(pn); // (worked out once, while nothing's changed)
-  }, 30_000);
+  });
 
   it('beats to a mark upwind: tacks on the way, sails further than the straight line, and arrives when the track does', () => {
     const w = at({}), pn = passageNow(w)!; // (the Cityfront to off Crissy Field: west, into the westerly)
@@ -37,18 +37,18 @@ describe('the passage she would sail leaving now', () => {
     expect(pn.eta).toBeCloseTo(pn.track[pn.track.length - 1].t, 6); expect(pn.eta! - pn.leave).toBeCloseTo(pn.minutes, 6);
     // each tack is on her track
     for (const q of pn.tacks) expect(Math.min(...pn.track.map(r => dist(r.p, q)))).toBeLessThan(60);
-  }, 30_000);
+  });
 
   it('runs to a mark downwind and reaches across: no tacks on a reach', () => {
     const run = passageNow(at({ sailFrom: 'crissy', sailTo: 'cityfront' }))!;
     expect(run.ok).toBe(true); expect(run.legs.every(l => l.kind !== 'beat')).toBe(true); expect(run.tacks.length).toBe(0);
-  }, 30_000);
+  });
 
   it('takes the current: the same passage at slack water and on the real tide arrives at different times', () => {
     const real = passageNow(at({ tideTime: '15:00' }))!, slack = passageNow(at({ tideTime: '15:00', current: 'slack' }))!;
     expect(real.ok && slack.ok).toBe(true);
     expect(Math.abs(real.minutes - slack.minutes)).toBeGreaterThan(0.5);
-  }, 30_000);
+  });
 });
 
 import { sailLeg } from '../src/sim/routing';
@@ -85,20 +85,20 @@ describe('sailLeg (the review of the course estimate)', () => {
       const cv = V(220), wv = { x: d.x / dt - cv.x * KT, y: d.y / dt - cv.y * KT }; // (through the water)
       expect(Math.abs(wrap(brg(wv.x, wv.y) - 0)), `step ${i}`).toBeGreaterThan(beat - 8);
     }
-  }, 30_000);
+  });
 
   it('runs on from where she rounded each turn of the route: the track has no jumps', () => {
     const pn = passageNow(at({ sailTo: 'raccoon' }))!;
     expect(pn.route.length).toBeGreaterThan(2);
     let worst = 0; for (let i = 1; i < pn.track.length; i++) worst = Math.max(worst, dist(pn.track[i - 1].p, pn.track[i].p));
     expect(worst).toBeLessThan(110); // (a point every 30 s at most: about 3 m/s × 30 s, and the current)
-  }, 30_000);
+  });
 
   it('is worked out again when the conditions change under way (the pause menu: World.applyConditions)', () => {
     const w = at({}), a = passageNow(w)!;
     w.applyConditions({ ...w.settings, current: 'slack' });
     const b = passageNow(w)!; expect(b).not.toBe(a);
-  }, 30_000);
+  });
 });
 
 describe('the laylines drawn with the passage', () => {
@@ -114,7 +114,7 @@ describe('the laylines drawn with the passage', () => {
       const st = tr[Math.min(tr.length - 2, lastTurn + 1)].p, dir = Math.atan2(end.x - st.x, end.y - st.y) * 180 / Math.PI;
       const off = Math.min(...pn.laylines!.tracks.map(g => Math.abs(wrap(dir - Math.atan2(g.x, g.y) * 180 / Math.PI))));
       expect(off).toBeLessThan(5);
-    }, 30_000); // (the router's plan: a few seconds cold, more under the full suite's load)
+    });
 });
 
 describe('passages along a shore', () => {

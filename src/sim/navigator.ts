@@ -1,5 +1,4 @@
-import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { STRUCTURE_CLEAR, clearTo, heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { KT, LOA, dist, dot, segCross, sub, unit, type Vec } from '../core/math';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -7,10 +6,8 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { FINE, routeLegSteps, trackClear, type Grain } from './router';
-import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
-import { landAlong, wharfNearest } from '../geo/shore';
-import { harborAt, harborRouteSteps, slipAt } from '../geo/marina';
+import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
+import { landAlong } from '../geo/shore';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
 /**
@@ -33,64 +30,8 @@ const ROUTE_NAME: Record<string, string> = {
   channel: 'the deep-water ship route', sausalito: 'the Sausalito ferry route', alcatraz: 'the Alcatraz ferry route', tour: 'the bay-cruise boats\' loop'
 };
 
-/** The passage by the old rules (routing.ts sailLeg, stretch by stretch along the way round the land, up the middle or
- * the long board first to either side): #406's planner, kept as a floor under the router. */
-/**
- * Where the next stretch of a passage starts: from where the last one ended (`end`, within its arrive of the turn) if
- * the next turn can be seen from there clear of the land, else from the turn itself, the track jumping to it. That jump
- * is sailed by nobody and judged by nothing, so it's taken only if it's clear as the router judges a line (helmPlan.ts
- * clearTo: no land, and STRUCTURE_CLEAR off the structures, or no nearer than she is) and through no gap narrower than
- * the pilot's turning room (narrowOn); else the next stretch starts where she is and the router finds the way. Jumped
- * regardless, a 119 m jump ran across the Berkeley Pier ruin's west tip, and the pilot was handed over before a gap too
- * narrow that a meter's shift in the plan made or unmade; and another, to a corner of the way round the land 3.6 m off
- * that tip, took her within 10 m of it (Deep Physics, 19 Nov 2026, on beat-chop).
- */
-function onFrom(end: Vec, turn: Vec, next: Vec | undefined): Vec {
-  if (!next) return turn;
-  if (landAlong(end, next) === Infinity && landDist(end) > 20) return end;
-  return clearTo(end, turn, false) && !narrowOn(end, turn) ? turn : end;
-}
-function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
-  let tt = t, ok = true, why: 'land' | 'time' | undefined, at = route[0];
-  const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
-  for (let i = 1; i < route.length; i++) {
-    const arrive = i === route.length - 1 ? 30 : 120;
-    // (each plan's track held, segment by segment, to the router's own test against the piers, wharves, breakwaters and
-    // docks: nothing crossed, nothing nearer than WHARF_CLEAR. The rules sail in 10 s steps, ~30 m, and look only for
-    // land under her: a pier can lie between two of them, or a few metres off her track)
-    const sound = (q: SailResult): SailResult => q.ok && !trackClear(q.path, route[i], arrive) ? { ...q, ok: false, why: 'land' } : q;
-    let r = sound(yield* sailLegSteps(o, at, route[i], tt, 'middle', undefined, arrive, 360));
-    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) { const q = sound(yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360)); if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q; }
-    legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
-    if (!r.ok) { ok = false; why = r.why; break; }
-    const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = onFrom(end, route[i], next);
-    if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
-  }
-  return { ok, why, minutes: tt - t, track, legs };
-}
-
-/**
- * A passage from a to b leaving at t, by the isochrone router (sim/router.ts): straight from a to b first, the router
- * finding its own way round the land, the lee and the tide; if it can't (the land between hides the way from its
- * front), stretch by stretch along the way round the land (routeAround), each by the router, and a stretch the router
- * can't sail by the old rules (sailLeg, up the middle or either side). A generator: it yields as the router works,
- * so the page can work a plan out a slice a frame (passageLive).
- */
-function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
-  const a = route[0], b = route[route.length - 1];
-  // (first the old rules' plans over the way round the land, which take a moment: the router then has a time to beat, and
-  // searches no water it couldn't beat it from. The passage is the quicker: the router's 5° headings and 1-minute fronts
-  // can be a few minutes out on a reach the rules sail dead straight)
-  const rules = yield* rulesPassage(o, route, t);
-  // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
-  // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
-  // An estimate: docs/CONSTANTS.md)
-  // (a front that has lost the way given up here, router.ts GIVE_UP, only when the stretches follow to try again)
-  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity, route.length > 2);
-  if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
-  if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
-  if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
+/** A passage from a to b leaving at t: round the land, each stretch sailed up the middle (tacking on a lane either side). */
+function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
   let tt = t, ok = true, why: 'land' | 'time' | undefined;
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
   // each stretch from where the last one really ended (she counts as round a turn within 120 m of it, and cuts the
@@ -98,17 +39,18 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
   let at = route[0];
   for (let i = 1; i < route.length; i++) {
     const arrive = i === route.length - 1 ? 30 : 120;
-    let r = yield* routeLegSteps(o, at, route[i], tt, arrive, 360, grain);
-    // (the router couldn't: the old rules, up the middle, then the long board first to one side or the other)
-    if (!r.ok) for (const pl of ['middle', 'left', 'right'] as const) {
-      const q = yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360);
-      if (q.ok && trackClear(q.path, route[i], arrive) && (!r.ok || q.minutes < r.minutes)) r = q;
+    let r = sailLeg(o, at, route[i], tt, 'middle', undefined, arrive, 360);
+    // run ashore up the middle (its lanes either side of the course meet the shore): a navigator would sail it the other
+    // ways, the long board first to one side or the other, and take whichever gets there soonest
+    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) {
+      const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360);
+      if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q;
     }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = onFrom(end, route[i], next);
+    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
   return { ok, why, minutes: tt - t, track, legs };
@@ -148,270 +90,41 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
-/**
- * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
- * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
- * are corners; the steps along a straight board aren't), and a corner kept wherever the chord would cross land or pass
- * through a gap narrower than GAP_MIN, so the helm never steers a leg the router didn't (sim/helmPlan.ts narrowOn).
- */
-export function helmPoints(pn: PassageNow): Vec[] {
-  const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
-  const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
-  const stack: [number, number][] = [[0, p.length - 1]];
-  while (stack.length) {
-    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL, most = -1, md = -1;
-    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } if (d > md) { md = d; most = i; } }
-    // (a chord within the tolerance is taken only if the router's track would be: across no land, and through no gap
-    // too narrow for the pilot (helmPlan.ts narrowOn), else the track's own corner is kept. Cut without that, rounding
-    // the Berkeley Pier ruin's west tip 8 m inside the tolerance, a chord ran across the tip, and a meter's shift in the
-    // track flipped the pilot's verdict on it to a gap too narrow: Deep Physics, 19 Nov 2026)
-    if (far < 0 && most >= 0 && (landAlong(p[a], p[b]) !== Infinity || narrowOn(p[a], p[b]) || nearerThanTrack(p, a, b))) far = most;
-    if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
-  }
-  return p.filter((_, i) => keep[i]);
-}
-/** Does the chord from track point a to b come nearer a pier, wharf or breakwater than the track it stands for, under
- * STRUCTURE_CLEAR? (The router keeps WHARF_CLEAR off them; cut within the tolerance, a chord through the 45 m gap at
- * the Berkeley Pier deck's end passed 10 m off its tip where the track rounded it wider, and she sailed it at 9.98 m.) */
-function nearerThanTrack(p: Vec[], a: number, b: number): boolean {
-  const off = (q: Vec) => wharfNearest(q, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR;
-  let track = STRUCTURE_CLEAR;
-  for (let i = a; i <= b; i++) track = Math.min(track, off(p[i]));
-  const L = dist(p[a], p[b]), n = Math.max(1, Math.ceil(L / 5));
-  for (let k = 1; k < n; k++) if (off({ x: p[a].x + (p[b].x - p[a].x) * k / n, y: p[a].y + (p[b].y - p[a].y) * k / n }) < track - 1) return true;
-  return false;
-}
-/** helmPoints' tolerance (m): about one of her lengths, well inside World.planTarget's 30 m for a corner made, so the
- * pilot's course between two corners is the plotted one to within a boat length (an estimate, not a measured figure). */
-const HELM_TOL = 8;
-/**
- * On Nav, the navigator's plan to the helm (World.planTarget: the pilot follows the plotted course, not the rhumb line,
- * the owner's r253), as a navPlan command for the page to send. A plan is asked of `plan` (the page's passageLive,
- * worked out between frames) only when something calls for one, not on a timer (the Coordinator, 18 Nov 2026: a plan
- * each 150 m took up to an eighth of the page's thread for the whole passage): the pilot engaged, or a new race; a corner
- * made, or past one and not yet clear to turn for the next; off the plan by more than HELM_OFF m; the wind or the tide at the course changed by more than HELM_WIND, HELM_KT
- * or HELM_TIDE since it was planned; or, failing all of those, HELM_EVERY minutes of the clock on. Meanwhile the helm
- * keeps the plan it has. A plan's taken only if she's within HELM_OFF m of its track (one held over from before she was
- * steered off it waits for the next; one begun some way back, as a long plan is by the time it's in, is taken up at the
- * leg she's on). The corners are counted as the World counts them (sim/helmPlan.ts), on the page's copy of the race.
- */
-export class HelmFeed {
-  private helm: { pn: PassageNow; P: HelmPlan; world: unknown; t: number; wind: { from: number; kt: number }; tide: number } | null = null;
-  private want = true; private nav = false;
-  /** Asked for only as a matter of course (a corner made, or HELM_EVERY on): the plan she has is kept unless the new one is quicker. */
-  private routine = false;
-  /** How many plans it has asked for, and taken (for the tests). */
-  asked = 0; taken = 0;
-  constructor(private plan: (w: SimView) => PassageNow | null) {}
-  tick(w: SimView): { k: 'navPlan'; to: Vec; pts: Vec[] } | null {
-    const nav = w.pilot.mode === 'nav' && w.running && w.cruising && !!w.dest;
-    if (!nav || !this.nav || this.helm?.world !== w) { this.helm = null; this.want = true; }
-    this.nav = nav; if (!nav) return null;
-    const dest = w.dest!.p, u = w.user, h = this.helm;
-    if (h && !this.want) {
-      const was = h.P.i; nextCorner(h.P, u, dest);
-      const dw = Math.abs(((w.wind.from - h.wind.from + 540) % 360) - 180);
-      const must = heldPast(h.P, u) || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
-        || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
-      this.want = must || h.P.i !== was || w.clockUtc - h.t >= HELM_EVERY; this.routine = !must;
-      if (!this.want) return null;
-    }
-    this.asked++;
-    const pn = this.plan(w); if (!pn || pn === h?.pn || !pn.ok || !pn.track.length) return null; // (asked again each frame till it's in)
-    // (asked as a matter of course, the plan she's on is kept unless the new one gets there HELM_BETTER sooner than what's
-    // left of hers: plans worked out afresh from each corner turned her round and back again south of the Berkeley Pier
-    // ruin, 20 minutes lost, as the router's front threaded it one way and then the other: v211's batch, 19 Nov 2026)
-    if (h && this.routine && pn.minutes > leftOn(h.pn, u) - HELM_BETTER) { h.t = w.clockUtc; this.want = false; return null; }
-    const pts = helmPoints(pn), P = helmPlan(dest, pts, u); if (!P || offLeg(P, u) > HELM_OFF) return null; // (she's not on it: the next)
-    this.helm = { pn, P, world: w, t: w.clockUtc, wind: { from: w.wind.from, kt: w.wind.kt }, tide: w.cur.kt }; this.want = false; this.taken++;
-    return { k: 'navPlan', to: { x: dest.x, y: dest.y }, pts };
-  }
-}
-/** HelmFeed's triggers (estimates, docs/CONSTANTS.md): planned afresh off the plan by HELM_OFF m (a few times what she
- * strays sailing one: tests/nav-follows-plan, 11-26 m), the wind HELM_WIND° or HELM_KT kt off what it was planned in, the
- * tide at the course HELM_TIDE kt, or HELM_EVERY minutes on. */
-const HELM_OFF = 100, HELM_WIND = 10, HELM_KT = 3, HELM_TIDE = 0.3, HELM_EVERY = 5;
-/** How much sooner (minutes) a plan asked for as a matter of course must get her there than what's left of the one she's
- * on, to replace it: about the router's own grain (its 1-minute fronts). An estimate (docs/CONSTANTS.md). */
-const HELM_BETTER = 1;
-/** What's left of a plan (minutes): from the point of its track nearest her to its end. */
-function leftOn(pn: PassageNow, at: Vec): number {
-  const T = pn.track; let k = 0, best = Infinity;
-  for (let i = 0; i < T.length; i++) { const d = dist(T[i].p, at); if (d < best) { best = d; k = i; } }
-  return T[T.length - 1].t - T[k].t;
-}
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
-/** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
- * menu, World.applyConditions, they're new objects). */
-function nowKey(w: SimView, cell = 25, every = 1): { key: string; refs: unknown[] } | null {
+export function passageNow(w: SimView): PassageNow | null {
   const dest = w.dest; if (!dest) return null;
-  const u = w.user, t0 = w.clockUtc;
-  return { key: `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / cell)},${Math.round(u.y / cell)}|${Math.floor(t0 / every)}|${cell}`, refs: [w.weather, w.tide, w.windModel, w.sea] };
-}
-/** The page's live plan is worked out again each LIVE_M m she sails or LIVE_MIN minutes of the clock (a plan takes a few
- * seconds of the page's spare time, and the passage doesn't change in less). */
-const LIVE_M = 150, LIVE_MIN = 2;
-const fresh = (m: { key: string; refs: unknown[] } | undefined, k: { key: string; refs: unknown[] }) => !!m && m.key === k.key && m.refs.every((r, i) => r === k.refs[i]);
-/** A place inside a marina's basin, for the passage: the marina's entrance nearest it (the middle of the way in). The
- * way between the entrance and her slip, round the docks and along the fairways, is the marina's own (ROADMAP 8m2,
- * Marinas), not the passage's. */
-/** Where a passage to a destination ends: bound for a slip, the middle of its harbor's entrance nearest it by water, where the
- * pilot hands her over (geo/marina.ts harborRoute, world.ts navTarget: one mouth for the plan and the pilot); else as
- * outOfBasin. The harbor's flood the first time, a little at a time. */
-function* destOut(p: Vec): Generator<void, Vec, void> {
-  const s = slipAt(p);
-  if (s) { const r = yield* harborRouteSteps(s); if (r) return { ...r.mouth }; }
-  return outOfBasin(p);
-}
-function outOfBasin(p: Vec): Vec {
-  const H = harborAt(p); if (!H || !H.exits.length) return p;
-  let e = H.exits[0]; for (const x of H.exits) if (dist(x, p) < dist(e, p)) e = x;
-  return { ...e };
-}
-/** The page's plans' outlook, one for a World in its conditions: its caches (the lee, the wind, the current, the chop, by
- * place and time) are memos of the day, so a plan after the first reads them warm (a new outlook for each, every re-plan
- * under way filled them again, ~45 s of work from Mile Rock: the physics review of nav-pace). */
-const outlooks = new WeakMap<SimView, { refs: unknown[]; o: ReturnType<typeof outlookFor> }>();
-function sharedOutlook(w: SimView) {
-  const refs = [w.weather, w.tide, w.windModel, w.sea, w.settings, w.gunUtc], m = outlooks.get(w);
-  if (m && m.refs.every((r, i) => r === refs[i])) return m.o;
-  const o = outlookFor(w); outlooks.set(w, { refs, o }); return o;
-}
-function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
-  const dest = w.dest; if (!dest) return null;
-  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
-  const o = sharedOutlook(w);
-  yield;
-  const route = yield* routeAroundSteps(from, to);
-  const r = yield* passageSteps(o, route, t0);
+  const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
+  const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
+  // (and the conditions it was worked in: changed from the pause menu, World.applyConditions, they're new objects)
+  const refs = [w.weather, w.tide, w.windModel, w.sea];
+  const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
+  const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
   const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
   const lk: 'beat' | 'run' | null = !last ? null : last.turns.length ? (last.turns[last.turns.length - 1].kind === 'gybe' ? 'run' : 'beat') : last.kind === 'reach' ? null : last.kind;
   // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
   // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
   const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
-  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : to, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
-  return { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
+  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
+  const v: PassageNow = { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
     tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
     laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };
+  nowMemo.set(w, { key, refs, v });
+  return v;
 }
-/** The passage leaving now, worked out at once (the tests, the brief): remembered for where she is, the minute and the conditions. */
-export function passageNow(w: SimView): PassageNow | null {
-  const k = nowKey(w); if (!k) return null;
-  const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;
-  const g = passageNowSteps(w); let r = g.next(); while (!r.done) r = g.next();
-  if (r.value) nowMemo.set(w, { ...k, v: r.value });
-  return r.value;
-}
-/**
- * The passage leaving now for the page (the HUD, the chart, the plan): the latest one worked out, while the next is
- * worked out in the background, a few milliseconds at a time between frames (the router takes a second or two, which
- * would hold a frame up). Null until the first is ready; `ready`, if given, is called when a new one is in (for what
- * draws only on demand: the setup's tide graph).
- */
-const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<void, PassageNow | null, void>; ready?: () => void }>();
-/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design
- * choice inside Capacity's frame budget); SLICE_NEW_MS while there's no plan at all for where she's going (a destination
- * just chosen: the player's waiting on it), or the passage panel's plan, asked for and waited on. */
-const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
-/** For the tests (tests/sailHome-mileRock.test.ts), kept only while `on`: each slice's length (ms, on `clock`), the live
- * plan's and the panel's, that none runs over its budget, and how many live plans were started (one for a passage
- * sailed, not one each 150 m). The test sets `clock` to the process's CPU time: it doesn't run while the process waits
- * for a core, so a loaded host doesn't read as a long slice (the slices' own budgets stay on the wall clock). */
-export const liveLog = { on: false, slices: [] as number[], panel: [] as number[], starts: 0, clock: () => performance.now() };
-const clock0 = () => liveLog.on ? liveLog.clock() : 0;
-const noteSlice = (c0: number, to = liveLog.slices) => { if (liveLog.on) to.push(liveLog.clock() - c0); };
-/** The destination's part of a plan's key (where she's going, not where she is or when). */
-const destOf = (key: string) => key.slice(0, key.indexOf('|'));
-export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
-  const k = nowKey(w, LIVE_M, LIVE_MIN); if (!k) return null;
-  const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;
-  const j = jobs.get(w);
-  // (a plan being worked out for the same destination in the same conditions is let finish, though she's sailed on or the
-  // clock's turned since it began: started again each 150 m, a long first plan (Mile Rock to Gashouse Cove, ~39 s of work)
-  // never finished under way: the owner's "ten minutes in, still plotting", ROADMAP 8b. The next starts from where she is
-  // once it's in)
-  const same = !!j && sameAim(j, k);
-  if (j && same && ready && j.ready !== ready) { const a = j.ready; j.ready = () => { a?.(); ready(); }; } // (each caller told when it's in)
-  if (!j || !same) {
-    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job); if (liveLog.on) liveLog.starts++;
-    const first = !m || !sameAim(m, k); // (nothing yet to show for where she's going, in these conditions)
-    const pump = () => {
-      if (jobs.get(w) !== job) return; // (a newer plan took its place)
-      // (the panel's share too while the panel waits on this plan, its own pump idle: on the background's 2 ms a frame, the
-      // panel's plan from Mile Rock came in past its 120 s, 4 runs in 4, once this plan had to be started afresh)
-      const t = performance.now(), c0 = clock0(), budget = first || waiting.has(w) ? SLICE_NEW_MS : SLICE_MS;
-      for (;;) {
-        const r = job.g.next();
-        if (r.done) { noteSlice(c0); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
-        if (performance.now() - t > budget) break;
-      }
-      noteSlice(c0);
-      setTimeout(pump, TICK_MS);
-    };
-    setTimeout(pump, 0);
-  }
-  return m && sameAim(m, k) ? m.v : null; // (the last plan for where she's going in these conditions, until the new one is in)
-}
-/** Two plans' keys for the same destination in the same conditions (where she is, and when, aside). */
-const sameAim = (a: { key: string; refs: unknown[] }, b: { key: string; refs: unknown[] }) => destOf(a.key) === destOf(b.key) && a.refs.every((r, i) => r === b.refs[i]);
-/** The live plan for where she's going, if it's recent enough for the panel to brief from: begun within 300 m of her and
- * five minutes of now. */
-function liveFor(w: SimView): PassageNow | null {
-  const k = nowKey(w), m = nowMemo.get(w); if (!k || !m || !sameAim(m, k)) return null;
-  return dist(m.v.route[0], outOfBasin({ x: w.user.x, y: w.user.y })) < 300 && Math.abs(w.clockUtc - m.v.leave) <= 5 ? m.v : null;
-}
-/** Panels waiting on the live plan (passagePlanSteps): their pumps idle meanwhile, not spinning on its yields. */
-const waiting = new WeakSet<SimView>();
 
 /** Why a passage can't be sailed, in words: the planner's course ran ashore, or it took too long. */
 export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
   ? 'the planner\'s course runs ashore on the way (its tacks or jibes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
-/** passagePlanSteps worked out at once (the tests). */
-export function passagePlan(w: SimView): PassagePlan | null { const g = passagePlanSteps(w, false); let r = g.next(); while (!r.done) r = g.next(); return r.value; }
-/**
- * passagePlanSteps a slice at a time between frames (it sails the passage leaving now and up to five times later, a
- * second or two each), then `done` with the plan. Returns a function that stops it (the panel closed, or another asked).
- */
-export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => void): () => void {
-  const g = passagePlanSteps(w); let stopped = false;
-  const pump = () => {
-    if (stopped) return;
-    if (waiting.has(w) && jobs.get(w)) { setTimeout(pump, TICK_MS); return; } // (the live plan's own pump is at it)
-    const t = performance.now(), c0 = clock0();
-    for (;;) { const r = g.next(); if (r.done) { noteSlice(c0, liveLog.panel); done(r.value); return; } if (performance.now() - t > SLICE_NEW_MS) break; } // (the panel's: asked for and waited on)
-    noteSlice(c0, liveLog.panel);
-    setTimeout(pump, TICK_MS);
-  };
-  setTimeout(pump, 0);
-  return () => { stopped = true; };
-}
-/** `live`: between frames, the passage leaving now taken from the page's live plan (waited on); at once (the tests), worked out here. */
-function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan | null, void> {
+export function passagePlan(w: SimView): PassagePlan | null {
   const dest = w.dest; if (!dest) return null;
-  const o = sharedOutlook(w), u = w.user, t0 = w.clockUtc;
-  const from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
+  const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
+  const from = { x: u.x, y: u.y }, to = dest.p;
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
   // (the same passage the chart and the setup show: passageNow)
-  // (the passage leaving now: the live plan's, the one the inset and the HUD draw, if it's recent; else that plan, started
-  // or joined and waited on. Worked out here a second time, it was ~45 s more of the page's thread from Mile Rock)
-  const k = nowKey(w)!, m = nowMemo.get(w);
-  let pn = fresh(m, k) ? m!.v : live ? liveFor(w) : (yield* passageNowSteps(w));
-  // (the plan it waits on is the one being worked out when it began waiting, or the one that starts at once: once that's
-  // in, it's taken, though she's sailed on. Waiting on whatever was running, it waited again on the next live plan, begun
-  // each 150 m as she sails (passageLive), whenever the first took her more than that: the panel's plan from Mile Rock in
-  // 16 s of the page's thread with one, 42 s with two, on the same quiet host; Marinas, 18 Nov 2026)
-  let on: unknown;
-  while (!pn && live) {
-    passageLive(w); const j = jobs.get(w); if (on === undefined) on = j ?? null;
-    if (j && j === on) { waiting.add(w); yield; waiting.delete(w); continue; }
-    pn = liveFor(w) ?? nowMemo.get(w)?.v ?? null; if (!pn) pn = (yield* passageNowSteps(w));
-    break;
-  }
-  if (!pn) return null;
-  const route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
+  const pn = passageNow(w)!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
   const cant = whyNot(pn.why);
   const straight = dist(from, to), routeLen = route.slice(1).reduce((a, p, i) => a + dist(route[i], p), 0);
   const fromName = w.fromSlip && !w.running ? `her slip (${w.homeSlip?.id})` : place(w.settings.sailFrom)?.name.replace(/^Off /, 'off ') ?? 'here';
@@ -425,7 +138,7 @@ function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan
   const rows: string[][] = [];
   let quick = { off: 0, minutes: now.ok ? now.minutes : Infinity };
   for (const off of [0, 30, 60, 90, 120, 180]) {
-    const p = off === 0 ? now : yield* passageSteps(o, route, t0 + off); // (the fine grain: the coarse one's minutes were out by up to half, and the advice on when to go is read off them)
+    const p = off === 0 ? now : passage(o, route, t0 + off);
     if (t0 + off + (p.ok ? p.minutes : 0) > horizon && off > 0) break;
     const tr = alongTrack(o, p.track), cur = tr.reduce((a, b) => a + b, 0) / Math.max(1, tr.length);
     rows.push([clockOf(t0 + off), p.ok ? clockOf(t0 + off + p.minutes) : '—', p.ok ? mins(p.minutes) : 'can\'t get there', `${cur >= 0 ? 'helping' : 'against'} ${kt1(Math.abs(cur))} kt`]);

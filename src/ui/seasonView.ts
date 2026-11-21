@@ -22,12 +22,6 @@ export function yourPlaces(res: Record<number, SeasonResult>): Record<number, nu
 export function nextRace(series: Series, res: Record<number, SeasonResult>): number | null {
   return series.races.find(r => !r.abandoned && !res[r.no])?.no ?? null;
 }
-/** The next race on the calendar that isn't published yet (none: every race is out). It's announced, not sailable: the
- *  club's results, and with them the day's real wind and tide, come once the race has been sailed. */
-export function upcomingRace(series: Series): { no: number; date: string } | null {
-  return series.calendar.find(c => !series.races.some(r => r.no === c.no)) ?? null;
-}
-const dayWords = (iso: string) => new Date(iso + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 export interface SeasonViewData {
   series: Series; res: Record<number, SeasonResult>; all: Series[]; live?: LiveBoat;
@@ -54,8 +48,7 @@ export function paintSeasonView(d: SeasonViewData): void {
   morph($('svCal'), tiles.join(''));
   $('svCal').style.gridTemplateColumns = `repeat(${Math.max(5, tiles.length)}, minmax(0, 1fr))`;
   const r = series.races.find(x => x.no === chosen);
-  const up = r ? null : upcomingRace(series); // (everything published is sailed: the next race is still to come)
-  $('svNextH').textContent = r ? `Race ${r.no} · ${dayWords(r.date)}` : up ? `Race ${up.no} · ${dayWords(up.date)} · opens once it's sailed` : 'Every race sailed';
+  $('svNextH').textContent = r ? `Race ${r.no} · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : 'Every race sailed';
   const go = $('bSailSeason') as HTMLButtonElement; go.hidden = !r; go.textContent = r ? `Sail Race ${r.no}` : '';
   $('svDock').hidden = !r;
   // the standings: the Yacht Club's own table (ui/season.ts)
@@ -65,7 +58,6 @@ export function paintSeasonView(d: SeasonViewData): void {
 }
 /** The Race page's Season card: the club's burgee, the next race's day, and where you stand. */
 export function seasonCardHtml(d: { series: Series; res: Record<number, SeasonResult>; burgee: string; place: number | null }): string {
-  const next = nextRace(d.series, d.res), r = d.series.races.find(x => x.no === next) ?? (next == null ? upcomingRace(d.series) : null);
-  const line = r ? (d.series.races.some(x => x.no === r.no) ? `Race ${r.no} next` : `Race ${r.no} · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`) : 'All sailed';
-  return `<span class="mc-sea">${d.burgee ? `<img class="t-burgee" src="${d.burgee}" alt="">` : ''}${r ? dateTile(r.date) : ''}<span class="t-text"><span class="t-h">${esc(d.series.title)}</span><span class="t-s">${line}${d.place ? ` · you're ${ord(d.place)}` : ''}</span></span></span>`;
+  const next = nextRace(d.series, d.res), r = d.series.races.find(x => x.no === next);
+  return `<span class="mc-sea">${d.burgee ? `<img class="t-burgee" src="${d.burgee}" alt="">` : ''}${r ? dateTile(r.date) : ''}<span class="t-text"><span class="t-h">${esc(d.series.title)}</span><span class="t-s">${r ? `Race ${r.no} next` : 'All sailed'}${d.place ? ` · you're ${ord(d.place)}` : ''}</span></span></span>`;
 }

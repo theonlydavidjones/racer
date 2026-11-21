@@ -2,22 +2,20 @@
  * The setup and the start of a sail: a new World for the setup's choices (prepare, newGame, setupChanged), the setup screen (the course picker and its card, the tide, the crew, the choices), the conditions dialog, and beginning a race or a cruise.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
-import { fleetChoiceHtml } from '../ui/tiles';
 import { rainLevel } from '../environment/rain';
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
 import { lessonGridHtml } from '../ui/lessons';
-import { describeSea, swellReach } from '../environment/sea';
+import { describeSea } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
-import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
-import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, drillFleet, drillFleetSize, saveSettings, type Settings } from '../settings';
+import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
 import { CONDITION_KEYS, World, describeTide } from '../sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../sim/host';
@@ -30,7 +28,7 @@ import { compass, sunPosition, sunTimes } from '../environment/sun';
 import { $ } from '../ui/dom';
 import { horn, logMessage, toast } from '../ui/feedback';
 import { sideWord } from '../ui/hud';
-import { passageLive, whyNot } from '../sim/navigator';
+import { passageNow, whyNot } from '../sim/navigator';
 import type { AppCtx } from '../app';
 import { burgeeCanvas } from '../render/burgees';
 import { morph } from '../ui/morph';
@@ -51,8 +49,7 @@ function prepare(seed = randomSeed()): void {
   app.incidentClips = []; // (a new race: its own rule incidents)
   app.pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
-  // (lesson 1, The boat: your own boat on show, sailing, never in her slip with her sails down)
-  const shown: BoatSpec | null = app.boatPanel?.open ? app.boatPanel.editing : app.fleet?.showing ?? (app.boatLesson?.on ? app.S.boat ?? null : null), showFlags = !!shown;
+  const shown: BoatSpec | null = app.boatPanel?.open ? app.boatPanel.editing : app.fleet?.showing ?? null, showFlags = !!shown;
   const WS0 = shown && shown.id !== app.S.boatId ? (() => { const o = app.S.opponents.filter(x => x !== shown.id); return { ...app.S, boat: shown, opponents: o, fleet: o.length }; })() : app.S;
   // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
   const WS1 = app.replayPin != null ? { ...WS0, windDir: app.replayPin } : WS0;
@@ -66,9 +63,8 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
-  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : WSd;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
-  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
+  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
   // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
   courseFileNow = args.file;
@@ -123,7 +119,7 @@ function buildSetupChoices(): void {
   const label = (c: typeof COURSES[number]) => {
     if (!c.group) return c.title;
     const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
-    return `${c.title.replace('Kelp Chowder · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
+    return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
   };
   const sel = $('courseSel') as HTMLSelectElement;
   groups.delete('Practice');
@@ -171,12 +167,11 @@ function courseCard(): void {
     const slip = slipById(app.S.boat.slip);
     if (!slip && (app.S.sailFrom === 'slip' || app.S.sailTo === 'slip')) { if (app.S.sailFrom === 'slip') app.S.sailFrom = 'cityfront'; if (app.S.sailTo === 'slip') app.S.sailTo = ''; }
   }
-  // racing: no outboard aboard (the class rules don't allow racing with it mounted aft: NFIA clarification, March 2006,
-  // under class rule 1.11; and racers leave it ashore, sim/world.ts makeBoat, no weight for it). Off the bracket, so she's
-  // drawn with a clean transom; aboard again for a cruise
+  // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
+  // clarification, March 2006, under class rule 1.11); the bracket can stay
   if (app.S.mode !== 'sail' && app.S.boat.perf.outboard === 'bracket') {
     app.S.boat.perf.outboard = 'stowed'; saveSettings(app.S); if (app.still) prepare(); else newGame();
-    toast('Her outboard stays ashore for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). It\'s aboard, stowed, for a cruise; ship it from the Motor tab.', 7000);
+    toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
   }
   const cruise = app.S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
@@ -282,12 +277,8 @@ function drawTideGraph(): void {
   } else { strip.windKt = Math.round(app.w.wind.kt); strip.windFrom = app.w.wind.from; rows.unshift(['Wind', `${Math.round(app.w.wind.kt)} kt from ${degAndPoint(app.w.wind.from)}, as you set it`]); }
   if (!app.w.tide) rows.push(['Current', CURRENTS[app.S.current]?.label ?? app.S.current]);
   const rainNow = rainLevel(app.S.rain, app.w.clockUtc); // (set, or the record's then)
-  // (the swell where she starts, not the buoy's offshore: inside the Gate it's turned and spread, and dies away behind the
-  // headlands and the city front (sea.ts swellReach). The offshore figure on the tile read as if it were the course's:
-  // 14 ft at the Cityfront, where the race said glassy)
-  const sw = app.w.sea.swell, at = cruise ? { x: app.w.user.x, y: app.w.user.y } : p, here = sw ? sw.hs * swellReach(at, true, sw.from).k : 0, ft = (m: number) => Math.round(m / 0.3048);
-  if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (sw) { strip.sea = `${ft(here)} ft`; strip.seaSub = `${Math.round(sw.tp)} s swell`; }
-  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${sw ? `${ft(here)} ft of swell here, ${ft(sw.hs)} ft, ${Math.round(sw.tp)} s outside the Gate${sw.total ? ` (the buoy reads ${Math.round(sw.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
+  if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (app.w.sea.swell) { strip.sea = `${Math.round(app.w.sea.swell.hs / 0.3048)} ft`; strip.seaSub = `${Math.round(app.w.sea.swell.tp)} s swell`; }
+  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(app.w.gunUtc * 60000), sp = sunPosition(app.w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
@@ -299,7 +290,7 @@ function drawTideGraph(): void {
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(app.w.gunUtc), top - 6); ctx.lineTo(tx(app.w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  const pn = cruise && app.w.dest ? passageLive(app.w, drawTideGraph) : null, near = pn?.eta != null && tx(pn.eta) - tx(app.w.gunUtc) < 44;
+  const pn = cruise && app.w.dest ? passageNow(app.w) : null, near = pn?.eta != null && tx(pn.eta) - tx(app.w.gunUtc) < 44;
   ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(app.w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
   // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
   // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
@@ -389,8 +380,8 @@ function drawHeads(): void {
   let burgee = burgeeUrls.get(host);
   if (burgee == null && !practice) { try { burgee = burgeeCanvas(host)?.toDataURL() ?? ''; } catch { burgee = ''; } burgeeUrls.set(host, burgee); }
   const C = w.C, nm = courseFileNow?.distanceNm;
-  const title = C.title.replace(/^Kelp Chowder · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
-  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Dorado Yacht Club">` : '',
+  const title = C.title.replace(/^Seaweed Soup · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
+  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Golden Gate Yacht Club">` : '',
     `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
   // the fleet: a tile each, and + to add one
   const fl = app.fleetChosen;
@@ -487,18 +478,10 @@ function dockSetup(view: 'setup' | 'drill' | 'season'): void {
 // the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
 function paintDrillPage(): void {
   for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (app.S.drillFrom ?? app.DRILL_FROM)));
-  const solo = app.S.drillSolo ?? true;
-  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === solo));
-  $('drillSoloSeg').querySelector('[data-ds="1"]')!.innerHTML = fleetChoiceHtml(false, 0);
-  $('drillSoloSeg').querySelector('[data-ds="0"]')!.innerHTML = fleetChoiceHtml(true, drillFleetSize(app.S));
-  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-fn]')) b.hidden = solo;
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === (app.S.drillSolo ?? true)));
 }
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
-$('drillSoloSeg').addEventListener('click', e => {
-  const t = e.target as HTMLElement, n = t.closest<HTMLElement>('[data-fn]'), b = t.closest<HTMLElement>('[data-ds]');
-  if (n) app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); else if (b) app.S.drillSolo = b.dataset.ds === '1'; else return;
-  saveSettings(app.S); paintDrillPage();
-});
+$('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; app.S.drillSolo = b.dataset.ds === '1'; saveSettings(app.S); paintDrillPage(); });
 function openSetupNow(view: 'setup' | 'drill' | 'season' = 'setup'): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }
@@ -526,7 +509,7 @@ function beginRaceNow(seed?: number): void {
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
-  logMessage(startHead(app.S.mode, { from: app.S.sailFrom === 'slip' ? 'her slip' : place(app.S.sailFrom)?.name, dest: app.w.dest?.name, course: app.w.C.title }));
+  logMessage(`— ${app.S.mode === 'sail' ? `Cruise · ${place(app.S.sailFrom)?.name ?? ''}${app.w.dest ? ' to ' + app.w.dest.name : ''}` : app.S.mode === 'drill' ? 'Start practice' : 'Race'} · ${app.S.mode === 'sail' ? '' : app.w.C.title}`);
   app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false });
   app.word('bFast', 'Speed 1×');
   horn(1.0);
@@ -589,7 +572,7 @@ function openLessons(): void {
 $('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
 $('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
-function beginLesson(id: LessonId): void { if (id === 'boat') { app.boatLesson.open(); return; } app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons', 'seasonView']) $(el).hidden = true; beginRace(); }
+function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons', 'seasonView']) $(el).hidden = true; beginRace(); }
 return { noRealWind, beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
 }
 

@@ -94,14 +94,3 @@ export function ensignStep(down: number, struck: boolean, dt: number): { down: n
   const want = struck ? 1 : 0, d = want > down ? Math.min(want, down + dt / 4) : Math.max(want, down - dt / 4);
   return { down: d, slide: Math.min(1, d / 0.75), out: Math.max(0, (d - 0.75) / 0.25) };
 }
-
-/**
- * Where a point of a flag goes as it hangs (x along the fly from the hoist, y down the hoist from its top: 0 … −h; h its hoist,
- * fly its length; sn/cs the sine and cosine of how far the fly falls from the wind's line). It swings down about the hoist
- * as a whole, the top falling just a little further than the foot (the cloth folding in under the hoist's foot), so the fly
- * keeps at least 90% of its depth: a rectangle hanging, not a pennant. (It was sheared, the top falling as much again as
- * the foot: in a light air's 75° the fly's depth went to nothing, the owner's "the ensign now has a pennant shape?".)
- */
-export function flagHang(x: number, y: number, h: number, fly: number, cs: number, sn: number): [number, number] {
-  return [x * cs, y - x * sn * (1 + 0.1 * h / fly * (y / h + 1))];
-}

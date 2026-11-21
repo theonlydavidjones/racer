@@ -4,19 +4,10 @@ body.tiller-held #tillerGuide{display:block}
 body.tiller-held #gl{cursor:ew-resize}
 .tg-line{position:absolute;left:50%;top:22%;bottom:22%;border-left:2px dashed rgba(255,255,255,.55);margin-left:-1px}
 .tg-hard{position:absolute;top:30%;bottom:30%;border-left:2px solid rgba(255,182,39,.45)}
-/* (the rudder's stall each side: --tg-stall, set from balance.ts RUDDER_STALL and HARD_OVER with the cursor's own mapping, app.ts
-   TILLER_SPAN; past these it brakes more than it turns) */
-.tg-hl{left:calc(50% - var(--tg-stall, 43%))}.tg-hr{left:calc(50% + var(--tg-stall, 43%))}
-/* (weather helm at the line's foot: dark on a light chip, teal when balanced, amber past 8°: app.ts showWeatherHelm; above
-   the foot in a lesson, where the guide's words sit beside it) */
-.tg-wh{position:absolute;left:50%;bottom:calc(22% - 10px);transform:translateX(-50%);padding:2px 8px;border-radius:999px;font:700 12px/1.15 var(--f-inst);letter-spacing:.02em;color:#0a141c;background:#e9f2f5;box-shadow:0 1px 3px rgba(0,0,0,.5);white-space:nowrap}
-.tg-wh.ok{background:#3fd0c0}.tg-wh.over{background:#ffb627}
-body.learning .tg-wh{bottom:calc(22% + 10px)}
-body:not(.tiller-held) #tillerGuide .tg-wh{display:none}
+.tg-hl{left:15%}.tg-hr{left:85%}
 .tg-cur{position:absolute;top:26%;bottom:26%;width:4px;margin-left:-2px;border-radius:2px;background:var(--accent);left:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .tg-l,.tg-r{position:absolute;top:calc(78% + 6px);font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .tg-l{right:calc(50% + 12px)}.tg-r{left:calc(50% + 12px)}
-body:not(.learning) #tillerGuide .tg-l,body:not(.learning) #tillerGuide .tg-r{display:none} /* the words: Learn to sail only */
 /* tiller bar */
 .tiller{position:relative;flex:2 1 220px;min-width:0;height:64px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);touch-action:none;cursor:ew-resize}
 .tiller.held{border-color:var(--accent)}
@@ -111,6 +102,12 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pl-read{font:700 13px/1 var(--f-inst);letter-spacing:.04em;min-width:190px;padding:0 6px;color:var(--accent);white-space:nowrap}
 .pilot .tp-btn{padding:7px 8px}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
+#controls .motorhead{flex-wrap:nowrap;width:max-content;margin-top:6px}
+#controls .motorhead .tp-btn{min-width:0;height:38px}
+.mo-thr{display:flex;align-items:center;gap:6px;font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px}
+.mo-thr input{width:110px}
+#moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
+#bMotor.on{border-color:var(--accent);color:var(--accent)}
 #bHome.dim,#bNavHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 #bHome.dim{opacity:.45}
 .pastrow .ghostpick{width:auto;max-width:230px;margin-right:6px;padding:6px 8px;font-size:12px} /* (no home slip: the tooltip says how to give her one) */
@@ -128,17 +125,7 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 /* the drills' cue above her masthead (render/drillGuides.ts): a word or two where you're already looking */
 .dg-cue{position:fixed;z-index:30;transform:translate(-50%,-100%);pointer-events:none;text-align:center;font:800 26px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)}
 .dg-cue[hidden]{display:none}
-.dg-hit{position:fixed;z-index:29;width:56px;height:28px;transform:translate(-50%,-50%);cursor:help} /* (the start gate's hover: "Cross here at the gun") */
-.dg-hit[hidden]{display:none}
-.dg-read{position:fixed;z-index:29;transform:translate(-50%,-50%);pointer-events:none;font:800 16px/1 var(--f-inst);color:#ffb627;text-shadow:0 0 4px rgba(9,22,33,.9),0 1px 3px rgba(9,22,33,.9)} /* (the favored-end read's degrees, on the water) */
-.dg-read[hidden]{display:none}
-.dg-end{position:fixed;z-index:29;transform:translate(-9px,-50%);pointer-events:none;display:flex;align-items:center;gap:6px;font:700 15px/1 var(--f-inst);color:#fff;text-shadow:0 0 4px rgba(9,22,33,.9),0 1px 3px rgba(9,22,33,.9)}
-.dg-end[hidden]{display:none}
-.dg-end i{display:block;width:14px;height:14px;box-sizing:border-box}
-.dg-end i.ring{border:2.5px solid #fff;border-radius:50%} .dg-end i.blk{background:#fff}
-.dg-end i.arr{width:0;height:0;border-left:16px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
 .dg-cue .w{display:inline-block;padding:6px 14px;border-radius:8px;background:rgba(12,20,30,.62);border:2px solid #ffd84a}
 .dg-cue.go .w{background:#ffd84a;color:#14202c;text-shadow:none}
 .dg-cue.done .w{border-color:#6fe3ff}
-.dg-cue .s{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:6px;background:rgba(12,20,30,.62);font:700 13px/1.2 var(--f-body);letter-spacing:.04em;text-transform:none;color:#f2f6fa}
-.dg-cue:not([hidden]){display:flex;flex-direction:column;align-items:center} /* (the word, and under it its line on its own dark backing: readable on a pale sky) */
+.dg-cue .s{margin-top:6px;font:700 13px/1.2 var(--f-body);letter-spacing:.04em;text-transform:none;color:#e8eef4}

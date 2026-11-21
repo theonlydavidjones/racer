@@ -308,7 +308,7 @@ The guard must keep watching the race-mode physics at full fidelity. The worker 
 | 5 | **The guards** (§3: spike, determinism, perf.cjs); the budget's new limit proposed to the owner with the measured room | 3–5 | with 3 | — |
 | | **total** | **26–42** | | |
 
-Laptop numbers are estimates from this container's calibration. The frame-time readout (Shift+F, ui/perfMeter.ts) gives the real
+Laptop numbers are estimates from this container's calibration. The frame-time readout (F9, ui/perfMeter.ts) gives the real
 ones: the owner's sim ms per frame at 4× in a full race, read once before step 2 and once after step 3, would settle
 the headroom on their actual machine.
 
@@ -496,8 +496,7 @@ arithmetic in the cache.
 
 **The method** (scripts/check/perf-pair.mjs): load two versions of the sim in one Node process (vite's runnerImport, two
 module graphs), sail them by turns in 10-second pieces, A, B, B, A, and time each piece on this thread's CPU clock.
-The host's drift lands on both alike. The second version loaded runs slower, by 0.4% on a quiet host and up to 3% on a busy one (14 Nov: main against v168,
-0.987–1.015 with main first, 1.022–1.047 with v168 first), so it runs twice, each version
+The host's drift lands on both alike. The second version loaded runs about 0.4% slower, so it runs twice, each version
 loaded first once, three races each, and the result is the geometric mean of the six ratios (about ±0.65%). The other version's `src/`
 comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from origin first if the clone hasn't got it.
 
@@ -511,184 +510,8 @@ comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from o
 
 **Two uses:**
 - **The PR gate:** `node scripts/check/perf-pair.mjs`, against origin/main. A PR that touches the step may be at most 1.5% slower.
-- **AI and rules PRs:** `--ai`, ten races (seeds 1–5 at 12 and 22 kt), each once, alternating the load order, the
-  geometric mean. A change to how boats sail changes the race: on the perf race's seed alone #276 read 1.023 against
-  turning, but over the ten its ratios ran 0.986–1.067 and their mean was 1.032; equal fouling in both versions still
-  cost 2–7%, so it was the code, not a more crowded race (14 Nov 2026).
 - **The owner's budget:** perf.test, and `--budget`, against v168 (425a5eb, the commit 43.1 was set on). v168 measured
   42.31 in the old units, so 43.1 is v168 × 43.1 / 42.31 = **v168 × 1.019**: the same budget, measured without the drift.
-
-### 8a. Two lessons from batch 41 (14 Nov 2026)
-
-**One run of six ratios isn't enough to decide on.** Batch 41d against v168, both runs quiet and balanced: perf.test's
-six read 1.0209, `--budget`'s twelve read 1.0006, each with a standard error of about 0.6%. They differ by 2.0%, about
-2.4 errors: on this host, one run can land 1–1.5% from the next, more than each run's own spread says, and the
-load-order effect even changed sign between them (0.985 and 1.02 with v168 loaded first). Pooled, the eighteen read
-1.0073 ± 0.5%. So perf.test now sails six races with each tree loaded first, twelve ratios (the owner, 14 Nov 2026).
-
-**A call added in World.step costs every step, even one that returns at once.** The paddle (#326) added two lines to
-World.step: the crew's look for a jam (every 30 steps) and the paddling's own work (returns at once with no paddle). The
-race was bit-identical with and without paddle, and still the step was 1.3% slower (12 ratios). Against the paddle
-merge, 8 ratios each:
-
-| variant | ratio |
-|---|---|
-| moveBoat's two paddle calls behind `if (b.paddle)` | 1.0017 |
-| without the two new fields on the Boat | 1.0101 (worse: the fields belong there) |
-| the physics.ts ↔ paddle.ts import cycle broken | 1.0049 |
-| the two lines in World.step removed | **0.9896** |
-| the two calls in a method of their own, entered only `if (user.paddle \|\| steps % 30 === 0)` | **0.9962** |
-
-World.step is very large: what's added to it changes how the engine compiles all of it, whatever the new code does at
-run time. So **new per-step work goes behind one cheap test, in a method of its own**, not inline in World.step; and a
-PR that adds lines to World.step runs perf-pair even when the lines look free. (A profile of a bundled build didn't
-show this cost; one of the trees loaded as perf-pair loads them, by vite's runnerImport, did.)
-
-**The same in aiThink** (irons, #441, 16 Nov 2026): the AI's way out of irons added about fifteen lines inline in aiThink,
-nearly all of them returning at once (a boat going astern is rare). perf-pair --ai against its main: 1.0301 inline;
-1.0224 with its one real cost (a polar lookup every think) made lazy; **1.0015** with the same lines moved into two
-functions of their own, entered from aiThink only behind one test (`b.astern > 0.05 || ai.gather`), the logic unchanged (not checked race for race).
-So the rule holds for aiThink as for World.step: any large function a step runs, new work goes behind one cheap test,
-in a function of its own.
-
-**The crew's state is built whole, as the Boat is** (the crew chain, 15 Nov 2026). CrewState's optional fields given
-mid-race, in a different order on each boat, made every read of them polymorphic: crewPhys.ts newCrew now declares all
-of them, undefined until given, as makeBoat does the Boat's. With that, and the together-set worked once with the worth
-(physics.ts `crewTogether`) rather than in each pick, the chain (3056411f, against main 5969fedd, Capacity's VM) went
-from 1.0148 to **1.0053** on the default race (12 ratios) and from 1.0193 to **1.0042** on `--ai` (ten races), the race
-bit-identical. A new field on CrewState (or on Aboard, a person aboard) goes in newCrew's literal.
-
-### 8b. The step's garbage (15 Nov 2026)
-
-The perf race made about 596 KB of garbage a step, and collecting it was about 3.7% of the step (the biggest line in
-an inlining-off profile). We measured it with V8's sampling heap profiler, collected objects included, over 2 minutes of
-the perf race (a scratch script driving `HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC/MinorGC`).
-Four lessons, all bit-identical (the fingerprint unchanged), took it to 488 KB and the step to **0.9868** against
-736afa84 (12 ratios):
-
-- **Math.hypot allocates.** V8's builtin makes a scratch array and a boxed result every call, and TurboFan doesn't
-  inline it. The step called it about 2,200 times. `core/math.ts` `hypot` is the same computation (the larger
-  magnitude out, the squares summed with Kahan's compensation, the root times it back) in the same order. It matches to
-  the last bit on 3·10⁷ random pairs and the edge cases. Use it, not `Math.hypot`, in the step's code.
-- **A fractional field read from objects of many shapes comes back boxed.** A point passed in as a boat, her bow, or a
-  plain `{x, y}` makes `p.x` a megamorphic load, and each such load of a double allocates. Read the coordinates once
-  into locals at the top of a hot helper (inPoly, segPt, hitsHarbor, endsOf), not once per vertex.
-- **Closures made per call are allocations.** `find` with a closure in a hot predicate (harborAt), and helper closures
-  inside a function called several times a step (sailForces' `one`), each cost one per call. Use an indexed loop, or a
-  module-level function with the captured values as arguments.
-- **One hidden class for the fleet bought nothing.** The 7 AI boats ended a race in 6 hidden classes: about 40 fields
-  are added as she sails, in each boat's own order. Declaring them all at birth gave all 7 one class, and measured
-  1.0040. The likely reason: a number field declared `undefined` can't keep V8's unboxed double, so every write then
-  allocates. Declaring them 0 isn't bit-identical, since most of them default to something else or test `== null`.
-  Also: **an object literal of more than 128 properties starts in V8's slow dictionary mode** (makeBoat's has 94), so
-  fields added at birth go in after the literal, not into it.
-
-### 8c. Where new per-step fields cost: memory, and the harness's imports (16 Nov 2026)
-
-Crew Model's crewSettle (claude/crewstation-8seeds) computes seven numbers a boat-step: the guide's angle and wind, a
-heading swing, a settle timer and two smoothed headings. It cost 1.5–2.5% of the step while deciding nothing. An "inert"
-copy computed every value but fed none into a decision (the fingerprint equal to main's): over four runs 1.013–1.027
-against its base, and 0.989 with only the call removed. Not garbage (the sampling heap profiler: 472.8 against 473.9 KB
-a step), not the boats' hidden classes (the same map groups, 112 keys at birth), not deopts (the same counts as main's),
-not the inlining (crewSettle is called, not inlined, both ways). What it was, timed around the call in the race (a
-`performance.now()` pair; an empty function there reads 2 µs a step, the timer's floor):
-
-| crewSettle | µs a step in the call |
-|---|---|
-| seven Boat fields, imports used directly | 18 |
-| one `Float64Array` per boat for the seven | 10 |
-| the array, and its imports read once into module-level consts | 5 |
-
-perf-pair `--ai`, the last against the same base: **0.9967**. Two lessons:
-
-- **A boat's double fields are scattered in memory.** With pointer compression V8 keeps a field holding a fraction as
-  a pointer to a separate HeapNumber (LATER_FRACTIONS makes them mutable in place, so writes don't allocate, but every
-  read and write follows the pointer). Seven such fields on eight boats are cache misses in a real race, which a loop
-  over one boat never shows: crewSettle ran 0.6 µs a call in a warm loop and 2 µs in the race. A group of numbers
-  updated together each step goes in one typed array on the boat, declared at birth.
-- **Under vite's module runner every imported name is a getter.** perf-pair and perf.test load the tree with
-  `runnerImport`: each module's exports are a dictionary-mode object (`%HasFastProperties` false for core/math,
-  boat/controls, boat/crewWork, boat/physics) with a getter per name, and the code reads `__vite_ssr_import_N__.wrap`
-  at every use. crewSettle used about 20 a call (constants, wrap, n360, clamp): 630 ns a call loaded this way, 220 ns as
-  plain JS. The published page is bundled and has direct references, so this is the harness's cost, but the gate
-  measures it. A hot function new to the step reads its imports once into module-level consts
-  (`const wrap_ = wrap`, the same function and value, the race bit-identical).
-
-Also measured: the double `%` in wrap and n360 is a call to C's fmod (about 10 ns each). For |t| < 360,
-`t % 360 === t`, and a fast path that adds 360 and subtracts it back when needed is bit-identical (0 mismatches over
-2·10⁷ inputs, every value within 64 ulps of a multiple of 180 included) at about half the time. The step makes about 346
-such calls, so roughly 0.4% to gain; not yet applied.
-
-### 8d. The budget's noise: two runs, and PRs judged against main (19 Nov 2026)
-
-The ten races' ratios against v168 run 0.96–1.04 (standard deviation about 0.028), so one run's mean carries about
-±0.9%. That's half the budget's 1.9% of room. Two quiet runs of one tree read 2% apart on the same day:
-
-| tree | quiet runs, ten races against v168 |
-|---|---|
-| main 4ef0708f (before v208) | 1.0210 (VM just restarted), 1.0104 |
-| main dcc707a2 (v208's src) | 1.0059 |
-| Deep Physics' soak b31b28a3 (1.0040 against b4334c09, the same src as dcc707a2) | 1.0226, 1.0232 |
-
-So a tree about 1% over v168 passed or failed on the run. The rule since then (the Coordinator, 19 Nov 2026; the limit unchanged):
-
-- **PRs** are judged against main: `--ai` (≤1.015), or the plain gate for a change that doesn't change the race. A
-  budget run within main's own margin no longer holds a PR.
-- **Main** is measured against the budget once a release, before publishing: `--budget --ai`, which now runs twice by
-  default (`--repeat 2`). The second run swaps which races go with which load order, so each of the ten races sails once
-  in each order: twenty ratios, about ±0.6%, their mean against 1.019. perf.test does the same with `PERF_BUDGET_AI=1`.
-  If main reads above about 1.015, making headroom on main (bit-identical savings first) comes ahead of other work.
-
-### 8e. v209's headroom, and the garbage left on the backlog (19 Nov 2026)
-
-v209 read 1.0134 against v168 on the two-run budget: 0.6% of room. The Coordinator asked for 2% back, bit-identical.
-
-**What the profile showed** (v209 against v168, the perf race, self time): no one hot spot. What's new since v168 is mostly
-physics that has to run:
-- the wave forces, 1.4% (15 components × 5 trig a boat a step);
-- the crew's settle, 0.8% (arithmetic);
-- the grounding test's onLand, about 1%;
-- the marina fetch, about 1.3%, mostly cold fills.
-
-**What was tried:**
-
-| change | result |
-|---|---|
-| fetch's rays to its nodes asking each 2 m wall cell once; basinRay looking the wall map up once a ray and keeping the last tile | bit-identical, but 1.0008 against v209: nothing, since its time was mostly cold fills both pay alike. Dropped |
-| a wave-force recurrence (approximate to 1e-15) | not built: V8's Math.sin + cos is 39 ns a pair, a JS sincos 47. A recurrence could replace only the phase's two calls a component, about 3.6 µs of a 1100 µs step (≈0.3%) |
-| **onLand's open water by the 25 m square** (#482, src/geo/shore.ts) | **0.9835 against main**: two-run ten races, settled. Proven against the full test at 25.5 M points; bit-identical races |
-
-v210 then read **0.9980** against v168 (two runs): 2% of room.
-
-**The garbage, shelved** (the Coordinator, 19 Nov 2026). On v210 (08afb104) the race allocates about 453 KB a step by the
-heap sampler. Measured with `--trace-gc-nvp`, it's about 800 KB: a scavenge every ~21 steps, ~3.1 ms each, ~3% surviving,
-all of it promoted. On the race's thread that's ~3% of the step.
-
-It's spread over ~40 sites. The top ones, bytes a step (the heap sampler, 120 s of the perf race):
-
-| site | B a step | share |
-|---|---|---|
-| moveBoat (physics.ts) | 25 400 | 5.6% |
-| at (tide.ts) | 25 100 | 5.5% |
-| trimSails (physics.ts) | 16 000 | 3.5% |
-| withPierWakes (pierWakes.ts) | 14 700 | 3.2% |
-| aiThink (ai.ts) | 13 800 | 3.0% |
-| travel (physics.ts) | 12 100 | 2.7% |
-| assessPair (rules/pairs.ts) | 10 800 | 2.4% |
-| touchableMarks (world.ts) | 10 400 | 2.3% |
-| addBoatWake (shadows.ts) | 9 500 | 2.1% |
-| shadowAt (world.ts) | 9 000 | 2.0% |
-| terrainLeeRaw, atShore, mainShape, crewSolve, landAlong, crewAndHeel | 7 000–8 700 each | 1.5–1.9% |
-
-moveBoat's own allocations show what each site is like: sailForces' argument objects, jibOn, the rmExtra closure it
-passes to crewAndHeel, cs.place, b.forces. That's about 250 B a boat, ~2 KB of the 453 KB: cutting all of them is ≈0.1%
-of the step. 1% this way would take ~10 PRs across physics.ts, balance.ts, ai.ts, crewPhys.ts and pairs.ts, each owner
-to coordinate, so it's left as a backlog item.
-
-**The rule for it:** a PR already touching one of these functions folds in its allocation cuts (scratch objects for
-arguments read and not kept; closures that escape made module functions with explicit arguments). It shows them
-bit-identical (the race's end state to the last digit), measures them with perf-pair, and says so in the PR. Not
-`b.forces` and the like, which the page's mirror may compare by object.
 
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
@@ -713,7 +536,7 @@ v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (
 thread waiting on the software GPU: frame times, and their 95th and 99th percentiles, mean nothing here. What holds: the
 renderer's counts (draw calls, triangles, programs), the same run to run, the best measure here of what the GPU is asked
 to do; the JS a frame, noisy (±5 ms; a run's outlier can double a view), paired back to back so the drift lands on both;
-and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190, Shift+F from the no-F-keys ruling).
+and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190).
 
 **The gate** (scripts/check/perf-ab.cjs): this tree's page and another version's, each from its own dev server, measured
 by perf.cjs's seven views alternately, two rounds, at half size (the same shape). It fails on draw calls or triangles
@@ -762,27 +585,3 @@ and threw each one away ("Maps became deprecated during optimization"), 14 s of 
 - In the browser the compiler's threads are off the worker's, so this costs a player background CPU in the first race
   rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
   nothing.
-
-## A behavior's cost: the puff response (15 Nov 2026)
-
-The auto crew's heavy-air puff response (physics.ts puffEase, on branch claude/puff-response) failed perf-pair --ai at
-1.041 against main. Split into what its code costs and what the different race costs (Crew Model with Capacity, each pair
-run alone, perf race and --ai):
-
-- **Code, about 3.7%.** H2: all of puffEase's code run every step, its result thrown away, so the race is the no-puff race
-  to the last digit (fingerprint bd02309f): 1.037 against the no-puff tree. The first probe of this, H (puffEase returning
-  at its first line), read 0.995 and was wrong: V8 drops the body after an early `return`, so the caller stays small and
-  keeps its inlining. **To measure a function's code cost, run all of it and drop the effect, not an early return.**
-- **Cuts, about 2.8% back, the race bit-identical (7905d3b8):** the seven fields declared in makeBoat (each boat
-  otherwise gained them at its first puff, mid-race: 0.7%), and the call gated to steps with a puff on, one being seen, or
-  something still eased (nearly every step has none).
-- **Behavior, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
-  `--max-inlined-bytecode-size=0` (puff on against H2, so the code is alike and only the race differs), the extra time is
-  spread: moveBoat, step and trimSails a few per cent each, aiThink +14%, the crew's hold +25%, clearAstern +14%. No
-  function is new work. A first profile pinned it on heaveTo's strip model; counted, no boat was ever hove to or had her
-  jib aback in either race (heaveTo needs b.isUser). The line was the leeway-as-motion block, the same HOVE formula,
-  which runs every step in both.
-- **Where it stands:** the gated version reads 1.019 on perf-pair --ai (12 kt about 1.005, 22 kt about 1.035), against
-  the 1.5% gate. Ruled (the Coordinator): the gate holds. The crew chain (#347, #348, crewJobs step 2, the seat swap: 0.9905)
-  lands without it, and the puff response follows once crewPhys placeCrew's step 3 (its 8.1 KB a step of allocations)
-  has paid for it.

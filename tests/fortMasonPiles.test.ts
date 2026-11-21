@@ -83,19 +83,6 @@ describe("Fort Mason's piers", () => {
     const w = cruise(); place(w, 1.3, 0.03, true); const msgs = run(w, 60).filter(m => /piles/.test(m));
     expect(msgs).toHaveLength(1); expect(msgs[0]).toMatch(/Against the piles of Fort Mason's Pier 3: fend off/);
   });
-  it('touching gently, then set onto them harder where she lies: told that too, once', () => {
-    const w = cruise(); place(w, 1.3, 0.03, true); const u = w.user, first = run(w, 10).filter(m => /piles/.test(m));
-    expect(first).toHaveLength(1); expect(first[0]).toMatch(/Against the piles/);
-    const then: string[] = [];
-    for (let t = 0; t < 30; t += DT) { if (Math.abs(u.sway ?? 0) < 0.02) u.sway = 0.3; w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /Set onto the piles|Against the piles/.test(e.msg)) then.push(e.msg); }
-    expect(then).toHaveLength(1); expect(then[0]).toMatch(/Set onto the piles of Fort Mason's Pier 3/);
-  });
-  it('set onto them, got clear for five minutes, then set on again at the same spot: told again', () => {
-    const w = cruise(); place(w, 3, 0.3); const first = run(w, 5).filter(m => /piles/.test(m)); expect(first).toHaveLength(1);
-    place(w, 60, 0); run(w, 150); // (well clear of them, longer than a spell lasts)
-    place(w, 3, 0.3); const again = run(w, 5).filter(m => /piles/.test(m));
-    expect(again).toHaveLength(1);
-  });
   // (pinned means a set her crew can't fend off, about 0.23 m/s against a hand's 250 N: physics.ts PIN_V, ESTIMATES)
   for (const [v, beam] of [[0.05, false], [0.1, false], [0.05, true], [0.1, true]] as const) it(`kept on them by a set of ${v} m/s, ${beam ? 'beam' : 'end'} on, for 90 s: a hand fends that off, so no wreck and no damage`, () => {
     const w = cruise(); place(w, 1.3, v, beam); const u = w.user;

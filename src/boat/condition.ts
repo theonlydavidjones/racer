@@ -23,7 +23,7 @@ import { OUTBOARDS } from './motor';
  *   high up (an aluminium-rigged boat at the class minimum carries those 9 kg as correctors in the bilge instead).
  * - **Boom:** the class sets an aluminium boom's minimum weight (9 kg) about where a spruce boom comes out: no measured
  *   difference in speed. It changes her looks only.
- * - **Outboard:** 18.5 kg (a 2.5 or 3.5 hp four-stroke; the 6 hp, 26 kg: motor.ts). Stowed below, it's weight low and a little aft; on the transom
+ * - **Outboard:** about 13 kg (a 2.5 hp four-stroke). Stowed below, it's weight low and a little aft; on the transom
  *   bracket (leg up) it's weight at the very stern. (Racing with it on the bracket is against the class rules.)
  * - **Weight over the class minimum** (1930 kg, the same for wood and fibreglass): gear and stores, or an old wooden
  *   hull's soaked planking. Displacement goes up: slower in light air, and more inertia.
@@ -36,12 +36,7 @@ export interface Condition {
   main: SailRig; jib: SailWear;
   /** Mass added to the boat (kg) and its fore–aft moment (kg·m, + forward of the centre of flotation: hullTrim.ts trims her by it). */
   extraKg: number; extraMoment: number;
-  /** An outboard up on its bracket, near deck level (kg; 0 stowed below or ashore). */
-  aloft: number;
-  /** Change in righting moment (N·m) at heel h (deg): weight aloft (a wooden rig, an outboard on its bracket) reduces it.
-   * It reads `aloft` off this same object, so a change of place (the motor stowed or shipped, sim/world.ts) is a change of
-   * data: the page's mirror of the race gets the numbers, and keeps its own copy of this function (sim/sync.ts sends no
-   * functions). */
+  /** Change in righting moment (N·m) at heel h (deg): weight aloft (a wooden rig) reduces it. */
   rightingDelta: (heelDeg: number) => number;
 }
 
@@ -60,29 +55,22 @@ const MAST_BEND = { soft: 145 / 125, average: 1, stiff: 105 / 125 };
  * estimate): the outboard on its transom bracket, and stowed in a cockpit locker. */
 const STATION = { transom: 3.45, locker: 2.3 };
 
-/**
- * Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water).
- * `outboardAt`: where her motor is right now, if that's not where her setup has it (shipped on the bracket or stowed
- * below mid-sail, sim/world.ts motorStow): its weight moves with it, aft and up on the bracket, lower and further
- * forward below.
- */
-export function condition(s: BoatSpec, month = 9, outboardAt: BoatSpec['perf']['outboard'] = s.perf.outboard): Condition {
+/** Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water). */
+export function condition(s: BoatSpec, month = 9): Condition {
   const f = fouling(s.perf.cleanedWeeks, month), finish = s.perf.finish;
-  const ob = outboardAt;
+  const ob = s.perf.outboard;
   const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : outboardKg(s));
   // gear sits about amidships (no moment); the outboard aft
   const extraMoment = ob === 'bracket' ? -outboardKg(s) * STATION.transom : ob === 'stowed' ? -outboardKg(s) * STATION.locker : 0;
   const wood = s.perf.mast === 'wood';
-  const o: Condition = {
+  return {
     fouling: f, dCf: v => dCfAt(f, finish, v),
     main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
-    aloft: ob === 'bracket' ? outboardKg(s) : 0,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
-      + (o.aloft ? -o.aloft * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
+      + (ob === 'bracket' ? -outboardKg(s) * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
-  return o;
 }
 
 /** Set the jumpers (turns, under way: CR 7.40 lets them be adjusted above deck while racing): the rig is worked out again. */
@@ -109,9 +97,7 @@ export function stepJumpers(b: Pick<Boat, 'tune' | 'rigMain' | 'jumperTarget' | 
   b.jumperT = (b.jumperT ?? 0) + dt;
   if (b.jumperT < JUMPER_HALF_TURN_S) return;
   b.jumperT = 0;
-  // (to the next half-turn mark that way: off the marks only on the guide's tune for the wind, set for her by none)
-  const up = b.jumperTarget > now, next = up ? Math.floor(now * 2 + 1 + 1e-9) / 2 : Math.ceil(now * 2 - 1 - 1e-9) / 2;
-  setJumpers(b, up ? Math.min(b.jumperTarget, next) : Math.max(b.jumperTarget, next), tws);
+  setJumpers(b, now + Math.sign(b.jumperTarget - now) * Math.min(0.5, Math.abs(b.jumperTarget - now)), tws);
 }
 
 /**
@@ -125,17 +111,6 @@ export function mainRig(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: Bo
   const base = b.cond?.main ?? STD_RIG;
   return b.rigMain ??= { ...base, tune: tuneEffect(b.tune, base.bend) };
 }
-/**
- * The same rig as mainRig, without keeping anything on the boat: for readers that don't own her (the coach, run on the
- * page's copy of the race, which the page may only change by commands: sim/commands.ts). Her kept rig if she has one.
- */
-export function rigOf(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: BoatSpec }): SailRig | undefined {
-  const cond = b.spec && !b.cond ? condition(b.spec) : b.cond; // (as mainRig: her condition before her rig)
-  if (!b.tune) return cond?.main;
-  if (b.rigMain) return b.rigMain;
-  const base = cond?.main ?? STD_RIG;
-  return { ...base, tune: tuneEffect(b.tune, base.bend) };
-}
 
 /** Added skin friction (N) at speed v (m/s) from roughness over the smooth-hull friction line, with the form factor. */
 export const foulingDrag = (c: Condition, v: number) => v <= 0 ? 0 : 0.5 * 1025 * HULL.wettedSurface * c.dCf(v) * v * v * 1.15;
@@ -144,9 +119,9 @@ export const foulingDrag = (c: Condition, v: number) => v <= 0 ? 0 : 0.5 * 1025 
 export const PERF_INFO = {
   weeks: 'Slime builds over the first weeks; copper antifouling holds off barnacles for about six, then they come fast (faster in late-summer water than in January). A slow boat feels it most: in light air, skin friction is most of her drag. Racing Folkboats are scrubbed every week or two.',
   finish: 'A burnished racing bottom has about 3% less skin friction than antifouling as it was rolled on (Schultz 2002). Worth a fraction of a percent; most in light air.',
-  sails: 'Old sailcloth sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
+  sails: 'Old Dacron sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
   spars: 'The class built the aluminum mast to bend like an average wooden one; wooden masts vary. A soft mast flattens the main and opens its leech by itself in a gust (good in a gusty breeze) but has less power in moderate air; a stiff one keeps its power but heels more in the gusts. A wooden rig is also about 9 kg heavier aloft. The boom makes no measured difference.',
-  outboard: 'Tohatsu-class four-strokes: 2.5 hp or 3.5 hp (about 18.5 kg each), neither with a reverse gear (they swivel round to push astern), or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
+  outboard: 'Tohatsu-class four-strokes: 2.5 hp (about 13 kg, no reverse gear: it swivels to push astern), 3.5 hp (about 18 kg) or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
   gear: 'Gear and stores, or an old wooden hull\'s soaked planking, over the class minimum of 1930 kg (wooden and fiberglass alike). Slower in light air; a little more stable in a breeze.'
 };
 
@@ -167,6 +142,4 @@ export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: B
   return items;
 }
 const AGE = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
-// (by the wind each is for, without the sailmakers' names (the owner, 18 Nov 2026): North Sails' guide's three, and
-// Heikkilä Sailmaker's raked tune; boat/rigTune.ts)
-const TUNE_LABEL = { light: 'light air', medium: 'medium', strong: 'strong wind', heikkila: 'raked', custom: 'your own' } as const;
+const TUNE_LABEL = { light: 'North Sails light', medium: 'North Sails medium', strong: 'North Sails strong', heikkila: 'Heikkilä', custom: 'your own' } as const;

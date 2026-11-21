@@ -6,7 +6,7 @@ import { cancelSignal } from '../src/sim/signals';
 describe('A message\'s one-line headline', () => {
   const h = (m: string) => headline(m).head;
   it('the words before a colon, when they say something', () => {
-    expect(h('Sight the line: from the Dorado YC flagpole end, X lines up with the shore of Belvedere and Tiburon. Near the line…')).toBe('Sight the line');
+    expect(h('Sight the line: from the GGYC flagpole end, X lines up with the shore of Belvedere and Tiburon. Near the line…')).toBe('Sight the line');
     expect(h('Weather helm: she wants to round up into the wind. Let go of the tiller and she will.')).toBe('Weather helm');
   });
   it('a word or two before the colon runs on to the end of the clause', () => {

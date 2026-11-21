@@ -1,4 +1,4 @@
-import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec, hypot } from '../core/math';
+import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
 import { landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
@@ -84,18 +84,11 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
- * (manoeuvreS's `hs`). The 25 kt tack re-measured with tests/manoeuvre.test.ts's measure() once the crew sat either side of
- * the jib winch at its true place (crewPhys.ts Z.deckFwd, winchAft): 4.3 to 5.0 s. The tack itself cost about 5.0 s
- * before as well: the 4.3 was her creeping back on her twin over the next few minutes after the crew's shuffle forward
- * and back re-trimmed her, which is gone (the physics review). And 4.0 since the crew cross as soon as the new side
- * fills (crewPhys.ts ROLL_HEEL), rather than sitting on the low side while she heels 20° and more: 3.98 measured (4.29
- * with it off); in 20 kt 2.82 (3.11), within the table's 2.9; light air unchanged.
- * Measured again, every wind, 15 Nov 2026, with her turn answering the helm sooner (physics.ts HOVE.gyration 0.19): light-air
- * tacks a second or two cheaper, the 25 kt tack 4.8 s.
+ * (manoeuvreS's `hs`).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 21.3], [4, 13.7], [6, 8.1], [8, 5.2], [12, 3.1], [16, 3.0], [20, 3.0], [25, 4.8]],
-  gybe: [[3, 4.1], [4, 3.6], [6, 2.4], [8, 1.7], [12, 1.1], [16, 0.7], [20, 0.6], [25, 0.5]]
+  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.3]],
+  gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
 /**
  * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of
@@ -118,7 +111,7 @@ function windFor(o: Outlook, p: Vec, t: number, sc: Scenario): { kt: number; fro
   // wind felt on the water: the air's motion minus the water's (environment/current.ts windOnWater)
   const a = V(w.from + sc.dFrom), kt = w.kt * sc.kMul;
   const wx = -a.x * kt - c.x / KT, wy = -a.y * kt - c.y / KT;
-  return { kt: hypot(wx, wy), from: brg(-wx, -wy) };
+  return { kt: Math.hypot(wx, wy), from: brg(-wx, -wy) };
 }
 
 /** Heading that makes good a straight line toward `to` across the current, at speed v (m/s). */
@@ -132,20 +125,13 @@ function crabTo(u: Vec, c: Vec, v: number): number {
  * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide).
  */
 export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
-  const g = sailLegSteps(o, a, b, t0, plan, sc, arrive, maxMin); let r = g.next();
-  while (!r.done) r = g.next();
-  return r.value;
-}
-/** sailLeg a little at a time: it yields every 8 of its 10 s steps, so the page can work a plan out between frames
- * (sim/navigator.ts passageLive) without a step of it holding a frame up. */
-export function* sailLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): Generator<void, SailResult, void> {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
   let turnedNow = false, lastTurnT = -Infinity, forced: LegKind | null = null;
   /** A tack or a gybe here: where, on the drawn track, and the time it costs (manoeuvreS, in the wind here). */
   const turn = (kind: 'tack' | 'gybe', c: Vec, tws: number, hs = 0) => {
-    tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t; turnTs.push(t);
+    tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t;
     const lp = path[path.length - 1]; if (lp.p.x !== p.x || lp.p.y !== p.y) path.push({ p: { ...p }, t });
     // (what it costs, as time with no way on, drifting with the current: the distance made good it loses, over her VMG)
     const ms = manoeuvreS(kind, tws, hs);
@@ -162,12 +148,8 @@ export function* sailLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan
     tack = Math.abs(wrap(bb - (w0.from - ang))) <= Math.abs(wrap(bb - (w0.from + ang))) ? 'S' : 'P';
   }
   let mode: LegKind | null = null, side = 0; // (side: which side of the wind her heading is on, + starboard)
-  /** Standing off the land, borne away: both boards were blocked close ahead (below) */
-  let standOff = false, standT = 0, standTwa = 0, standEnd = -Infinity;
-  const turnTs: number[] = []; // (when she turned: a dead end shows as turns crowding together)
   const maxSteps = maxMin * 60 / DT;
   while (dist(p, b) > arrive && steps < maxSteps) {
-    if (steps % 8 === 7) yield;
     steps++;
     const sd = landDist(p);
     const w = windFor(o, p, t, sc), c = o.current(p, t), toB = sub(b, p), u = unit(toB), bb = brg(u.x, u.y);
@@ -195,53 +177,12 @@ export function* sailLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan
       v = sp(off); h = crabTo(u, c, v);
       const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
     } else {
-      const sgn = mode === 'beat' ? -1 : 1;
-      // her angle to the wind on each board: close-hauled to windward; downwind, the pair of angles, one on each gybe from
-      // her deepest VMG angle up to 30° hotter, whose tracks over the ground, current and all, sailed one then the other,
-      // make most along the straight line to the mark (the two tracks' meeting with that line: the polar's double tangent,
-      // with the current in it). In still water it is her deepest VMG angle on both; in a current across her course the
-      // gybe into it sails hotter, so it still makes ground. Sailed at the deepest angle on both,
-      // the gybe into a cross-current made next to none, and the plan doubled back (the owner's Horseshoe Bay plan, 15 Nov
-      // 2026: it gybed off Yellow Bluff and ran back toward the start)
-      let angS = beat, angP = beat;
-      if (mode === 'run') {
-        const as: number[] = []; for (let a = run; a >= Math.max(run - 30, 90) - 1e-9; a -= 5) as.push(a);
-        const g = (T: 'S' | 'P', a: number) => { const d = V(w.from + (T === 'S' ? -a : a)), vv = sp(a); return { x: d.x * vv + c.x, y: d.y * vv + c.y }; };
-        const GS = as.map(a => g('S', a)), GP = as.map(a => g('P', a));
-        let best = -Infinity; angS = angP = run;
-        for (let i = 0; i < as.length; i++) for (let j = 0; j < as.length; j++) {
-          const s1 = cross(u, GS[i]), s2 = cross(u, GP[j]);
-          // (the two tracks either side of the line, or one on it: some share of each makes it good)
-          if (s1 * s2 > 0) continue;
-          const l = s1 === s2 ? 1 : s2 / (s2 - s1), k = l * (GS[i].x * u.x + GS[i].y * u.y) + (1 - l) * (GP[j].x * u.x + GP[j].y * u.y);
-          if (k > best + 1e-9) { best = k; angS = as[i]; angP = as[j]; }
-        }
-        // (no pair either side of the line, a current setting her off it whatever she does: each gybe its own best along it)
-        if (best === -Infinity) for (const T of ['S', 'P'] as const) {
-          let bv = -Infinity, ba = run; as.forEach((a, i) => { const q = T === 'S' ? GS[i] : GP[i], m = q.x * u.x + q.y * u.y; if (m > bv + 1e-9) { bv = m; ba = a; } });
-          if (T === 'S') angS = ba; else angP = ba;
-        }
-      }
-      // (a gybe that lays the mark already on her deepest angle's track sails that angle: the hotter one is for the board
-      // before the layline. Every rule after reads her track by this angle: the room ahead, what she makes, the layline;
-      // with the hotter angle in some and the deepest in others she sailed on past the mark and ashore)
-      if (mode === 'run') for (const T of ['S', 'P'] as const) {
-        const d = V(w.from + (T === 'S' ? -run : run)), vr = sp(run), g = { x: d.x * vr + c.x, y: d.y * vr + c.y }, m = sub(b, p);
-        const r = wrap(brg(m.x, m.y) - brg(g.x, g.y)) * (T === 'S' ? 1 : -1);
-        if (r >= 0 && r < 90) { if (T === 'S') angS = run; else angP = run; }
-      }
-      const angT = (T: 'S' | 'P') => T === 'S' ? angS : angP;
-      const vbS = sp(angS), vbP = angP === angS ? vbS : sp(angP), vbT = (T: 'S' | 'P') => T === 'S' ? vbS : vbP;
-      const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -angT(T) : angT(T));
-      const gnd = (T: 'S' | 'P') => { const d = V(hd(T)), vb = vbT(T); return { x: d.x * vb + c.x, y: d.y * vb + c.y }; };
-      /** what board T makes toward the mark over the ground (m/s) */
-      const made = (T: 'S' | 'P') => { const g = gnd(T); return g.x * u.x + g.y * u.y; };
+      const ang = mode === 'beat' ? beat : run, vb = sp(ang), sgn = mode === 'beat' ? -1 : 1;
+      const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -ang : ang);
+      const gnd = (T: 'S' | 'P') => { const d = V(hd(T)); return { x: d.x * vb + c.x, y: d.y * vb + c.y }; };
       // can she lay the mark on this tack (her track over the ground, current and all, reaches it)?
       /** how far the mark is inside tack T's track over the ground, seen from q (deg: 0 on the layline, + she lays it) */
-      // (downwind she lays it once it's inside her deepest angle's track: anywhere from there to the hotter angle's she can
-      // steer straight for it; judged on the hotter angle alone, she sailed on past it and overstood)
-      const layG = (T: 'S' | 'P') => { if (mode !== 'run') return gnd(T); const d = V(w.from + (T === 'S' ? -run : run)), vr = sp(run); return { x: d.x * vr + c.x, y: d.y * vr + c.y }; };
-      const inside = (T: 'S' | 'P', q: Vec) => { const g = layG(T), d = sub(b, q); return wrap(brg(d.x, d.y) - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); };
+      const inside = (T: 'S' | 'P', q: Vec) => { const g = gnd(T), d = sub(b, q); return wrap(brg(d.x, d.y) - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); };
       const lays = (T: 'S' | 'P') => { const r = inside(T, p); return r >= 0 && r < 90; };
       /** if she'll cross the other tack's layline within this step, sail on just to it (so she tacks on it, not up to a
        * step past it and overstanding the mark) and say so */
@@ -263,59 +204,17 @@ export function* sailLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan
       // the land close ahead on this board and no better on the other (a corner, a narrowing channel): she tacks (or
       // gybes) off it all the same, as a skipper does before the shallows, rather than sail on into it
       else if (!near && room(tack) < 30 && room(other) >= room(tack) && t - lastTurnT > 0.75) flip = true; // (45 s on a board at least: not a burst of tacks in a dead end)
-      // (the lane is for open water: within 400 m of the shore the shore's rules decide, or the lane's turn sent her back
-      // toward the land the closing-the-shore turn had just taken her off, a tack a minute in light air)
-      else if (plan === 'middle' && sd >= 400) {
+      else if (plan === 'middle') {
         // the lane either side of the course: she turns back when she's beyond it on the side this board is taking her
         // (her track over the ground: on a run the gybes go to the opposite sides from a beat's tacks)
         const xt = cross(legU, sub(p, a)), go = cross(legU, gnd(tack)); // (+ left of the straight course, looking from start to mark)
-        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5 && made(other) > Math.max(0.1, 0.5 * made(tack)) && room(other) >= 80) flip = true; // (half a minute on a board at least; never back onto a board that makes less than half what this one does, or under 0.1 m/s, a track doubling back; and not onto a board with no water ahead, back across the lane into the shore, where the room rules sent her back again, a tack every step)
-      }
-      // both boards blocked close ahead on a beat (a corner of the shore, an island's lee with the tide setting her on):
-      // tacking from one to the other every half-minute only drifts her onto it. A skipper bears away and stands off,
-      // on whichever board and angle has the most room, until a board to windward has room again, and goes round
-      // (the land within 400 m, or standing off already: otherwise there's nothing to look for)
-      const close = mode === 'beat' && !near && (sd < 400 || standOff), rS = close ? room('S') : 600, rP = close ? room('P') : 600;
-      // (out to where a board has room to make some ground, a minute at least: let go at the first 80 m, she sailed
-      // straight back into the same pocket)
-      // (and let go once a board has room to make some ground, after a minute at least; or after five, whatever: hovering
-      // where both boards showed 50-100 m she stood off till the time ran out, a board change every half-minute. Then
-      // not again for two minutes)
-      // (a last resort, once the dead end shows in her turns, three in three minutes: the usual rules see her through most
-      // shores, and standing off where they would have she wandered off and back for hours)
-      const crowded = turnTs.length >= 3 && t - turnTs[turnTs.length - 3] < 3;
-      if (close && sd < 60 && rS < 30 && rP < 30 && crowded && !standOff && t - standEnd > 2) { standT = t; standOff = true; }
-      else if (standOff && (!close || (Math.max(rS, rP) >= 150 && t - standT >= 1) || t - standT >= 5)) { standOff = false; standEnd = t; }
-      let off: { h: number; v: number; T: 'S' | 'P'; twa: number } | null = null;
-      if (standOff) {
-        const off0 = t - standT > 1e-9; // (standing off since an earlier step: she's on standTwa, not close-hauled)
-        // (of the headings borne away whose track is clear water all the way (a point or a pier between her and open water
-        // at the end is as bad as land at the end) and ends with room, the one that makes most toward the mark; the other
-        // board only for more than the tack or gybe to it costs, or she'd swap boards every step on a corner where the two
-        // are near-equal. If none leaves room, the one with most)
-        let best = -Infinity;
-        for (const T of [tack, other] as const) for (let extra = 20; extra <= 100; extra += 20) {
-          const twa = beat + extra, hh = w.from + (T === 'S' ? -twa : twa), vv = sp(twa), d = V(hh), g = { x: d.x * vv + c.x, y: d.y * vv + c.y };
-          const end = { x: p.x + g.x * 90, y: p.y + g.y * 90 }, r = landDist(end), clear = landAlong(p, end) === Infinity;
-          // (m: the time the turn costs, at her speed; through the wind or round downwind, whichever's the shorter turn from
-          // the angle she's on now)
-          const now = off0 ? standTwa : beat, cost = T === tack ? 0 : manoeuvreS(now + twa < 180 ? 'tack' : 'gybe', w.kt, ch.hs) * vv;
-          // (the other board for more than the turn costs and 25 m besides: in light air the turn's cost is a few meters,
-          // and she swapped boards every half-minute where the two were near-equal)
-          const score = clear && r >= 80 ? 1e4 + dot(g, u) * 90 - cost - (T === tack ? 0 : 25) : clear ? r : r - 1e3;
-          if (score > best) { best = score; off = { h: hh, v: vv, T, twa }; }
-        }
-        flip = false;
+        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
       }
       if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt, ch.hs); }
-      h = hd(tack); v = vbT(tack);
-      if (off) { tack = off.T; h = off.h; v = off.v; standTwa = off.twa; } // (a change of board standing off is counted below, as her heading crosses the wind)
-      else if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
-        const hm = crabTo(u, c, vbT(tack)), twa = Math.abs(wrap(hm - w.from));
+      h = hd(tack); v = vb;
+      if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
+        const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
         if (mode === 'beat' ? twa >= beat : twa <= run) { h = hm; v = sp(twa); }
-        // (downwind, the mark deeper than she'll sail: she holds her deepest angle, the layline she lays it on and the chart
-        // draws, not the hotter angle she sails before she lays it, which carried her on away from the mark and ashore)
-        else if (mode === 'run') { h = w.from + (tack === 'S' ? -run : run); v = sp(run); }
       }
     }
     // her heading across the wind from the last step's however she came to it (a reach turned beat, a beat's last board
@@ -373,101 +272,40 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
  * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
  */
-/** Her width each side of a way round the land, near its ends (m): half her beam (1.1) and room to steer, the same 4 m
- * either side of her track that ai.ts homeCourse looks along (an estimate). */
-export const HULL_CLEAR = 4;
-/** The least a way round the land keeps off it, away from its ends, where nothing wider leads there (m): two of her
- * lengths and a margin either side of a channel's middle, an estimate. */
-const MIN_ROOM = 30;
-export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] { return drive(routeAroundSteps(a, b, clear)); }
-/** routeAround a little at a time (on a long leg its look along the line alone is ~100 ms): for the page's plans. */
-export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, Vec[], void> {
+export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   const nearEnd = (q: Vec) => dist(q, a) < 400 || dist(q, b) < 400;
-  // (how far off the land the way keeps: `clear`, or less where nothing wider leads there: the Estuary, below)
-  let room = clear;
   const blocked = (q: Vec) => {
     if (onLand(q)) return true;
     if (nearEnd(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * room, y: q.y + Math.cos(t) * room })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
   // the line itself is tested exactly)
-  // (and near either end, where blocked() asks no clearance, her whole width: lines HULL_CLEAR either side of the leg as
-  // well as its middle, exactly, as ai.ts homeCourse looks ahead. A way out from beside a breakwater's end passed it
-  // 0.25 m off at West Harbor, and through the corner of Gashouse Cove's and South Beach's: the centreline alone was
-  // clear. The first and last HULL_CLEAR of the leg are hers already, so she can leave a wall she lies beside)
-  const wide = (p: Vec, q: Vec): boolean => {
-    const L = dist(p, q); if (L <= 2 * HULL_CLEAR) return true;
-    const ux = (q.x - p.x) / L, uy = (q.y - p.y) / L, sx = -uy * HULL_CLEAR, sy = ux * HULL_CLEAR;
-    const p0 = { x: p.x + ux * HULL_CLEAR, y: p.y + uy * HULL_CLEAR }, q0 = { x: q.x - ux * HULL_CLEAR, y: q.y - uy * HULL_CLEAR };
-    return landAlong({ x: p0.x + sx, y: p0.y + sy }, { x: q0.x + sx, y: q0.y + sy }) === Infinity && landAlong({ x: p0.x - sx, y: p0.y - sy }, { x: q0.x - sx, y: q0.y - sy }) === Infinity;
-  };
-  // (not for the legs of the way out from among the Wharf's and the Embarcadero's piers: their fairways are 20–30 m, the
-  // way out is found on its own 10 m grid (escapeWharf), and asking her width there only moved the way's turns, closer to
-  // the docks than before. Those legs start or end on that way out's own points)
-  const pierWay = new Set<Vec>();
-  const amongPiers = (p: Vec, q: Vec) => pierWay.has(p) || pierWay.has(q);
-  const visible = function* (p: Vec, q: Vec, hull = true): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; if (hull && (nearEnd(p) || nearEnd(q) || room < clear) && !amongPiers(p, q) && !wide(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
-  if (yield* visible(a, b)) return [a, b];
+  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  if (visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
-  const ea = wharfNearest(a, 150) ? yield* escapeWharf(a) : [a];
-  const eb = wharfNearest(b, 150) ? (yield* escapeWharf(b)).reverse() : [b];
-  if (ea.length > 1) for (const p of ea.slice(0, -1)) pierWay.add(p);
-  if (eb.length > 1) for (const p of eb.slice(1)) pierWay.add(p);
-  const A = ea[ea.length - 1], B = eb[0], ends = [A, B];
-  const near2 = (q: Vec) => ends.some(e => dist(q, e) < 400) || nearEnd(q);
+  const ea = wharfNearest(a, 150) ? escapeWharf(a) : [a];
+  const eb = wharfNearest(b, 150) ? escapeWharf(b).reverse() : [b];
+  const A = ea[ea.length - 1], B = eb[0];
+  const near2 = (q: Vec) => dist(q, A) < 400 || dist(q, B) < 400 || nearEnd(q);
   const blocked2 = (q: Vec) => {
     if (onLand(q)) return true;
     if (near2(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * room, y: q.y + Math.cos(t) * room })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
-  // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier; and near the
-  // ends, her width as well, as for the legs below: the way's own steps there were the ones that passed a breakwater's
-  // end close (Horseshoe Bay's, 0.75 m). Where that finds no way, the steps by their middle alone, as before)
-  const step = (p: Vec, q: Vec) => landAlong(p, q) === Infinity, wideStep = (p: Vec, q: Vec) => step(p, q) && (!near2(p) && !near2(q) && room === clear || amongPiers(p, q) || wide(p, q));
-  const grid = function* (p: Vec, q: Vec): Generator<void, Vec[] | null, void> { return (yield* gridPathSteps(p, q, 50, 2500, blocked2, wideStep)) ?? (yield* gridPathSteps(p, q, 50, 2500, blocked2, step)); };
-  let mid = yield* grid(A, B);
-  let ea2 = ea, eb2 = eb;
-  // (in a corner by the land, a harbor's entrance or a cove, the 50 m grid can't see the way out: first out to open
-  // water on the 10 m grid, as from among the Wharf's piers, then the rest. Without it the way fell back to the straight
-  // line, through the land: out of Gashouse Cove's and South Beach's entrances)
-  if (!mid) {
-    // (not from an end that's on land itself, a point picked on the chart: there's no way out of it to find)
-    const out = function* (p: Vec): Generator<void, Vec[], void> { return onLand(p) ? [p] : (yield* gridPathSteps(p, p, 10, 700, onLand, step, q => landDist(q) >= 100, 0)) ?? [p]; };
-    ea2 = [...ea, ...(yield* out(A)).slice(1)]; eb2 = [...(yield* out(B)).reverse().slice(0, -1), ...eb];
-    const A2 = ea2[ea2.length - 1], B2 = eb2[0];
-    ends.push(A2, B2); // (the water got out to counts as an end too: no clearance asked round it)
-    const m2 = A2 === A && B2 === B ? null : yield* grid(A2, B2);
-    if (m2) { ea.splice(0, ea.length, ...ea2); eb.splice(0, eb.length, ...eb2); mid = m2; }
-  }
-  // (a channel narrower than twice `clear` leads there, the only way by water: the Oakland Estuary, a few hundred meters
-  // wide, between Alameda and Oakland. At 120 m off the land every cell of it but its ends was blocked, and the way out of
-  // its harbors to the Bay fell back to the straight line, through Alameda. Then keep half as far off, and half again,
-  // down to MIN_ROOM. Each time from the ends as they are and, failing that, from the water stepped out to above: from
-  // Gashouse Cove to the Estuary the way needs both. 30 m is what the cells' 8 probes look, not a clearance (a thin
-  // breakwater's end can lie between two of them), so once room is less, every leg and step, not only those near the
-  // ends, keeps her width too, as above. The room is one for the whole way: in the open Bay too it keeps only as far off)
-  // (the middle of a channel is a chart line, not the rule: a boat keeps to the starboard side of a narrow channel, and
-  // out of the way of a ship that can sail only in it, COLREGS/Inland Rule 9(a)(i) and (b), USCG Navigation Rules)
-  const A2 = ea2[ea2.length - 1], B2 = eb2[0];
-  while (!mid && room / 2 >= MIN_ROOM) {
-    room /= 2; mid = yield* grid(A, B);
-    if (!mid && (A2 !== A || B2 !== B)) { const m2 = yield* grid(A2, B2); if (m2) { ea.splice(0, ea.length, ...ea2); eb.splice(0, eb.length, ...eb2); mid = m2; } }
-  }
+  // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier)
+  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
   const out = [a];
   let i = 0;
-  // (the farthest she can see keeping her width; failing that, the farthest by its middle alone, as before; failing that,
-  // the next turn: so a way is never closer to the land than it was without her width asked)
   while (i < pts.length - 1) {
     let j = pts.length - 1;
-    while (j > i + 1 && !(yield* visible(pts[i], pts[j]))) j--;
-    if (j === i + 1 && !(yield* visible(pts[i], pts[j]))) { j = pts.length - 1; while (j > i + 1 && !(yield* visible(pts[i], pts[j], false))) j--; }
+    while (j > i + 1 && !visible(pts[i], pts[j])) j--;
     out.push(pts[j]); i = j;
   }
   return out;
@@ -478,10 +316,8 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
  * eight neighbours, no cutting a corner of the land), with a and b themselves as its ends; null if there's none.
  * With `isGoal`, it stops at the first cell that passes (b then only steers the search).
  */
-/** Run a generator to its end at once: the synchronous form of the functions below that the page works out between frames. */
-function drive<T>(g: Generator<void, T, void>): T { let r = g.next(); while (!r.done) r = g.next(); return r.value; }
-function* gridPathSteps(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
-  isGoal?: (q: Vec) => boolean, lean = 1): Generator<void, Vec[] | null, void> {
+function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
+  isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
   const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
   const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
@@ -495,9 +331,8 @@ function* gridPathSteps(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: 
   const push = (e: [number, number]) => { heap.push(e); let c = heap.length - 1; while (c > 0) { const pa = (c - 1) >> 1; if (heap[pa][0] <= heap[c][0]) break; [heap[pa], heap[c]] = [heap[c], heap[pa]]; c = pa; } };
   const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
   gs[start] = 0; push([h(start), start]);
-  let end = -1, popped = 0;
+  let end = -1;
   while (heap.length) {
-    if (++popped % 16 === 0) yield;
     const [f, k] = pop();
     if (f > gs[k] + h(k) + 1e-6) continue; // (a stale entry)
     const i = k % nx, j = Math.floor(k / nx);
@@ -507,7 +342,7 @@ function* gridPathSteps(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: 
       const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
       const kk = jj * nx + ii; if (kk !== goal && isBlocked(kk)) continue;
       if (di && dj && (isBlocked(j * nx + ii) || isBlocked(jj * nx + i))) continue; // no cutting a corner of the land
-      const g = gs[k] + cell * hypot(di, dj);
+      const g = gs[k] + cell * Math.hypot(di, dj);
       if (g >= gs[kk]) continue;
       if (!edgeOk(k === start ? a : at(i, j), kk === goal ? b : at(ii, jj))) continue; // nor through a pier or a dock
       gs[kk] = g; from[kk] = k; push([g + h(kk), kk]);
@@ -522,6 +357,6 @@ function* gridPathSteps(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: 
 }
 
 /** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
-function* escapeWharf(p: Vec): Generator<void, Vec[], void> {
-  return (yield* gridPathSteps(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0)) ?? [p];
+function escapeWharf(p: Vec): Vec[] {
+  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0) ?? [p];
 }

@@ -23,8 +23,7 @@ describe('pushed off from a Gashouse Cove slip under bare poles, on the real tid
       u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false };
       w.pushOff();
       // until her crew have let her go (a slip she's swung head to wind from and held is not this test's)
-      // (up to 150 s: walked out to the fairway and turned there by hand, 8m2, she's let go after about 75)
-      let i = 0; for (; i < 60 * 150 && (u.handled || u.docked); i++) { u.steer = 0; u.tiller = 0; w.step(DT); }
+      let i = 0; for (; i < 60 * 60 && (u.handled || u.docked); i++) { u.steer = 0; u.tiller = 0; w.step(DT); }
       if (u.handled || u.docked) continue;
       freed++;
       expect(Math.hypot(u.cur.x, u.cur.y) / KT, `${s.id}: the stream at her in the basin (kt)`).toBeLessThan(0.1);

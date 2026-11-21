@@ -94,48 +94,4 @@ describe('the mirror World is the real one over again', () => {
         if (i === 600) applyCommand(w, { k: 'ctlTarget', key: 'vang', v: 0.6 });
       });
   }, 900_000);
-
-  it('a key deleted and another added in the same frame: the mirror drops the old one (the key count unchanged)', () => {
-    // (Crew Habits, 19 Nov 2026: deletes were looked for only when an object's key count changed, so one key gone and
-    // another come in the same packet left the old one on the page's copy; crewWork's lineWant and lineSlow delete keys so)
-    sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 10, sailFrom: 'cityfront', sailTo: '', current: 'slack' }), 5, { freeSail: true }),
-      12, () => 2, 1, (w, i) => {
-        const u = w.user as unknown as { probe?: Record<string, number> };
-        if (i === 2) u.probe = { a: 1, b: 2 };
-        if (i === 5) { delete u.probe!.a; u.probe!.c = 3; } // (two keys before, two after)
-        if (i === 8) { delete u.probe!.b; delete u.probe!.c; u.probe!.d = 4; u.probe!.e = 5; }
-      });
-  }, 120_000);
-
-  it('paddling with the boom crutch in a calm, and a contact (the paddle state and lastHitT go across)', () => {
-    sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 1, sailFrom: 'cityfront', sailTo: '', current: 'slack' }), 5, { freeSail: true }),
-      400, () => 4, 40, (w, i) => {
-        if (i === 5) applyCommand(w, { k: 'paddle', side: 'P' });
-        if (i === 120) applyCommand(w, { k: 'paddle', side: 'S', back: true });
-        if (i === 200) w.user.lastHitT = w.t; // (as a contact would set it)
-        if (i === 300) applyCommand(w, { k: 'paddle', side: null });
-      });
-  }, 300_000);
-});
-
-import { CoachMemory, teach } from '../src/boat/coach';
-import { foulingDrag } from '../src/boat/condition';
-describe('The motor stowed and shipped, through the mirror (its weight is data in her condition: sim/sync.ts sends no functions)', () => {
-  it('after a stow, the page\'s copy of her condition still has its functions, and the same numbers as the race\'s; the coach runs on it', { timeout: 120_000 }, () => {
-    const boat = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, outboard: 'bracket' as const, outboardHp: 3.5 as const } };
-    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 10, windTurn: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-11-14', current: 'slack', sea: 'flat', boats: [boat], boat, boatId: boat.id, fleet: 0, opponents: [] } as unknown as Settings;
-    const A = new World(COURSES[0], S, 1, { freeSail: true }), M = new World(COURSES[0], S, 1, { freeSail: true });
-    const src = new SyncSource(A), mirror = new SyncMirror(M);
-    const frame = () => { A.step(DT); mirror.apply(structuredClone(src.capture(A.drainEvents()))); };
-    A.user.manualTrim = true; A.user.trimAll = true; // (a sheet in hand: the coach works out her heel, with her condition's righting)
-    for (let i = 0; i < 60; i++) frame();
-    applyCommand(A, { k: 'motor', op: 'stow' });
-    for (let i = 0; i < 60 * 200 && !A.user.motor!.stowed; i++) frame(); frame();
-    expect(M.user.motor!.stowed).toBe(true);
-    const c = M.user.cond!;
-    expect(typeof c.rightingDelta).toBe('function'); expect(typeof c.dCf).toBe('function');
-    expect(c.extraMoment).toBe(A.user.cond!.extraMoment); expect(c.rightingDelta(20)).toBe(A.user.cond!.rightingDelta(20));
-    expect(() => { teach(M.user); new CoachMemory().step(M.user, M.t); foulingDrag(c, 2); }).not.toThrow();
-    expect(firstDifference(A, M)).toBeNull();
-  });
 });

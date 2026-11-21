@@ -20,8 +20,10 @@ function aim(w: World, from: Vec, h: number, off: number, v: number) {
 function run(w: World, s: number) { const out = { toasts: [] as string[], wrecked: [] as string[] }; for (let i = 0; i < s / DT; i++) { w.step(DT); for (const e of w.drainEvents()) { if (e.type === 'toast') out.toasts.push(e.msg); if (e.type === 'wrecked') out.wrecked.push(`${e.how} @ ${e.where}`); } } return out; }
 /** West Harbor's breakwater, from the Bay to its north: concrete and rock. */
 const offWestHarbor = LL(37.8098, -122.4410);
-/** Crissy Field's shore, from the water off it: the open shore (mud and sand, for now). */
+/** Crissy Field's shore, from the water off it: the open shore, where the chart gives no kind (a beach): mud and sand. */
 const offCrissy = LL(37.8075, -122.4560);
+/** The Marina Green, from the water off it: NOAA's chart has it a sea wall (SLCONS CATSLC 10: geo/shoreKind.ts). */
+const offMarinaGreen = LL(37.8095, -122.4380);
 
 describe('wrecks', () => {
   it('into a harbor breakwater at 2 m/s (about 4 kn): a wreck, at that harbor, held there', () => {
@@ -37,11 +39,11 @@ describe('wrecks', () => {
     const w = world('sail'); aim(w, offWestHarbor, 180, 1, 0.3); run(w, 8);
     expect(w.user.wrecked).toBeUndefined(); expect(w.user.damage?.level ?? 'scrape').toBe('scrape');
   });
-  it('the open shore at 2 m/s: aground, no damage (mud and sand until its kinds are sourced)', () => {
+  it('a beach at 2 m/s (the chart gives Crissy Field\'s shore no kind): aground, no damage', () => {
     const w = world('sail'); aim(w, offCrissy, 180, 2, 2); const r = run(w, 4);
     expect(r.wrecked).toHaveLength(0); expect(w.user.damage).toBeUndefined(); expect(r.toasts.some(m => /Aground/.test(m))).toBe(true);
   });
-  it('racing, wrecked: she retires (RET only, in a season race too: the Coordinator, for now)', () => {
+  it('racing, wrecked: she retires (RET only, in a season race too: the owner, 14 Nov 2026)', () => {
     const w = world('race'); aim(w, offWestHarbor, 180, 2, 2); run(w, 4);
     expect(w.user.wrecked).toBeTruthy(); expect(w.user.retired).toBe(true);
   });
@@ -50,7 +52,7 @@ describe('wrecks', () => {
     const u = w.user; u.h = 0; w.carryOn(); u.v = 1; run(w, 3);
     expect(u.wrecked?.carryOn).toBe(true); expect(Math.hypot(u.vx, u.vy)).toBeGreaterThan(0.05);
   });
-  it('the AI boats are never wrecked or marked (only your boat: the Coordinator, for now)', () => {
+  it('the AI boats are never wrecked or marked (only your boat: the owner, 14 Nov 2026)', () => {
     const w = world('race'); const ai = w.boats.find(b => !b.isUser)!;
     const u = V(180); let d = 0; while (!onLand({ x: offWestHarbor.x + u.x * d, y: offWestHarbor.y + u.y * d })) d += 0.25;
     Object.assign(ai, { x: offWestHarbor.x + u.x * (d - 5.8), y: offWestHarbor.y + u.y * (d - 5.8), h: 180, v: 2 });
@@ -77,4 +79,19 @@ describe('wrecks', () => {
     w.step(DT);
     expect(u.wrecked?.where).toBe('on the Bay'); expect(u.retired).toBe(true);
   });
+  // (the open shore's kinds from NOAA's chart, geo/shoreKind.ts: the Marina Green is a sea wall)
+  it('the Marina Green\'s seawall at 2 m/s: a wreck, "hit the seawall"; at 1 m/s, damage', () => {
+    const w = world('sail'); aim(w, offMarinaGreen, 180, 2, 2); const r = run(w, 4);
+    expect(r.wrecked, r.toasts.join(' / ')).toHaveLength(1); expect(r.wrecked[0]).toMatch(/^hit the seawall at 3\.\d kn @ /);
+    const w2 = world('sail'); aim(w2, offMarinaGreen, 180, 2, 1); const r2 = run(w2, 6);
+    expect(r2.wrecked).toHaveLength(0); expect(w2.user.damage).toEqual({ level: 'damage', what: 'the seawall' });
+  });
+  // (the physics review's cases: a beach beside a construction read as the construction, and a pier always under water read as
+  // standing concrete. Each the chart's natural coast or the bottom, not the edge: aground, no wreck)
+  for (const [where, la, lo] of [['Crissy Field, east', 37.8085, -122.4544], ['Crissy Field, east end', 37.8085, -122.4508], ['off the East Beach', 37.8085, -122.4478], ['by Torpedo Wharf', 37.8085, -122.4666], ['Aquatic Park\'s cove (a submerged ruined pier)', 37.8085, -122.4242]] as const)
+    it(`${where} at 2 m/s: the chart's natural coast or the bottom, not a construction: no wreck`, () => {
+      const w = world('sail'); aim(w, LL(la, lo), 180, 2, 2); const r = run(w, 4);
+      expect(r.wrecked, r.toasts.join(' / ')).toHaveLength(0);
+    });
 });
+

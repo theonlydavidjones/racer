@@ -81,7 +81,7 @@ export function windKindFor(date: string, choice: WindKind | 'auto' = 'auto'): W
 /** The wind for a time (minutes since epoch, UTC), kind of day, and light/typical/windy, interpolated between the hourly records. */
 export function breezeAt(tMin: number, day: WindDay, kind: WindKind = 'west'): Breeze {
   const parts = Object.fromEntries(fmt.formatToParts(new Date(tMin * 60000)).map(p => [p.type, p.value]));
-  const m = (+parts.month - 1 + 12) % 12, h = (+parts.hour % 24) + (+parts.minute + (tMin - Math.floor(tMin))) / 60; // (to the second: by whole minutes the wind came on in a step a minute)
+  const m = (+parts.month - 1 + 12) % 12, h = (+parts.hour % 24) + +parts.minute / 60;
   const cells = MONTHS[m].kinds[kind] ?? MONTHS[m].kinds.west!; // a kind that (almost) never comes this month: the westerly
   const h0 = Math.floor(h) % 24, h1 = (h0 + 1) % 24, f = h - Math.floor(h);
   const a = cells[h0], b = cells[h1];
@@ -126,29 +126,11 @@ export function landLee(p: Vec, from: number): number {
 /** How much the wind comes in through the Gate (the slot): all of a westerly, none of a northerly or southerly. */
 export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 255) * Math.PI / 180)) ** 2;
 
-/**
- * anyShoreDist at p, kept by p's exact coordinates: the same number, worked out once. World.buildField asks for the same
- * grid's points every 30 s of race time, twice each, and the distance to every shore is nearly all of its cost: done
- * afresh in one step it was a 20–60 ms step every 30 s, a hitch the player sees (docs/CAPACITY.md §9).
- */
-const SHORE_AT = new Map<number, Map<number, number>>();
-let shoreAtN = 0;
-function shoreDistAt(p: Vec): number {
-  let row = SHORE_AT.get(p.x), d = row?.get(p.y);
-  if (d === undefined) {
-    d = anyShoreDist(p);
-    if (shoreAtN >= 50000) { SHORE_AT.clear(); shoreAtN = 0; row = undefined; } // (the map asks for anywhere it's drawn: kept bounded)
-    if (!row) { row = new Map(); SHORE_AT.set(p.x, row); }
-    row.set(p.y, d); shoreAtN++;
-  }
-  return d;
-}
-
 export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
   // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
   // under 0.3% of the wind here, typically 0.005% (the review's measure over the water within 420 m of a shore): for a boat's own wind every step, as for her current; the map keeps the exact one)
-  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : shoreDistAt(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
+  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }
 
@@ -246,8 +228,8 @@ export class Puffs {
  * rest give the 0 weight() would. The same sums, from a few puffs where it was all 170, for each boat every step.
  * Kept beside the puffs, not on them, so the page's mirror isn't sent them; made again each step (puffs.steps).
  */
-interface PuffBuckets { steps: number; near(x: number, y: number): Int32Array }
-interface Grid extends PuffBuckets { size: number; x0: number; y0: number; nx: number; ny: number; head: Int32Array; next: Int32Array; out: Int32Array }
+interface PuffBuckets { steps: number; near(x: number, y: number): number[] }
+interface Grid extends PuffBuckets { size: number; x0: number; y0: number; nx: number; ny: number; head: Int32Array; next: Int32Array; out: number[] }
 const BUCKETS = new WeakMap<Puffs, Grid>();
 function bucketPuffs(f: Puffs): void {
   let size = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -255,24 +237,21 @@ function bucketPuffs(f: Puffs): void {
   const nx = Math.max(1, Math.floor((x1 - x0) / size) + 1), ny = Math.max(1, Math.floor((y1 - y0) / size) + 1);
   let g = BUCKETS.get(f);
   if (!g) {
-    g = { steps: 0, size, x0, y0, nx, ny, head: new Int32Array(0), next: new Int32Array(0), out: new Int32Array(0), near(x, y) {
-      const G = this as Grid, out = G.out; let n = 0;
+    g = { steps: 0, size, x0, y0, nx, ny, head: new Int32Array(0), next: new Int32Array(0), out: [], near(x, y) {
+      const G = this as Grid, out = G.out; out.length = 0;
       const bx = Math.floor((x - G.x0) / G.size), by = Math.floor((y - G.y0) / G.size);
       for (let j = Math.max(0, by - 1); j <= Math.min(G.ny - 1, by + 1); j++)
-        for (let i = Math.max(0, bx - 1); i <= Math.min(G.nx - 1, bx + 1); i++) for (let k = G.head[j * G.nx + i]; k >= 0; k = G.next[k]) out[n++] = k;
-      // (the puffs' own order, so the sums add up as they did: a typed array sorts its numbers as numbers, no comparator)
-      return out.subarray(0, n).sort();
+        for (let i = Math.max(0, bx - 1); i <= Math.min(G.nx - 1, bx + 1); i++) for (let k = G.head[j * G.nx + i]; k >= 0; k = G.next[k]) out.push(k);
+      return out.sort((a, b) => a - b); // (the puffs' own order: the sums add up as they did)
     } };
     BUCKETS.set(f, g);
   }
   // (each square's puffs a chain through next[], the arrays kept from step to step: nothing new a step)
   if (g.head.length < nx * ny) g.head = new Int32Array(nx * ny * 2);
   if (g.next.length < f.cells.length) g.next = new Int32Array(f.cells.length);
-  if (g.out.length < f.cells.length) g.out = new Int32Array(f.cells.length); // (each puff once at most in near's nine squares)
   g.head.fill(-1, 0, nx * ny);
-  g.steps = f.steps; g.size = size; g.x0 = x0; g.y0 = y0; g.nx = nx; g.ny = ny;
-  const cells = f.cells, head = g.head, next = g.next;
-  for (let i = 0; i < cells.length; i++) { const c = cells[i], b = Math.floor((c.y - y0) / size) * nx + Math.floor((c.x - x0) / size); next[i] = head[b]; head[b] = i; }
+  Object.assign(g, { steps: f.steps, size, x0, y0, nx, ny });
+  f.cells.forEach((c, i) => { const b = Math.floor((c.y - y0) / size) * nx + Math.floor((c.x - x0) / size); g!.next[i] = g!.head[b]; g!.head[b] = i; });
 }
 
 /** windTerrain on a precomputed 50 m grid (for drawing the wind on the water, where it's needed at thousands of points). */

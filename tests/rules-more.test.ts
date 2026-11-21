@@ -96,16 +96,6 @@ describe('Rule 19 · room to pass an obstruction', () => {
   //   ~~~~~~~~~~~ shore ~~~~~~~~~~~
   //   Blue →        (inside, 4 m off, windward)
   //   Red ↗         (outside, leeward) luffs toward Blue and the shore
-  it('19.2(b) is judged in the water: a current setting both boats toward the shore isn\'t the outside boat squeezing (the inside boat bore down onto her: hers, rule 11)', () => {
-    const blue = boat('Blue', { at: [0, 16], heading: 90 }), red = boat('Red', { at: [0, 11.5], heading: 90 });
-    const p = pair(blue, red, [], shore);
-    expect(p.at(10)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
-    moveTo(blue, [2, 13.8], 120); moveTo(red, [2.5, 11.5]); // Blue bears away onto Red; Red holds her course
-    const cur = { x: 0, y: 1 }; // (1 m/s setting north, toward the shore: over the ground both drift in)
-    for (const b of [blue, red]) { b.v = Math.hypot(b.vx, b.vy); b.cur = cur; b.vx += cur.x; b.vy += cur.y; }
-    expect(p.at(11).foul).toMatchObject({ by: 'Blue', rule: '11' });
-  });
-
   it('19.2(b): the outside boat squeezes the inside boat toward the shore: outside boat is penalized', () => {
     const blue = boat('Blue', { at: [0, 16], heading: 90 }); // port beam reach, windward
     const red = boat('Red', { at: [0, 11.5], heading: 90 });

@@ -1,4 +1,4 @@
-import { V, clamp, type Vec, hypot } from '../core/math';
+import { V, clamp, type Vec } from '../core/math';
 import { PIERS, type Pier } from '../geo/shore';
 import { WindSum, bluffDeficit } from './shadows';
 
@@ -73,22 +73,15 @@ function extent(P: Pier, c: Vec, e: Vec): { W: number; L: number; back: number; 
 /* ---------- the wind ---------- */
 
 /** The piers' wind shadows at p (the true wind from `from`), added to `sum`. Where one stands inside another, the deeper of the two. */
-/** The box round every pier's wind wake (each pier's box and its reach): outside it, none of them reaches. */
-let PIER_AIR: { x0: number; x1: number; y0: number; y1: number } | null = null;
 export function addPierWakes(sum: WindSum, from: number, p: Vec): void {
-  // (one test for all of them, as every boat asks every step; then each pier's own, as before)
-  const A = PIER_AIR ??= PIERS.reduce((a, P) => { const b = P.box, r = 30 * P.top + 100; return { x0: Math.min(a.x0, b.x0 - r), x1: Math.max(a.x1, b.x1 + r), y0: Math.min(a.y0, b.y0 - r), y1: Math.max(a.y1, b.y1 + r) }; }, { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
-  if (p.x < A.x0 || p.x > A.x1 || p.y < A.y0 || p.y > A.y1) return;
   const e = V(from + 180);
   let fender = 0, tower = 0;
   for (const P of PIERS) {
-    const b = P.box, r = 30 * P.top + 100;
+    const b = P.box, r = 30 * P.top + 100; // (by then under 2%)
     if (p.x < b.x0 - r || p.x > b.x1 + r || p.y < b.y0 - r || p.y > b.y1 + r) continue;
     const c = centreOf(P), dx = p.x - c.x, dy = p.y - c.y, x = dx * e.x + dy * e.y, y = dx * e.y - dy * e.x;
     const { W, L } = extent(P, c, e);
-    // (faded out over the last 30% of the box searched: a wide, low pier's far wake is still a few percent at its edge)
-    const out = Math.max(0, b.x0 - p.x, p.x - b.x1, b.y0 - p.y, p.y - b.y1);
-    const d = bluffDeficit(x, y, P.top, W, L) * Math.min(1, (r - out) / (0.3 * r));
+    const d = bluffDeficit(x, y, P.top, W, L);
     if (d <= 0.001) continue;
     if (/^Golden Gate Bridge, south tower/.test(P.name)) { if (/fender/.test(P.name)) fender = d; else tower = d; continue; }
     sum.addDeficit(e.x, e.y, d);
@@ -117,7 +110,7 @@ function wakesFor(flows: Vec[]): typeof wakeList {
   if (flows === wakeFlows) return wakeList;
   wakeFlows = flows; wakeList = [];
   for (let i = 0; i < WAKE_PIERS.length; i++) {
-    const { P, c } = WAKE_PIERS[i], f = flows[i], U = hypot(f.x, f.y);
+    const { P, c } = WAKE_PIERS[i], f = flows[i], U = Math.hypot(f.x, f.y);
     if (U < 0.02) continue;
     const e = { x: f.x / U, y: f.y / U }, { W, back } = extent(P, c, e);
     wakeList.push({ P, c, U, e, W, back });
@@ -129,14 +122,9 @@ function wakesFor(flows: Vec[]): typeof wakeList {
  * The current at p with the piers' wakes in it: `here` the current at p without them, `flows[i]` the stream meeting
  * WAKE_PIERS[i] (m/s), `t` the time (s) for the eddies.
  */
-/** The box round every pier's water wake (its middle, and the reach each tests): outside it, none of them reaches. */
-let PIER_WATER: { x0: number; x1: number; y0: number; y1: number } | null = null;
 export function withPierWakes(p: Vec, here: Vec, flows: Vec[], t: number): Vec {
   let ox = here.x, oy = here.y;
   const R2 = (WAKE.reach + 100) ** 2;
-  // (one test for all of them, as every boat's current asks every step: past it, each pier's own distance test fails)
-  const B = PIER_WATER ??= WAKE_PIERS.reduce((a, { c }) => { const R = WAKE.reach + 100 + 1e-6; return { x0: Math.min(a.x0, c.x - R), x1: Math.max(a.x1, c.x + R), y0: Math.min(a.y0, c.y - R), y1: Math.max(a.y1, c.y + R) }; }, { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
-  if (p.x < B.x0 || p.x > B.x1 || p.y < B.y0 || p.y > B.y1) return { x: ox, y: oy };
   for (const { P, c, U, e, W, back } of wakesFor(flows)) {
     const dx = p.x - c.x, dy = p.y - c.y;
     if (dx * dx + dy * dy > R2) continue;

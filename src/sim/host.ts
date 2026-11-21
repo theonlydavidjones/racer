@@ -23,8 +23,6 @@ import { applyCommand, type Command, type CommandResult } from './commands';
 import { DT, World, type WorldOptions } from './world';
 import { SyncMirror, checkOf } from './sync';
 import type { FromWorker, ToWorker } from './worker';
-import { CoachRun, type CoachStep } from './coachRun';
-import type { CoachContext } from '../boat/coach';
 import type { CourseFile } from '../courses/course';
 import type { Settings } from '../settings';
 
@@ -35,9 +33,9 @@ export type RO<T> = T extends (...a: never[]) => unknown ? T
   : T;
 
 /** The World's members that change the race: the page reaches them only through SimHost (commands and steps). */
-type Changes = 'step' | 'idle' | 'drainEvents' | 'pushOff' | 'callTurn' | 'setSail' | 'setDest' | 'retire' | 'motorTilt' | 'motorStart'
-  | 'motorStop' | 'motorGear' | 'motorThrottle' | 'motorSwivel' | 'motorStow' | 'castOff' | 'sendHome' | 'moveHere' | 'applyConditions'
-  | 'userHail' | 'pilotTack' | 'assignPenalty' | 'hail' | 'replyYouTack' | 'passOnHail' | 'paddle' | 'rule42';
+type Changes = 'step' | 'idle' | 'drainEvents' | 'pushOff' | 'setSail' | 'setDest' | 'retire' | 'motorTilt' | 'motorStart'
+  | 'motorStop' | 'motorGear' | 'motorThrottle' | 'motorSwivel' | 'castOff' | 'sendHome' | 'moveHere' | 'applyConditions'
+  | 'userHail' | 'assignPenalty' | 'hail' | 'replyYouTack' | 'passOnHail';
 
 /*
  * What the page reads, for step 3 (when the view is the worker's state sent back each frame, not the World itself):
@@ -75,11 +73,6 @@ export interface SimHost {
   send(c: Command): void;
   /** Do something whose answer the page needs (the motor's start, home, move her here). */
   ask(c: Command): Promise<CommandResult>;
-  /**
-   * The trim coach (sim/coachRun.ts): `ctx` while the page wants it (sailing, no lesson on), null when not. Its newest
-   * step since the last call, or null: in the worker it comes back with a frame's answer, a frame or two late.
-   */
-  coach(ctx: CoachContext | null): CoachStep | null;
   /** What happened in the race since the last call (toasts, horns, incidents). */
   drainEvents(): SimEvent[];
   /** Done with this race (a new one's being built): the worker stops. */
@@ -130,18 +123,15 @@ export class LocalHost implements SimHost {
   readonly mode = 'local';
   /** Time not yet stepped, s (the race's time: the page's time × its speed). */
   private acc = 0;
-  private coachRun = new CoachRun();
-  private coachDt = 0;
   /** The view the page reads: the World itself, or (?simguard, dev only) a proxy that refuses writes. */
   view: SimView;
   constructor(public world: World, private guard = false) { this.view = guard ? guarded(world) : world; }
   rebuild(args: WorldArgs, mirror?: World): void {
     this.world = mirror && mirror.steps === 0 && !mirror.running ? mirror : new World(args.file, args.settings, args.seed, args.opts);
     this.view = this.guard ? guarded(this.world) : this.world; this.acc = 0;
-    this.coachRun = new CoachRun(); this.coachDt = 0; // (a new race, a fresh coach: its memory is of the old race's clock)
   }
   advance(dt: number, twa?: number): number {
-    const w = this.world, t0 = performance.now(); this.coachDt += dt;
+    const w = this.world, t0 = performance.now();
     if (w.running && !w.paused) {
       this.acc += dt * w.speed;
       while (this.acc >= DT) {
@@ -153,7 +143,6 @@ export class LocalHost implements SimHost {
     }
     return performance.now() - t0;
   }
-  coach(ctx: CoachContext | null): CoachStep | null { const dt = this.coachDt; this.coachDt = 0; return this.coachRun.step(this.world, dt, ctx); }
   send(c: Command): void { applyCommand(this.world, c); }
   ask(c: Command): Promise<CommandResult> { return Promise.resolve(applyCommand(this.world, c)); }
   drainEvents(): SimEvent[] { return this.world.drainEvents(); }
@@ -184,8 +173,6 @@ export class WorkerHost implements SimHost {
   private asks = new Map<number, (r: CommandResult) => void>();
   private nextAsk = 1; private inflight = 0; private due = 0; private lastMs = 0;
   private events: SimEvent[] = [];
-  /** The trim coach: the situation sent with each frame while the page wants it, and its newest step back. */
-  private coachCtx: CoachContext | null = null; private coachGot: CoachStep | null = null;
   /** Checks the mirror failed (sim/sync.ts checkOf): 0, or the mirror isn't the race. */
   faults = 0;
   /** Checks made. */
@@ -228,7 +215,7 @@ export class WorkerHost implements SimHost {
    */
   rebuild(args: WorldArgs, mirror?: World): void {
     for (const [, res] of this.asks) res(undefined);
-    this.asks.clear(); this.queue = []; this.sent = []; this.inflight = 0; this.due = 0; this.events = []; this.coachGot = null;
+    this.asks.clear(); this.queue = []; this.sent = []; this.inflight = 0; this.due = 0; this.events = [];
     if (this.local) { // (the worker failed earlier: the page sails the new race itself)
       const adopt = !!mirror && mirror.steps === 0 && !mirror.running;
       this.world = adopt ? mirror! : new World(args.file, args.settings, args.seed, args.opts);
@@ -260,7 +247,6 @@ export class WorkerHost implements SimHost {
     }
     for (const { id, r } of m.results) { this.asks.get(id)?.(r); this.asks.delete(id); }
     this.lastMs = m.ms;
-    if (m.coach) this.coachGot = m.coach;
   }
   private fail(why: string): void {
     if (this.local) return;
@@ -294,12 +280,8 @@ export class WorkerHost implements SimHost {
     if (this.inflight >= 2) return this.lastMs;
     const cmds = this.queue, due = this.due; this.queue = []; this.due = 0; this.inflight++;
     this.sent.push({ cmds, at: now, frame: this.frames });
-    this.worker.postMessage({ k: 'frame', dt: due, twa, cmds, ...(this.coachCtx ? { coach: this.coachCtx } : {}) } satisfies ToWorker);
+    this.worker.postMessage({ k: 'frame', dt: due, twa, cmds } satisfies ToWorker);
     return this.lastMs;
-  }
-  coach(ctx: CoachContext | null): CoachStep | null {
-    if (this.local) return this.local.coach(ctx);
-    this.coachCtx = ctx; const got = this.coachGot; this.coachGot = null; return ctx ? got : null;
   }
   send(c: Command): void { if (this.local) this.local.send(c); else this.queue.push({ c }); }
   ask(c: Command): Promise<CommandResult> {

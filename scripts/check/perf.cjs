@@ -32,9 +32,6 @@ const VIEWS = [
   { name: 'start_cockpit', mode: 1 },
   { name: 'overhead_out', mode: 3, zoomOut: 40 },
   { name: 'course_map', mode: 2, map: true },
-  // (the inset map with layers on: the wind field and the wind shadows, which the inset samples (ROADMAP 8b, the owner
-  // 15 Nov 2026: "inset map is really lagging again"); its own JS is the inset column, gated by perf-ab.cjs)
-  { name: 'inset_layers', mode: 2, layers: { wind: true, current: false, sea: false, fog: false, shadows: true, ships: true, laylines: true } },
   { name: 'night_east_span', night: true, cam: [LL(37.8070, -122.3520, 4), LL(37.8125, -122.3590, 80)] },
   { name: 'night_start', night: true, cam: [LL(37.8118, -122.4510, 2.5), LL(37.7980, -122.3900, 60)] },
   { name: 'night_bridge_whole', night: true, cam: [LL(37.8140, -122.3990, 5), LL(37.7980, -122.3740, 70)] },
@@ -55,32 +52,25 @@ const VIEWS = [
   });
   // the worst fleet: seven opponents (the most there can be), on a windy day, with the ships
   // the same race each run (the seed, the wildlife, the fleet's colours all come from Math.random): a fixed sequence
-  // (started again just before the race is made, below: three.js draws a number from it for every object it makes, so a
-  // version that builds one more mesh while the page loads would otherwise sail a different race, and perf-ab would compare
-  // two different scenes)
-  await p.addInitScript(() => { let a = 12345; window.__reseed = () => { a = 12345; }; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
+  await p.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
   await p.addInitScript(() => { if (!localStorage.getItem('fbsim-settings-v2')) localStorage.setItem('fbsim-settings-v2', JSON.stringify({ opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], windDay: 2, traffic: 1 })); });
   // (PERF_URL: another server's page, as scripts/check/perf-ab.cjs runs it against a second version)
   await p.goto(process.env.PERF_URL || 'http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
-  await p.evaluate(() => { window.__reseed(); document.querySelector('[data-home="create"]').click(); }); await p.waitForTimeout(1500);
-  await p.evaluate(() => { window.__reseed(); document.getElementById('bGo').click(); }); await p.waitForTimeout(4000); // (again at Go: the setup may make its race again, on its debounce, before)
-  // (the race sailed: its course, the day's wind and the fleet, for perf-ab.cjs to check both versions sailed the same one)
-  const race = await p.evaluate(() => { const w = window.sim(), m = w.windModel; return { course: w.C?.id ?? null, base: m ? Math.round(m.base) : null, kt: m ? Math.round(m.kt * 2) / 2 : null, fleet: w.boats.map(b => b.name) }; });
+  await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1500);
+  await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
   // the sim's steps and the scene's update/draw, timed inside the frame
   await p.evaluate(() => {
-    const w = window.sim(), v = window.__view, h = window.__hud, acc = window.__acc = { step: 0, render: 0, inset: 0 };
-    // (the inset map's own JS: its drawing, ten times a second, and its overlay every frame)
-    for (const k of ['map', 'insetStreaks']) { const f = h[k].bind(h); h[k] = (...a) => { const t0 = performance.now(); f(...a); acc.inset += performance.now() - t0; }; }
+    const w = window.sim(), v = window.__view, acc = window.__acc = { step: 0, render: 0 };
     const st = w.step.bind(w); w.step = dt => { const t0 = performance.now(); st(dt); acc.step += performance.now() - t0; };
     const rd = v.render.bind(v); v.render = (...a) => { const t0 = performance.now(); rd(...a); acc.render += performance.now() - t0; };
   });
   const measure = async (n = 6) => p.evaluate(n => new Promise(res => {
     let k = 0, acc; const f = () => {
       // (the first frame starts the count: the sum runs over the n − 1 whole frames after it)
-      if (k++ === 0) { acc = window.__acc; acc.step = 0; acc.render = 0; acc.inset = 0; window.__frames.clear(); return requestAnimationFrame(f); }
+      if (k++ === 0) { acc = window.__acc; acc.step = 0; acc.render = 0; window.__frames.clear(); return requestAnimationFrame(f); }
       if (k < n) return requestAnimationFrame(f);
       const fr = [...window.__frames.values()], tot = fr.reduce((a, x) => a + x, 0) / fr.length, info = window.__renderer.info;
-      res({ js: tot, step: acc.step / fr.length, render: acc.render / fr.length, inset: acc.inset / fr.length, calls: info.render.calls, tris: info.render.triangles, programs: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures });
+      res({ js: tot, step: acc.step / fr.length, render: acc.render / fr.length, calls: info.render.calls, tris: info.render.triangles, programs: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures });
     }; requestAnimationFrame(f);
   }), n);
   const setNight = on => p.evaluate(on => { const w = window.sim(); if (!window.__gun0) window.__gun0 = w.gunUtc;
@@ -88,7 +78,7 @@ const VIEWS = [
     const d = new Date(window.__gun0 * 60000), loc = new Date(d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })), off = d.getTime() - loc.getTime();
     loc.setHours(20, 30, 0, 0); w.gunUtc = (loc.getTime() + off) / 60000 - w.t / 60; }, on);
   const rows = []; let over = false;
-  console.log('view                 calls      tris  progs  geo  tex   JS ms/frame (sim + scene + rest; the inset of it)');
+  console.log('view                 calls      tris  progs  geo  tex   JS ms/frame (sim + scene + rest)');
   const only = (process.env.PERF_ONLY || '').split(',').filter(Boolean);
   for (const V of VIEWS) {
     if (only.length && !only.includes(V.name)) continue;
@@ -97,8 +87,6 @@ const VIEWS = [
     if (V.zoomOut) { await p.keyboard.down('-'); await p.waitForTimeout(V.zoomOut * 100); await p.keyboard.up('-'); }
     if (V.cam) await p.evaluate(c => { window.__cam = { pos: c[0], at: c[1] }; }, V.cam);
     if (V.map) await p.keyboard.press('m');
-    // (the maps' layers, as the page's own choices: Hud.display, which the maps draw from; a version without it, as set)
-    if (V.layers) await p.evaluate(l => { const h = window.__hud; if ('display' in h) { window.__display = h.display; const d = h.display?.() ?? {}; h.display = () => ({ ...d, mapLayers: l }); } }, V.layers);
     await p.waitForTimeout(3000);
     await measure(3); // (a few frames first: the first frames in a new view upload what it hasn't drawn before)
     let cdp = null;
@@ -107,10 +95,9 @@ const VIEWS = [
     if (cdp) { const { profile } = await cdp.send('Profiler.stop'); require('fs').writeFileSync(`${out}/perf_${V.name}.cpuprofile`, JSON.stringify(profile)); }
     await p.screenshot({ path: `${out}/perf_${V.name}.png` });
     if (V.map) await p.keyboard.press('m');
-    if (V.layers) await p.evaluate(() => { if (window.__display !== undefined) { window.__hud.display = window.__display; window.__display = undefined; } });
     const bad = r.calls > BUDGET.calls || r.tris > BUDGET.tris || r.programs > BUDGET.programs || r.js > BUDGET.jsMs;
     over ||= bad; rows.push({ view: V.name, ...r });
-    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${r.step.toFixed(1)} + ${r.render.toFixed(1)} + ${(r.js - r.step - r.render).toFixed(1)}; inset ${r.inset.toFixed(2)})${bad ? '  OVER BUDGET' : ''}`);
+    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${r.step.toFixed(1)} + ${r.render.toFixed(1)} + ${(r.js - r.step - r.render).toFixed(1)})${bad ? '  OVER BUDGET' : ''}`);
   }
   await p.evaluate(() => { window.__cam = undefined; }); await setNight(false);
   // a long session: race after race (the setup's "start" each time); the GPU's geometries and textures and the JS heap
@@ -131,48 +118,7 @@ const VIEWS = [
     if (extra > 50 || growT > 4 || growH > 30) { over = true; console.log(`LEAK: ${extra} geometries on the GPU beyond the scene's, textures +${growT}, heap +${growH.toFixed(0)} MB over ${seen.length - 2} races`); }
   }
   // (PERF_JSON: the rows and the races' memory as data, for perf-ab.cjs)
-  // The start-up views (ROADMAP 8v2, the owner, 18 Nov 2026: "a lot of lag, in boat editor, at beginning of cruises. it
-  // tends to resolve after a while"): each in a page of its own, fresh from the start page as a player comes to it. The
-  // first 30 frames after the editor opens or a cruise sets off: their JS's mean is the view's JS (perf-ab.cjs gates it as
-  // the others'), their worst beside it. And a cruise on Nav, once under way: the page working the passage's live plan in
-  // its slices the whole way (r253), a standing load, measured as the race views are. (PERF_NO_START: without them.)
-  const START = [
-    { name: 'editor_open', first: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="fleet"]').click()); await q.waitForTimeout(1500);
-      await q.evaluate(() => document.querySelector('[data-f="tab"][data-v="boats"]').click()); await q.waitForTimeout(600); return () => q.evaluate(() => document.querySelector('.fcard').click()); } },
-    { name: 'cruise_start', first: true, cruise: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await q.waitForTimeout(3000);
-      return () => q.evaluate(() => document.getElementById('bGo').click()); } },
-    { name: 'cruise_nav', cruise: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await q.waitForTimeout(3000);
-      await q.evaluate(() => document.getElementById('bGo').click()); await q.waitForTimeout(4000);
-      return async () => { await q.evaluate(() => window.__host().send({ k: 'pilot', op: 'engage', mode: 'nav' })); await q.waitForTimeout(8000); }; } },
-  ];
-  // (the race's page closed first: left drawing beside them, it shares the software GL and its frames land in theirs)
-  if (!process.env.PERF_NO_START && START.some(V => !only.length || only.includes(V.name))) await p.close();
-  for (const V of process.env.PERF_NO_START ? [] : START) {
-    if (only.length && !only.includes(V.name)) continue;
-    const q = await b.newPage({ viewport: { width: Math.round(1280 * sc), height: Math.round(760 * sc) } }); q.setDefaultTimeout(180000);
-    q.on('pageerror', e => errs.push(`${V.name}: ${e.message}`));
-    await q.addInitScript(() => { const raf = window.requestAnimationFrame.bind(window); window.__frames = new Map();
-      window.requestAnimationFrame = cb => raf(t => { const t0 = performance.now(); cb(t); window.__frames.set(t, (window.__frames.get(t) || 0) + performance.now() - t0); }); });
-    await q.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
-    // (a fixed day and passage for the cruises, Alcatraz to Crissy Field in the west wind, as scripts/check/pilot-engage.cjs sails it)
-    await q.addInitScript(c => { localStorage.setItem('fbsim-settings-v2', JSON.stringify(c ? { windDay: 2, traffic: 1, mode: 'sail', sailFrom: 'alcatraz', sailTo: 'crissy', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00' } : { windDay: 2, traffic: 1 })); }, !!V.cruise);
-    // (the race in its worker, as the published page sails it: in the page's thread, ?inproc, the World's own start-up
-    // lands in the first frames, which a player's page never does)
-    await q.goto((process.env.PERF_URL || 'http://localhost:5173/').replace(/[?&]inproc\b/, '')); await q.waitForTimeout(5000);
-    const go = await V.act(q);
-    await q.evaluate(() => window.__frames.clear()); await go();
-    let fr;
-    if (V.first) { await q.waitForFunction(() => window.__frames.size >= 31, null, { timeout: 300000 }); fr = (await q.evaluate(() => [...window.__frames.values()])).slice(0, 30); }
-    else { await q.evaluate(() => window.__frames.clear()); await q.waitForFunction(() => window.__frames.size >= 10, null, { timeout: 300000 }); fr = (await q.evaluate(() => [...window.__frames.values()])).slice(1, 10); }
-    const info = await q.evaluate(() => { const i = window.__renderer.info; return { calls: i.render.calls, tris: i.render.triangles, programs: i.programs.length, geo: i.memory.geometries, tex: i.memory.textures }; });
-    const nav = V.cruise ? await q.evaluate(() => window.sim().pilot?.mode) : undefined;
-    if (V.name === 'cruise_nav' && nav !== 'nav') errs.push(`cruise_nav: the pilot isn't on Nav (${nav})`);
-    const r = { js: fr.reduce((a, x) => a + x, 0) / fr.length, worst: Math.max(...fr), step: 0, render: 0, ...info };
-    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${V.first ? `the first 30 frames' mean; the worst ${r.worst.toFixed(0)}` : 'under way'})`);
-    rows.push({ view: V.name, ...r });
-    await q.close();
-  }
-  if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs, race }));
+  if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs }));
   console.log('ERRORS:', errs.join('\n') || 'none'); await b.close();
   process.exit(over || errs.length ? 1 : 0);
 })();

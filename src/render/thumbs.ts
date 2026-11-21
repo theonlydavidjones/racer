@@ -18,7 +18,7 @@ const W = 400, H = 300;
 /** The camera looks this way: from off her starboard bow, a little above her deck. */
 const VIEW = new THREE.Vector3(-17, -0.6, 16).normalize();
 /** Bump when the picture's drawing changes, so pictures kept from before are drawn again. */
-const LOOK_VERSION = 3; // (2: pictures saved before 8t's fix framed an empty sea; 3: the showroom's settled trim, World.idle)
+const LOOK_VERSION = 2; // (2: pictures saved before 8t's fix framed an empty sea; the new key drops them)
 const STORE = 'folkboat.thumbs', KEEP = 24;
 interface GL { renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; sea: THREE.Mesh; fog: THREE.Fog }
 let gl: GL | null = null;
@@ -53,7 +53,6 @@ function rippleNormals(): THREE.Texture {
 
 function setup(): GL {
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-  renderer.debug.checkShaderErrors = import.meta.env.DEV; // (as scene.ts: no wait on each program's compile outside the dev server)
   renderer.setSize(W, H, false); renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // as the main view (three-setup.ts)
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(27, W / H, 0.5, 20000);
@@ -108,17 +107,16 @@ function keep(key: string, url: string): void {
 let purged = false;
 /** Her picture, as a data URL (kept by her looks). */
 export function boatThumb(spec: BoatSpec, S: Settings): string {
-  const key = JSON.stringify([LOOK_VERSION, spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.nameColor, spec.companionway, spec.navLights, spec.lineColors, spec.lineRopes, spec.perf.mast, spec.perf.boom, spec.perf.outboard]);
+  const key = JSON.stringify([LOOK_VERSION, spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.nameColor, spec.companionway, spec.navLights, spec.lineColors, spec.perf.mast, spec.perf.boom, spec.perf.outboard]);
   if (!purged) { purged = true; purgeOldThumbs(); }
   const hit = cache.get(key) ?? kept().find(e => e[0] === key)?.[1]; if (hit) { cache.set(key, hit); return hit; }
   gl ??= setup();
   // her, as the sim builds her: a quiet world with just her in it, sailing a gentle reach with her flags flying
   const w = new World(COURSES[0], { ...S, boat: spec, boatId: spec.id, boats: [spec], opponents: [], fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', windKind: 'west', windKt: 10, traffic: 0 }, 1, { freeSail: true, showFlags: true });
   const b = w.user;
-  // she sails on a close reach, port tack, in the real physics: the first step settles the crew's trim and her speed and
-  // heel (World.idle, as the showroom does), the next three seconds put her on the waves, so her sails, heel and flags all
-  // answer the same apparent wind; then the picture, from off her starboard bow (her leeward side)
-  for (let i = 0; i < 60 * 3; i++) w.idle(DT, -55);
+  // she sails: twenty seconds on a close reach, port tack, in the real physics (the crew trimming), so her sails, heel and
+  // flags all answer the same apparent wind; then the picture, from off her starboard bow (her leeward side)
+  for (let i = 0; i < 60 * 20; i++) w.idle(DT, -55);
   const m = buildBoatMesh(b);
   for (let i = 0; i < 90; i++) syncBoatMesh(m, b, i / 30); // (the windex and flags swing round to the wind as they would)
   m.crew.group.visible = false; // just the boat

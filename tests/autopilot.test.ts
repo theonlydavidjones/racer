@@ -3,9 +3,6 @@ import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { adjust, engage, standby, tack } from '../src/boat/autopilot';
-import { applyCommand } from '../src/sim/commands';
-import { SLOW_TACK } from '../src/boat/physics';
-import { FULL_RUDDER } from '../src/boat/balance';
 import { place } from '../src/sim/places';
 import { dist, n360, wrap } from '../src/core/math';
 
@@ -50,56 +47,11 @@ describe('the tiller pilot', () => {
     expect(held(10)).toBeLessThan(8);
   });
 
-  it('the buttons turn the set course; Standby leaves the ram on the tiller pin, holding it, until you lift it off or take the tiller', () => {
+  it('the buttons turn the set course, and Standby leaves the tiller to you', () => {
     const w = new World(COURSES[0], S(), 7, { freeSail: true }), u = w.user;
-    applyCommand(w, { k: 'running', on: true }); // (a called tack needs the clock going: World.callTurn)
     engage(u, w.pilot, 'auto'); const c = w.pilot.course;
     adjust(u, w.pilot, 10); expect(wrap(w.pilot.course - c)).toBeCloseTo(10);
-    run(w, 3); standby(w.pilot); const held = w.pilot.ram;
-    u.tiller = 0.3; run(w, 1); expect(u.tiller).toBe(held); // (the stopped ram still has it: Raymarine 81402 p.43)
-    applyCommand(w, { k: 'pilot', op: 'lift' }); expect(w.pilot.onPin).toBe(false);
-    u.tiller = 0.3; run(w, 1); expect(u.tiller).toBe(0.3);
-    // your hand on the tiller lifts it off as well
-    engage(u, w.pilot, 'auto'); run(w, 1); standby(w.pilot);
-    applyCommand(w, { k: 'tiller', v: -0.2 }); expect(w.pilot.onPin).toBe(false); run(w, 1); expect(u.tiller).toBe(-0.2);
-    // and so do putting her about yourself, a lashing, and a jump to somewhere else (the physics review, 18 Nov)
-    for (const lift of [() => applyCommand(w, { k: 'turn' }), () => applyCommand(w, { k: 'lash', on: true, at: 0 }), () => w.moveHere(place('alcatraz')!.p, 'Alcatraz')]) {
-      applyCommand(w, { k: 'lash', on: false }); u.v = 2.5; engage(u, w.pilot, 'auto'); run(w, 1); standby(w.pilot); expect(w.pilot.onPin).toBe(true);
-      lift(); expect(w.pilot.onPin).toBe(false);
-    }
-  });
-
-  it('a tack you call yourself on standby goes about: your hand lifts the ram off the pin', () => {
-    const w = new World(COURSES[0], S({ windKt: 14, sea: 'flat' }), 7, { freeSail: true }), u = w.user;
-    applyCommand(w, { k: 'running', on: true }); u.h = n360(w.wind.from + 42); u.v = 3; engage(u, w.pilot, 'auto'); run(w, 20);
-    standby(w.pilot); const before = u.tack;
-    applyCommand(w, { k: 'turn' }); run(w, 15);
-    expect(u.tack).not.toBe(before);
-  });
-
-  // The bug (Crew Habits, 18 Nov 2026): Wind, close-hauled in 22 kt, a seaway, off Alcatraz, seed 3: Tack pressed with her
-  // making barely a knot. She stalled head to wind, gathered sternway, the pilot alarmed to standby with the tiller over,
-  // and nothing said the ram still held it there: left alone she circled and crash-gybed for ten minutes. Now Tack warns
-  // her too slow (the handbook's AutoTack has no speed check, so it still tacks), the alarm says where the ram holds the
-  // tiller, and lifting it off frees it.
-  it('Wind tacked too slow in 22 kt: a warning, the alarm says the ram holds the tiller, and lifting it off frees it', () => {
-    const w = new World(COURSES[0], S({ windKt: 22, sea: 'real', sailFrom: 'alcatraz' }), 3, { freeSail: true }), u = w.user;
-    u.h = n360(w.wind.from + 42); u.v = 2.5;
-    engage(u, w.pilot, 'wind'); w.pilot.awa = -30;
-    run(w, 300); w.drainEvents();
-    expect(u.v).toBeLessThan(SLOW_TACK);
-    applyCommand(w, { k: 'pilot', op: 'tack' });
-    const toasts = () => w.drainEvents().flatMap(e => e.type === 'toast' ? [e.msg] : []);
-    expect(toasts()).toContain('Too slow to tack: bear away for way first.');
-    let alarm: string | undefined;
-    for (let i = 0; i < 60 && !alarm; i++) { run(w, 1); alarm = toasts().find(m => m.startsWith('Pilot alarm')); }
-    expect(alarm).toBeDefined(); expect(w.pilot.mode).toBe('off');
-    const ram = w.pilot.ram, deg = Math.round(Math.abs(ram) * FULL_RUDDER);
-    expect(deg).toBeGreaterThan(5);
-    expect(alarm).toContain(`the ram's still on the tiller pin, holding it ${deg}° to ${ram > 0 ? 'starboard' : 'port'}: take the helm, or lift the pilot off`);
-    run(w, 20); expect(u.tiller).toBe(ram); // (held there, as a stopped ram on its pin does)
-    applyCommand(w, { k: 'pilot', op: 'lift' });
-    applyCommand(w, { k: 'tiller', v: 0 }); run(w, 5); expect(u.tiller).toBe(0); // (free: yours)
+    standby(w.pilot); u.tiller = 0.3; run(w, 1); expect(u.tiller).toBe(0.3);
   });
 
   it('Nav beats to a waypoint upwind, tacking on its own call (the layline), and holds her heading when she gets there', () => {

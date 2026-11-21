@@ -1,6 +1,5 @@
 import chart from '../geo/data/enc-chart.json';
 import { LL } from '../geo/geo';
-import { CLUB_TABLE } from '../club/clubs';
 import { PIERS } from '../geo/shore';
 import { inPoly } from '../core/math';
 import type { Tf } from './draw2d';
@@ -252,11 +251,6 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
       const font = n.k === 'sea' ? 'italic 600 12px Georgia, serif' : n.k === 'land' ? '600 11px "Saira Semi Condensed", sans-serif' : '600 10px "Saira Semi Condensed", sans-serif';
       const col = n.k === 'sea' ? I.waterText : I.ink;
       if (P.text(n.t, s[0], s[1], font, col) && n.k === 'bridge' && n.clr != null && scale > 0.15) P.text(`VERT CL ${Math.round(n.clr * FT)} FT`, s[0], s[1] + 11, '9px "Saira Semi Condensed", sans-serif', col);
-    }
-    // the clubs' names where their clubhouse is (club/clubs.ts base: sourced positions only), the short form from afar
-    if (scale > 0.12) for (const C of CLUB_TABLE) if (C.base) {
-      const q = LL(C.base[0], C.base[1]), s = tf(q.x, q.y); if (!on(s[0], s[1], 80)) continue;
-      P.text(scale > 0.3 ? C.name : C.short, s[0], s[1], '600 10px "Saira Semi Condensed", sans-serif', I.ink);
     }
     // the areas' names: the anchorages by number, the rest by name, in magenta
     const done = new Set<string>();

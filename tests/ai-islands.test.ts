@@ -95,16 +95,11 @@ describe('the AI at an island and downwind', () => {
     expect(Math.abs(wrap(F - B.desired))).toBeGreaterThanOrEqual(150);
   });
   it('with a boat on her tack overlapped to windward (rule 17: heading up would luff it), she gybes away instead of heading up', () => {
-    const { w, B, clean, run } = blanket({ windward: true });
+    const { w, B, F, clean, run } = blanket({ windward: true });
     const [, , C] = w.boats;
     expect(w.rights(B, C).kc).toBe(C); // she's the leeward boat
     run(8, 0.5);
-    // (off her own wind, the one she sails by (b.ww), not the course's: here it's 1.8° round from it, so the same
-    // running angle read off the course's wind is that much deeper on one gybe and shallower on the other, 3.5° apart.
-    // It passed only while rule 14's allowance for her turn's lag reached the boat abeam of her, 5 m off, and moved her
-    // course; with a quicker helm it doesn't, rightly, and the two winds' difference showed: Deep Physics' helm-travel)
-    const Fb = B.ww.from;
-    expect(Math.abs(wrap(Fb - B.desired)), 'not above her run').toBeGreaterThanOrEqual(Math.abs(wrap(Fb - clean)) - 2);
+    expect(Math.abs(wrap(F - B.desired)), 'not above her run').toBeGreaterThanOrEqual(Math.abs(wrap(F - clean)) - 2);
     expect(B.ai!.goTack?.to, 'gybing away').toBe('P');
   });
 });

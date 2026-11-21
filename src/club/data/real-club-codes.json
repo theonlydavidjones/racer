@@ -1,6 +1,0 @@
-{
-  "_note": "Provenance only: the club codes in the published results (src/boat/data/sf-folkboat-results.json), mapped to the game's club ids (club/clubs.ts) at display time. Any code not listed here is not shown to the player. Real names are allowed in this file.",
-  "stfyc": "stfyc", "ggyc": "ggyc", "sfyc": "sfyc", "bvbc": "bvbc", "bay view boat club": "bvbc",
-  "sequoia": "seqyc", "seqyc": "seqyc", "sequoia yc": "seqyc",
-  "cpyc": "cpyc", "coyote point yc": "cpyc", "ryc": "ryc"
-}

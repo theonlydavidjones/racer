@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HELD_MAX, LINE_BREAK, cleatOf, dockStep, type DockLine } from '../src/boat/dockLines';
 import type { Boat } from '../src/boat/boat';
-import { HANDLING, hullResistance } from '../src/boat/dynamics';
-import { ASTERN } from '../src/boat/physics';
 
 /** Dock lines as damped springs, with the capstan equation's hold round a cleat (boat/dockLines.ts). */
 const boat = (v = 0, h = 0): Boat => ({ x: 0, y: 0, h, v, astern: 0, sway: 0, turnRate: 0, vx: 0, vy: 0 } as unknown as Boat);
@@ -14,32 +12,11 @@ describe('dock lines', () => {
     // the bow line led aft to a dock cleat abeam her shrouds: going ahead at a walk, she strains it and stops
     const b = boat(0.5), L: DockLine = { role: 'bow', at: 3.6, side: 1, to: { x: 1.4, y: 2.4 }, len: 0, state: 'made' };
     const p0 = cleatOf(b, L); L.len = Math.hypot(L.to.x - p0.x, L.to.y - p0.y);
-    // (her energy, as a share of what she came in with, every step for a minute)
-    let maxT = 0, maxY = 0, at3 = 1, at15 = 1; const es: number[] = [];
-    for (let i = 0; i < 3600; i++) {
-      dockStep(b, [L], calm, still, 1 / 60, open); maxT = Math.max(maxT, L.T ?? 0); maxY = Math.max(maxY, b.y);
-      const e = (b.vx ** 2 + b.vy ** 2) / 0.25; if (i === 180) at3 = e; if (i === 899) at15 = e; es.push(e);
-    }
+    let maxT = 0, maxY = 0; for (let i = 0; i < 900; i++) { dockStep(b, [L], calm, still, 1 / 60, open); maxT = Math.max(maxT, L.T ?? 0); maxY = Math.max(maxY, b.y); }
     expect(maxY).toBeLessThan(1.2); // (she goes on no more than a metre or so while the line takes her way off)
-    // the line takes her way: nine tenths of her energy within 3 s (the snub itself)
-    expect(at3).toBeLessThan(0.1);
-    // then on one line she swings about it like a pendulum, slowly (about 45 s a swing, out to some 55 degrees), the keel's
-    // broadside drag and the line's own damping taking it down, as a boat on a single line does: the reason the stern line
-    // and springs follow. Each swing smaller: the second's peak no more than half the first's. (Measured on her real
-    // sternway drag, physics.ts ASTERN: 10.9% then 3.1%. The old law's sternway drag, 3–20 times her hull's own at a walk,
-    // had taken the swing out too, so it once read "most of her way gone after 15 s")
-    // The test's first property, kept: most of her way gone after 15 s. Sim-measured on the sourced sternway drag,
-    // 17 Nov 2026: 11.1% of her energy left at 15 s; on the earlier unsourced drag 4.1%, under a bound of 10%. The same
-    // headroom: 11.06 x 10 / 4.13 = 26.8%. (The Coordinator's ruling, 17 Nov 2026.) The swings' checks are extra.
-    expect(at15).toBeLessThan(0.268);
-    // (each swing's own peak, 18 Nov 2026: her energy's high points after the snub, each the most within 2 s either side.
-    // They were read as the most before 30 s and the most after, which split one swing in two once her yaw inertia was
-    // re-estimated (physics.ts HOVE.gyration, v206's other change): with both in, the first swing peaks at 6.8% near 10 s
-    // and is still coming down at 30 s, 4.1%, which was taken for the second; the second's own peak is 1.1%, near 50 s.
-    // On the sourced drag alone, 11.1% at 13.6 s and 3.2% at 43.3 s, as before)
-    const peaks: number[] = []; for (let i = 300; i < es.length - 120; i++) if (es[i] > 1e-4 && es[i] >= Math.max(...es.slice(i - 120, i + 121))) { peaks.push(es[i]); i += 120; }
-    const swing1 = peaks[0] ?? 0, swing2 = peaks[1] ?? 0;
-    expect(peaks.length).toBeGreaterThan(0); expect(swing1).toBeLessThan(0.15); expect(swing2).toBeLessThan(0.5 * swing1);
+    // (on one line she swings about it like a pendulum, the keel's broadside drag damping it slowly, as a boat on a single
+    // line does: the reason the stern line and springs follow; after 15 s most of her way is gone)
+    expect(Math.hypot(b.vx, b.vy)).toBeLessThan(0.5 * Math.sqrt(0.1));
     expect(maxT).toBeGreaterThan(200); expect(maxT).toBeLessThan(LINE_BREAK / 2);
     expect(Number.isFinite(b.x) && Number.isFinite(b.h)).toBe(true);
   });
@@ -61,13 +38,7 @@ describe('dock lines', () => {
     expect(sumT).toBeGreaterThan(0.6 * q); expect(sumT).toBeLessThan(1.6 * q);
     expect(Math.abs(b.sway ?? 0)).toBeLessThan(0.02);
     const free = boat(0, 0); run(free, [], { from: 270, kt: 15 }, 30);
-    // (blown off sideways, slowly: the keel's broadside drag. Her sway after 30 s, sim-measured, 18 Nov 2026, with both of
-    // v206's changes in: 0.139 m/s; it was 0.200, asked over 0.15. She's blown off no slower (0.33 m/s over the ground,
-    // 0.24 before): her bow has fallen off 47 degrees by then, and with the sourced sternway drag in place of the old
-    // law's (3 to 20 times her hull's own at a walk, fore and aft) more of that drift is headway and less of it sway
-    // (0.158 on that alone), and with her yaw inertia re-estimated she falls off a little sooner. The bound, 0.10: the same
-    // headroom, 0.15 over 0.200, on the new measurement)
-    expect(free.sway).toBeGreaterThan(0.10); expect(free.sway).toBeLessThan(0.6);
+    expect(free.sway).toBeGreaterThan(0.15); expect(free.sway).toBeLessThan(0.6); // (blown off sideways, slowly: the keel's broadside drag)
   });
   it('a 20 kt gust abeam on her made lines: held, with no growing oscillation (the stiff lines integrate stably at a 60th of a second)', () => {
     const b = boat(0, 0), lines: DockLine[] = [{ role: 'bow', at: 3.6, side: -1, to: { x: -1.6, y: 3.6 }, len: 0.6, state: 'made' }, { role: 'stern', at: -3.6, side: -1, to: { x: -1.6, y: -3.6 }, len: 0.6, state: 'made' }, { role: 'spring', at: 0, side: -1, to: { x: -1.6, y: -2.0 }, len: 2.3, state: 'made' }];
@@ -81,14 +52,6 @@ describe('dock lines', () => {
   it('the same inputs, the same result, to the last bit', () => {
     const go = () => { const b = boat(0.4, 10), L: DockLine[] = [{ role: 'bow', at: 3.6, side: 1, to: { x: 2, y: 4 }, len: 1.2, state: 'held' }]; run(b, L, { from: 200, kt: 12 }, 20); return [b.x, b.y, b.h, b.v, b.sway, L[0].len, L[0].T]; };
     expect(go()).toEqual(go());
-  });
-  it('gliding free in a calm she slows by her hull\'s own resistance ahead, and by twice it stern first (physics.ts ASTERN)', () => {
-    const slowing = (v: number, astern: number) => { const b = boat(v); b.astern = astern; const u0 = b.v - b.astern!; dockStep(b, [], calm, still, 1 / 60, open); return Math.abs(u0) - Math.abs(b.v - (b.astern ?? 0)); };
-    for (const v of [0.2, 0.5, 1]) {
-      const ahead = slowing(v, 0) * 60, back = slowing(0, v) * 60, hull = hullResistance(v) / HANDLING.mass; // (m/s²)
-      expect(ahead / hull, `ahead at ${v} m/s`).toBeGreaterThan(0.98); expect(ahead / hull).toBeLessThan(1.1); // (and the air on her at her own speed, a little)
-      expect(back / hull, `astern at ${v} m/s`).toBeGreaterThan(ASTERN * 0.98); expect(back / hull).toBeLessThan(ASTERN * 1.1);
-    }
   });
   it('touching the dock: her speed into it taken out, and the bump reported', () => {
     const b = boat(0, 0); b.sway = -0.6; // (sliding to port at 0.6 m/s onto a dock along x < -1.4)
