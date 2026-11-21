@@ -444,9 +444,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
       // (the turn for her planned tack (ai.ts goTack), when it's a slow one, sculled through the wind, or a wear round,
       // whatever the tack was asked as: the lull may come in the moments between the asking and the helm's turn. Its
-      // plan is held as long as this commitment is, ai.ts: the v215 review)
+      // plan is held as long as this commitment is, ai.ts: the v215 review). A wear only in light air, where slowTack is
+      // the wind's (under SLOW_TACK's cap): in a breeze a boat slowed in a crowd wears round as she always has, her plan
+      // lapsing at 20 s; held, those wears put back the berth test's 29 calls against its 28. Marked once, on the plan's
+      // first such turn, so a commitment re-made the other way never re-marks it.
       const g = ai.goTack;
-      if (g && (slowAsk || wear) && tackFor(b.ww.from, b.desired, b.tack) === g.to) { g.turn = ai.turnCommit; g.turnAt = t; }
+      if (g && g.turn == null && (slowAsk || (wear && slowTack(b) < SLOW_TACK)) && tackFor(b.ww.from, b.desired, b.tack) === g.to) { g.turn = ai.turnCommit; g.turnAt = t; }
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;

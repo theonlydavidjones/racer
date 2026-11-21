@@ -218,7 +218,7 @@ const HOLD_MAX_S = 240;
 /** Whether her planned tack is still being turned for: the helm's commitment to its slow tack or wear round
  * (goTack.turn), unchanged, and not past HOLD_MAX_S. */
 export function turnHeld(g: { turn?: number; turnAt?: number }, turnCommit: number, t: number): boolean {
-  return g.turn != null && turnCommit === g.turn && t - (g.turnAt ?? t) < HOLD_MAX_S;
+  return !!g.turn && turnCommit === g.turn && t - (g.turnAt ?? t) < HOLD_MAX_S;
 }
 /** One think's footing for the way to tack: whether she foots, and her time at it. It counts only while she still wants
  * the tack and is short of the way for it: when the reason goes (a tack for clear air or the rhumb line that lapses, a
@@ -854,6 +854,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // want either side of it, so the plan never lapsed and she sat by the circle: Red in the berth test, 12 kt, seed
     // 27, 35 s, 10-14 m off, called under 21.2 (the v215 review's trace))
     const g = ai.goTack;
+    if (g && g.turn != null && !turnHeld(g, ai.turnCommit, w.t)) g.turn = 0; // (that turn's over or changed: held no longer, nor marked again)
     if (g && (b.tack === g.to && !b.tacking || (w.t - g.at > 20 && !turnHeld(g, ai.turnCommit, w.t)) || g.mode !== mode || g.leg !== b.leg)) ai.goTack = null;
     if (mode !== 'beat' || ai.goTack) ai.footT = 0;
     let headedNow = false;

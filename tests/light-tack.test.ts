@@ -157,4 +157,13 @@ describe('A planned tack held while its slow turn lasts (ai.ts turnHeld; the v21
     expect(turnHeld(g, 1, 240), 'past the cap').toBe(false);
     expect(turnHeld({}, 1, 30), 'never marked').toBe(false);
   });
+  it('the plan is marked once: a commitment made afresh the other way doesn\'t re-mark it', () => {
+    const a = beatAngle(2), b = testBoat({ heading: 360 - a, kt: 1, windKt: 2 });
+    b.sea = { ...FLAT_SEA, hsW: 0.5, tpW: 2.8 }; sail(b, 90);
+    b.isUser = false; b.ai = { turnCommit: 0, commitFor: 0, goTack: { to: 'P', at: 0, mode: 'beat', leg: 0 } } as unknown as NonNullable<Boat['ai']>;
+    b.desired = a; sail(b, 2);
+    const g = b.ai.goTack!, first = g.turn;
+    b.ai.turnCommit = 0; sail(b, 1); // (the commitment dropped and made again)
+    expect(g.turn, 'still the first').toBe(first);
+  });
 });
