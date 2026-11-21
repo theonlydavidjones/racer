@@ -5,6 +5,8 @@ import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
 import { TRAVELLER_SWING } from '../boat/controls';
 import { inBasin } from '../geo/marina';
+import { Puffs, type Puff } from '../environment/wind';
+import { sigmaU } from '../environment/gusts';
 
 /**
  * Learn to sail (the owner's go, 13 Nov 2026; design/learn-to-sail-mockup.png and design/LEARN-TO-SAIL-PLAN.md): lessons
@@ -91,6 +93,35 @@ export const LESSON_MARKS = {
    * Faster than MOB_STRIKE_KT her hull hitting them runs them down; her stem coming onto them at any speed is a strike. */
   reachS: 15, alongsideM: 1.5, mobKt: 1, mobHoldS: 4, mobStrikeKt: 2
 };
+/**
+ * Lesson 11's look-ahead (w028; the owner, 15 Nov 2026: "more in-game guidance about when the puffs are coming"): her
+ * wind's rise in the next seconds, from the sim's own wind as it moves. The gusts (environment/gusts.ts) are a field
+ * frozen in the air and carried with it (Taylor's hypothesis: "a gust you see coming down the course arrives"), so the
+ * gust she'll have in τ s is the one now at her place then, less the air's travel, U·τ upwind of it; the puffs
+ * (environment/wind.ts Puffs) are carried on at their own speed and aging. Each at the same size the sim gives it
+ * (sigmaU, the puffs' weights). The first second her wind's up by the lesson's puff (PUFF_KT) on the mean, when it isn't
+ * already, is when it reaches her; where that air is now (upwind of her) is the patch to mark. Nothing invented.
+ */
+export interface PuffWind { gusts: { at(p: Vec): { u: number; v: number } }; puffs: { cells: readonly Puff[]; gustiness: number; dir: Vec }; wind: { from: number; kt: number } }
+export function puffAhead(w: PuffWind, her: { x: number; y: number; vx: number; vy: number; kt: number }, horizon = 15): { inS: number; at: Vec } | null {
+  const U = Math.max(0.3, her.kt * KT), d = V(w.wind.from + 180), sg = sigmaU(U), field = w.puffs;
+  // her wind's rise over the mean (kt) τ s on, and where that air is now
+  const rise = (tau: number): { kt: number; air: Vec } => {
+    const x = her.x + her.vx * tau, y = her.y + her.vy * tau, air = { x: x - d.x * U * tau, y: y - d.y * U * tau };
+    let k = 0;
+    for (const c of field.cells) {
+      if (c.age + tau > c.life) continue;
+      const v = c.v ?? 0, moved = { ...c, x: c.x + (c.dx ?? field.dir.x) * v * tau, y: c.y + (c.dy ?? field.dir.y) * v * tau, age: c.age + tau };
+      k += c.amp * field.gustiness * Puffs.weight(moved, x, y, field.dir);
+    }
+    return { kt: k * her.kt + w.gusts.at(air).u * sg / KT, air };
+  };
+  const need = LESSON_MARKS.puffKt;
+  if (rise(0).kt >= need) return null; // (in one already: not one coming)
+  for (let tau = 1; tau <= horizon; tau++) { const r = rise(tau); if (r.kt >= need) return { inS: tau, at: r.air }; }
+  return null;
+}
+
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   boat: '', tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',

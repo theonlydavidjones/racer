@@ -45,7 +45,7 @@ import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
 import { WindRose } from './render/windRose';
 import { beatFor } from './boat/seaway';
-import { pointTarget } from './sim/lessons';
+import { pointTarget, puffAhead } from './sim/lessons';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
@@ -698,10 +698,24 @@ function drillCues(): void {
     logMessage(favLine);
   }
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
+  if (!mode && w.running && !w.paused && S.mode === 'lesson' && S.lesson === 'breeze' && !w.lesson?.passed) { puffCue(); return; }
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
   const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee, others: w.boats.filter(b => b !== u).map(b => ({ x: b.x, y: b.y })), call: favCall, read: (S.favCalls ?? 0) < 3, names: [w.C.pinLabel, w.C.committeeLabel] } : null }, mode);
   guides.set(out.spec, out.key); guides.wake(out.wake); guides.cue(out.cue); guides.place(u);
+}
+/**
+ * Lesson 11, a breeze (w028; the owner, 15 Nov 2026: "more in-game guidance about when the puffs are coming"): the puff
+ * coming down to her marked on the water where it is now, and "Puff" over her with the seconds till it reaches her, from
+ * the sim's own puffs (sim/lessons.ts puffAhead). Looked again four times a second; its ring moved every half second.
+ */
+let puffT = 0, puffNow: ReturnType<typeof puffAhead> = null;
+function puffCue(): void {
+  const now = performance.now(), u = w.user;
+  if (now - puffT > 250) { puffT = now; puffNow = puffAhead(w, { x: u.x, y: u.y, vx: u.vx ?? 0, vy: u.vy ?? 0, kt: u.ww.kt }); }
+  const p = puffNow, at = p ? { x: Math.round(p.at.x / 10) * 10, y: Math.round(p.at.y / 10) * 10 } : null;
+  guides.set(at ? { zone: at } : null, at ? `puff:${at.x},${at.y}` : '');
+  guides.cue(p ? { word: 'Puff', sub: `${p.inS} s` } : null); guides.place(u);
 }
 /** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
  * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
