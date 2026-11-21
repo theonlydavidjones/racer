@@ -2,7 +2,7 @@ import { HelmFeed, passageLive } from './sim/navigator';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
-import { trimNotesHtml } from './ui/trimNotes';
+import { NAME as TRIM_NAME, trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
@@ -582,7 +582,6 @@ function crewPopOpen(open = !!$('crewPop').hidden, from: 'button' | 'coach' = 'c
 }
 $('bCrew').onclick = () => crewPopOpen(undefined, 'button');
 // the crew line in the Coach card is redrawn every frame: catch its clicks on the card
-$('trimNotes').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tn-strat')) { closeTrimNotes(); courseView.openStrategist(w); } });
 $('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-crew')) crewPopOpen(); });
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
@@ -722,18 +721,11 @@ function renderCoach(): void {
  * open. From the Coach card (its Trim coach button, or All notes in the live note) or its key; Back, Esc or the key
  * again closes it, and the race carries on if it was sailing when it opened. */
 let notesPaused = false;
-/** The card's trim line as it reads, without its badges (the 1 and "1 of 3"). */
-function hintText(): string { const c = $('tpHint').cloneNode(true) as HTMLElement; c.querySelectorAll('.tp-n, .tp-of').forEach(n => n.remove()); return (c.textContent ?? '').trim(); }
 function openTrimNotes(): void {
   if (!w.running || !$('trimNotes').hidden) return;
   notesPaused = !w.paused; if (notesPaused) send({ k: 'pause', on: true });
   const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band }); // (the band the live note last said)
-  // (in a race, the Strategist card's racing lines first, whole, and the one way into the strategist's view: r298)
-  // (the card's own lines, as the card shows them and in its order, whole: the same pick, never a second verdict)
-  const situ = $('situ'), race = $('tpRace'), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const lines = [!situ.hidden ? situ.title : '', !race.hidden ? $('tpRaceMsg').textContent ?? '' : '', hintText()].filter(Boolean);
-  const racing = w.freeSail ? '' : `<div class="tn-race"><div class="tn-race-h"><span>Now</span><button type="button" class="tn-strat">Strategist ›</button></div>${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>`;
-  $('trimNotesBody').innerHTML = racing + trimNotesHtml(w.user, s, notes);
+  $('trimNotesBody').innerHTML = trimNotesHtml(w.user, s, notes);
   $('trimNotes').hidden = false; $<HTMLButtonElement>('bTrimNotesX').focus();
 }
 function closeTrimNotes(): void {
@@ -745,7 +737,41 @@ $('trimNotes').addEventListener('click', e => { const el = e.target as HTMLEleme
 $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-all')) openTrimNotes(); });
 // the Strategist card (r298): a click anywhere on it (not on a control in it) opens the whole of it: the racing lines and
 // the strategist, then every line's note (Trim Notes)
-$('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button, a, input, .sb-ctl')) return; openTrimNotes(); });
+let cardOpen = false, cardTimer = 0;
+$('trimPanel').addEventListener('click', e => {
+  const t = e.target as HTMLElement;
+  if (t.closest('.tpx-all')) { openTrimNotes(); return; }
+  if (t.closest('.tpx-strat')) { courseView.openStrategist(w); return; }
+  if (t.closest('button, a, input, .sb-ctl')) return;
+  cardShow(!cardOpen);
+});
+/** The card grown in place (r298; the owner's option A, design stills/r298-coach-card X-expanded): under its two lines,
+ *  the sails as pills (main, jib, heel, helm, crew), each line's note (the coach's own, lineNotes: what Trim Notes says,
+ *  fixes first), then the ways on: All notes (Trim Notes, also its key) and, racing, the Strategist (the C view). Kept
+ *  fresh twice a second while open. */
+function cardShow(on: boolean): void {
+  cardOpen = on; $('trimPanel').classList.toggle('open', on); $('tpX').hidden = !on;
+  clearInterval(cardTimer); if (on) { cardFill(); cardTimer = window.setInterval(cardFill, 500); }
+}
+function cardFill(): void {
+  if (!w.running && !w.paused) { cardShow(false); return; } // (the race over, or a new one: closed; paused, it stays)
+  const u = w.user, esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const pill = (k: string, v: string, cls = '') => `<span class="tpx-pill">${k} <b class="${cls}">${esc(v)}</b></span>`;
+  const st = (id: string) => { const e = $(id); return [e.textContent ?? '', /luffing/.test(e.className) ? 'warn' : /stalled|backed/.test(e.className) ? 'bad' : ''] as const; };
+  const [mw, mc] = st('tpMain'), [jw, jc] = st('tpJib'), hn = u.helmNeed ?? 0, crew = document.querySelector('#tpBalance .tp-crew')?.textContent?.replace(/^crew /, '') ?? '';
+  const helm = hn > 5 ? ['weather', 'warn'] : hn < -1.5 ? ['lee', 'warn'] : ['neutral', ''];
+  const { notes } = lineNotes(u, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band });
+  const lines = [...notes].sort((a, b) => (b.fix ? 1 : 0) - (a.fix ? 1 : 0)).slice(0, 6)
+    .map(n => `<div class="tpx-line${n.fix ? ' fix' : ''}"><span>${esc(TRIM_NAME[n.line] ?? n.line)}</span><span>${esc(n.fix ? (n.fix.short ?? n.fix.head) : n.ok)}</span></div>`).join('');
+  // (built once, then only the parts that changed rewritten: a click on a way on never lands on a node being replaced)
+  const x = $('tpX');
+  if (!x.querySelector('.tpx-ways')) x.innerHTML = '<div class="tpx-sec">Sails</div><div class="tpx-pills"></div><div class="tpx-sec">Lines</div><div class="tpx-lines"></div>'
+    + '<div class="tpx-ways"><button type="button" class="tpx-all">All notes ›</button><button type="button" class="tpx-strat">Strategist ›</button></div>';
+  const set = (q: string, html: string) => { const e = x.querySelector<HTMLElement>(q)!; if (e.innerHTML !== html) e.innerHTML = html; };
+  set('.tpx-pills', `${pill('Main', mw.toLowerCase(), mc)}${pill('Jib', jw.toLowerCase(), jc)}${pill('Heel', `${Math.abs(Math.round(u.heelMag ?? 0))}°`)}${pill('Helm', helm[0], helm[1])}${crew ? pill('Crew', crew) : ''}`);
+  set('.tpx-lines', lines);
+  x.querySelector<HTMLElement>('.tpx-strat')!.hidden = w.freeSail;
+}
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
