@@ -42,3 +42,14 @@ describe('copy sweep E: the Keys labels are short, the detail a hover', () => {
     expect(ACTIONS.filter(a => a.label.length > 90).map(a => a.id)).toEqual([]);
   });
 });
+
+describe('copy sweep D: the past-race caveats are short, their hovers one line', () => {
+  it('the words under a row, and the hovers through shortTip', () => {
+    const a = read('src/app.ts');
+    expect(a).not.toContain('course from a sailor in the race (a last-minute change)');
+    expect(a).not.toContain('the published distance disagrees with the course sheet');
+    expect(a).toContain("title=\"${esc(shortTip('The course from ' + r.courseFrom))}\"");
+    expect(a).toContain('title="${esc(shortTip(r.uncertain))}"');
+    expect(a).toContain('title="${esc(shortTip(r.doubt))}"');
+  });
+});

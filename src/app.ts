@@ -1790,7 +1790,7 @@ function realRaceRows(): void {
     const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!);
     const won = fin[0];
     return `<div class="pastrow"><div><b>${esc(raceDisplayName(r.event))} · race ${r.raceNo} · course ${r.courseNo} (${r.distanceNm} nm)</b>`
-      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${r.courseFrom ? ` · <span title="${esc('The course from ' + r.courseFrom)}">course from a sailor in the race (a last-minute change)</span>` : ''}${r.uncertain ? ` · <span class="warn" title="${esc(r.uncertain)}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(r.doubt)}">the published distance disagrees with the course sheet</span>` : ''}</small></div>`
+      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${r.courseFrom ? ` · <span title="${esc(shortTip('The course from ' + r.courseFrom))}">course from a sailor (a last-minute change)</span>` : ''}${r.uncertain ? ` · <span class="warn" title="${esc(shortTip(r.uncertain))}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(shortTip(r.doubt))}">distance disagrees with the course sheet</span>` : ''}</small></div>`
       + `<button type="button" class="ghost sm" data-real="${esc(r.id)}">Sail it</button></div>`;
   }).join('') : '';
 }
