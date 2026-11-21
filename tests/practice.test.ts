@@ -19,10 +19,13 @@ describe('Practice at a default club', () => {
     expect(mine.seq).toBe(2); // (your own settings left as they were)
   });
 
-  it('the practice area (no club) keeps your own', () => {
+  it("the practice area (no club): its own committee's plain start, your sequence's length, 1 to 5 min", () => {
     expect(hostOf(areaCourse)).toBe('practice');
     const s = asTheClubRunsIt({ ...mine, course: areaCourse });
-    expect([s.seq, s.prepFlag, s.penaltyTurns, s.judging, s.bias]).toEqual([2, 'black', 1, 'umpired', 8]);
+    expect([s.seq, s.prepFlag, s.penaltyTurns, s.bias]).toEqual([2, 'P', 2, 0]); // (rule 30's flags: the start drill's)
+    expect(asTheClubRunsIt({ ...mine, course: areaCourse, seq: 9 }).seq).toBe(5);
+    expect(asTheClubRunsIt({ ...mine, course: areaCourse, seq: 0.4 }).seq).toBe(5); // (nothing set: RRS 26's five)
+    expect(asTheClubRunsIt({ ...mine, course: areaCourse, seq: 1 }).seq).toBe(1);
   });
 
   it('a cruise or a drill is untouched', () => {

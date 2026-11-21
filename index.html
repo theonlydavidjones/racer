@@ -209,7 +209,7 @@
         <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" aria-hidden="true"><line x1="4" y1="22" x2="36" y2="22" stroke="#ffb627" stroke-width="2.6"/><rect x="2" y="12" width="5" height="10" fill="#e8eef2"/><circle cx="36" cy="22" r="3" fill="#ff8a2a"/><path d="M20 4 l4 9 h-8 z" fill="#9fd3ea"/></svg></span>
           <span class="t-h">The start</span>
           <button class="cta dgo" id="bDrill" type="button" title="The last minutes to the gun, then a debrief and a replay">Go</button>
-          <div class="dsets"><div class="seg" id="drillFromSeg" aria-label="Minutes to the gun"><button type="button" data-df="60">1 min</button><button type="button" data-df="120">2 min</button><button type="button" data-df="180">3 min</button></div><div class="seg" id="drillSoloSeg" aria-label="Alone or with the fleet"><button type="button" data-ds="1">Alone</button><button type="button" data-ds="0">With the fleet</button><button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button></div></div></div>
+          <div class="dsets"><div class="flagpick" id="drillFlagPick" role="radiogroup" aria-label="Preparatory flag (rule 30)"></div><div class="seg" id="drillFromSeg" aria-label="Minutes to the gun"><button type="button" data-df="60">1 min</button><button type="button" data-df="120">2 min</button><button type="button" data-df="180">3 min</button></div><div class="seg" id="drillSoloSeg" aria-label="Alone or with the fleet"><button type="button" data-ds="1">Alone</button><button type="button" data-ds="0">With the fleet</button><button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button></div></div></div>
         <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" stroke="#9fd3ea" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 26 L14 6 L22 26 L30 6"/><path d="M30 6 l-1 6 M30 6 l-5 3"/></svg></span>
           <span class="t-h">Tacks and jibes</span>
           <button class="cta dgo" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: each one scored against a good crew's">Go</button></div>
@@ -242,21 +242,9 @@
         <div class="field step" id="courseField"><span>Course</span>
           <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json, club/practice.ts coursePicker --></select>
           <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
-          <details class="si" id="siBox"><summary><small><span id="siSum"></span> <u>Change</u></small></summary>
-            <div class="sibody">
-              <div class="field" id="seqField"><span>Sequence</span>
-                <div class="seg" data-k="seq"><button type="button" data-v="2">2 min</button><button type="button" data-v="3">3 min</button></div></div>
-              <div class="field" id="prepField"><span>Preparatory flag</span>
-                <div class="seg" data-k="prepFlag"><button type="button" data-v="P">P</button><button type="button" data-v="I">I</button><button type="button" data-v="Z">Z</button><button type="button" data-v="U">U</button><button type="button" data-v="black">Black</button></div>
-                <small id="prepNote"></small></div>
-              <div class="field" id="penaltyField"><span>Penalty for a foul</span>
-                <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (Rule 44.1)</button><button type="button" data-v="1">One turn</button></div></div>
-              <div class="field" id="judgingField"><span>On-the-water judging</span>
-                <div class="seg" data-k="judging"><button type="button" data-v="protests">Protests (Part 5)</button><button type="button" data-v="umpired">Umpired</button></div></div>
-              <div class="field" id="biasField"><span>Line set by the committee</span>
-                <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
-            </div>
-          </details>
+          <div class="si" id="siBox"><small id="siSum"></small></div>
+          <!-- the practice area's one committee choice that's yours: the sequence's length (the owner, 21 Nov 2026: 1 to 5 minutes, not a row of buttons) -->
+          <label class="field seqpick" id="seqField"><span>Sequence</span><input type="range" id="seqRange" min="1" max="5" step="1" aria-label="Start sequence, minutes"><output id="seqOut" for="seqRange"></output></label>
           <div class="coursecard" id="courseCard"></div></div>
           </div>
         </section>

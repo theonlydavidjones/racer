@@ -88,3 +88,16 @@ describe('The last-minute rules (RRS 30)', () => {
     expect(caught).toBeLessThanOrEqual(2); // out of 20 AI starts
   }, 180_000);
 });
+
+describe('sequences of any length from 1 to 5 minutes (the owner, 21 Nov 2026)', () => {
+  it('each starts at its warning signal and ends at the gun, with no two signals at once', async () => {
+    const { startSequence } = await import('../src/sim/signals');
+    for (const m of [1, 2, 3, 4, 5]) {
+      const s = startSequence(m, 'P'), ts = s.map(x => x.t);
+      expect(ts[0], `${m} min`).toBe(-m * 60); expect(ts.at(-1)).toBe(0);
+      expect(new Set(ts).size, `${m} min`).toBe(ts.length);
+    }
+    expect(startSequence(1, 'P').map(x => x.name)).toEqual(['Warning signal', 'Starting signal']);
+    expect(startSequence(4, 'I').map(x => [x.name, x.t])).toEqual([['Warning signal', -240], ['Preparatory signal', -180], ['One-minute signal', -60], ['Starting signal', 0]]);
+  });
+});

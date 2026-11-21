@@ -100,5 +100,14 @@ body.lashed .tg-lash{display:block}
 .lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}
 
 /* the sailing instructions at a default club: the club's, shown, not changed (r275; club/practice.ts) */
-#siBox.locked summary{pointer-events:none}
-#siBox.locked summary u{display:none}
+#siBox{margin:2px 0 4px}
+#seqField.seqpick{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;text-align:left}
+#seqField.seqpick>span{margin:0}
+.seqpick input[type=range]{flex:0 1 220px;accent-color:var(--accent)}
+.seqpick output{font:600 13px var(--f-inst);min-width:44px}
+/* the start drill's preparatory flag: the flags themselves, the one chosen ringed (the owner, 21 Nov 2026) */
+.flagpick{display:flex;gap:6px;flex-wrap:wrap}
+.flagpick button{padding:3px;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;line-height:0}
+.flagpick button[aria-checked="true"]{border-color:var(--accent)}
+.flagpick button:hover{border-color:var(--rule)}
+.flagpick img{width:34px;height:23px;display:block;outline:1px solid rgba(255,255,255,.35)} /* (the black flag shows against the dark card) */

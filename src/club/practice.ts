@@ -49,11 +49,21 @@ export const CLUB_COMMITTEE: Record<Exclude<Host, 'practice'>, Committee> = {
   ggyc: { seq: 5, prepFlag: 'P', penaltyTurns: 2, judging: 'protests', bias: 0 }
 };
 
-/** The settings a race is sailed with: at a default club, its committee's in place of yours; anywhere else, as you set them. */
+/**
+ * The practice area's committee (the owner, 21 Nov 2026: the preparatory flag is the committee's, not yours): RRS 26's
+ * plain P start, RRS 44.1's two turns, the line laid square. Only the sequence's length is yours, 1 to 5 minutes
+ * (SEQ_RANGE). Rule 30's flags are practiced in the start drill instead (Settings.drillFlag).
+ */
+export const PRACTICE_COMMITTEE: Pick<Settings, 'prepFlag' | 'penaltyTurns' | 'bias'> = { prepFlag: 'P', penaltyTurns: 2, bias: 0 };
+export const SEQ_RANGE = [1, 5] as const;
+export const practiceSeq = (seq: number): number => Math.max(SEQ_RANGE[0], Math.min(SEQ_RANGE[1], Math.round(seq) || 5));
+
+/** The settings a race is sailed with: at a default club, its committee's in place of yours; in the practice area, its
+ * own committee's with your sequence's length. */
 export function asTheClubRunsIt<T extends Settings>(S: T): T {
   if (S.mode !== 'race') return S;
   const h = hostOf(S.course);
-  return h === 'practice' ? S : { ...S, ...CLUB_COMMITTEE[h] };
+  return h === 'practice' ? { ...S, ...PRACTICE_COMMITTEE, seq: practiceSeq(S.seq) } : { ...S, ...CLUB_COMMITTEE[h] };
 }
 
 /**

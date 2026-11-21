@@ -1,4 +1,5 @@
 import type { LessonId } from './sim/lessons';
+import type { PrepFlag } from './sim/signals';
 import { DEFAULT_BOAT, NEW_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
@@ -37,7 +38,7 @@ export interface Settings {
   turnHoUses?: number;
   /** Starts in which you've called the favored end: the read's drawn on the water for the first three (app/drills.ts). */
   favCalls?: number;
-  drillFrom?: number; drillSolo?: boolean; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
+  drillFrom?: number; drillSolo?: boolean; /** The start drill's preparatory flag (rule 30's: P, I, Z, U or black; the owner, 21 Nov 2026). */ drillFlag?: PrepFlag; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
   /** Sail it yourself: the Case sailed (its number), with mode 'lesson' and lesson 'case'. */

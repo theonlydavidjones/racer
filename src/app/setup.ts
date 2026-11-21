@@ -4,14 +4,15 @@
  */
 import { fleetChoiceHtml } from '../ui/tiles';
 import { rainLevel } from '../environment/rain';
-import { PREP_MEANING } from '../sim/signals';
+import { PREP_MEANING, type PrepFlag } from '../sim/signals';
+import { flagCanvas } from '../render/flags';
 import { LESSONS, type LessonId } from '../sim/lessons';
 import { lessonGridHtml } from '../ui/lessons';
 import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
-import { asTheClubRunsIt, coursePicker, hostOf } from '../club/practice';
+import { asTheClubRunsIt, coursePicker, hostOf, practiceSeq } from '../club/practice';
 import { place } from '../sim/places';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -67,7 +68,7 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
-  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : asTheClubRunsIt(WSd); // (a race at a default club: its committee's settings, r275)
+  const WSf = app.S.mode === 'drill' ? { ...drillFleet(WSd, app.S.drillSolo ?? true), prepFlag: app.S.drillFlag ?? 'P' } : asTheClubRunsIt(WSd); // (the start drill: its own flag, rule 30's to practice) // (a race at a default club: its committee's settings, r275)
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
@@ -142,19 +143,17 @@ function courseCard(): void {
     + `<div class="legs">${chips.join('<span class="arr">→</span>')}</div>`;
   { // the course's host (club/practice.ts hostOf: who hosts the course chosen) and its sailing instructions
     const host = hostOf(app.S.course);
-    $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
     ($('courseSel') as HTMLSelectElement).value = app.S.course;
     // (at a default club, its sailing instructions: locked, the club's committee's, as it runs its races; club/practice.ts)
-    const R = asTheClubRunsIt({ ...app.S, mode: 'race' }), si = $('siBox') as HTMLDetailsElement;
-    si.classList.toggle('locked', host !== 'practice'); if (host !== 'practice') si.open = false;
-    si.querySelector('summary')?.setAttribute('tabindex', host !== 'practice' ? '-1' : '0');
+    const R = asTheClubRunsIt({ ...app.S, mode: 'race' });
+    // (the practice area: its committee's start, P, two turns, a square line; the sequence's length is yours, 1 to 5 min)
+    $('seqField').hidden = host !== 'practice';
+    ($('seqRange') as HTMLInputElement).value = String(R.seq); $('seqOut').textContent = `${R.seq} min`;
     const flag = R.prepFlag === 'black' ? 'black flag' : `${R.prepFlag ?? 'P'} flag`;
     const line = C.biasAdjustable ? ` · line ${R.bias ? (R.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(R.bias) + '°' : 'square'}` : '';
     $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailed as the club runs it'}: ${R.seq}-min sequence · ${flag} · ${R.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${R.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
   }
   $('lengthField').hidden = app.S.mode === 'sail' || app.S.course !== RC_COURSE;
-  $('biasField').hidden = !C.biasAdjustable;
-  $('prepNote').textContent = PREP_MEANING[app.S.prepFlag ?? 'P'];
   $('fleetField').hidden = app.S.mode === 'sail';
   { // racing from her slip: sail out to the line from her marina
     const sl = slipById(app.S.boat.slip), btn = $<HTMLButtonElement>('raceFromSlip');
@@ -486,6 +485,7 @@ function dockSetup(view: 'setup' | 'drill' | 'season'): void {
 }
 // the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
 function paintDrillPage(): void {
+  paintDrillFlags();
   for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (app.S.drillFrom ?? app.DRILL_FROM)));
   const solo = app.S.drillSolo ?? true;
   for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === solo));
@@ -493,6 +493,16 @@ function paintDrillPage(): void {
   $('drillSoloSeg').querySelector('[data-ds="0"]')!.innerHTML = fleetChoiceHtml(true, drillFleetSize(app.S));
   for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-fn]')) b.hidden = solo;
 }
+/** The start drill's preparatory flag (the owner, 21 Nov 2026: moved here from Practice): the flags themselves, P the
+ * usual start, I, Z, U and black rule 30's; each one's meaning on hover. */
+const DRILL_FLAGS: PrepFlag[] = ['P', 'I', 'Z', 'U', 'black'];
+function paintDrillFlags(): void {
+  const cur = app.S.drillFlag ?? 'P';
+  morph($('drillFlagPick'), DRILL_FLAGS.map(f => `<button type="button" role="radio" data-flag="${f}" aria-checked="${f === cur}" title="${app.esc(PREP_MEANING[f])}"><img src="${flagUrl(f)}" alt="${f === 'black' ? 'Black flag' : f}"></button>`).join(''));
+}
+const flagUrls = new Map<PrepFlag, string>();
+const flagUrl = (f: PrepFlag): string => { let u = flagUrls.get(f); if (u == null) { try { u = flagCanvas(f).toDataURL(); } catch { u = ''; } flagUrls.set(f, u); } return u; };
+$('drillFlagPick').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-flag]'); if (!b) return; app.S.drillFlag = b.dataset.flag as PrepFlag; saveSettings(app.S); paintDrillFlags(); });
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
 $('drillSoloSeg').addEventListener('click', e => {
   const t = e.target as HTMLElement, n = t.closest<HTMLElement>('[data-fn]'), b = t.closest<HTMLElement>('[data-ds]');
@@ -558,7 +568,8 @@ $('bManoeuvres').onclick = () => { app.S.mode = 'manoeuvres'; app.courseView.clo
 $('bLessons').onclick = () => openLessons();
 $('bRoundings').onclick = () => { app.S.mode = 'roundings'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
 // (locked at a default club: however it's opened, by the mouse, the keyboard or a script, it shuts again)
-$('siBox').addEventListener('toggle', () => { const si = $('siBox') as HTMLDetailsElement; if (si.open && si.classList.contains('locked')) si.open = false; });
+$('seqRange').addEventListener('input', () => { const v = practiceSeq(+($('seqRange') as HTMLInputElement).value); $('seqOut').textContent = `${v} min`; });
+$('seqRange').addEventListener('change', () => { app.S.seq = practiceSeq(+($('seqRange') as HTMLInputElement).value); saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); });
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
 $('bCondClose').onclick = () => {
