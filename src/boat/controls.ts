@@ -98,7 +98,7 @@ export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.m
  * forestay's pin on the deck. The centre and the tape are North Sails' Nordic Folkboat tuning guide's ("the jib-lead
  * track is placed with its centre 58 cm from the boat's centreline"; "2.65 m from the pin in the forestay"): 12.65° at
  * the middle hole, which puts the jib at its best trim close-hauled (the beat's apparent wind, about 30–31° in 10–12 kt,
- * less trim.ts's 18°).
+ * less trim.ts's 16.5°).
  * Until the owner measures Josephine: the drawing (Boat Detail, from a photo) reads 0.66 m, within a photo's error of
  * it; the holes' 24 mm is the drawing's. (reference/design/sheet-geometry.md, Rigging.)
  */

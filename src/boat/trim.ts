@@ -17,7 +17,7 @@ export type SailName = 'main' | 'jib';
 export type Flow = 'good' | 'luffing' | 'stalled';
 
 export interface SailSpec {
-  aoa: number; // best angle of attack, deg (apparent wind to the sail's chord at mid height)
+  aoa: number; // best angle of attack, deg: the apparent wind angle less the sheet angle (to the boom; the jib's clew)
   min: number; // sheeted hard in, deg from centreline
   max: number; // fully eased: boom on the shroud / clew as far out as the sheet lead allows
   crewRate: number; // how fast the crew trims, deg/s
@@ -35,6 +35,9 @@ export interface SailSpec {
  * at 18° the inner hole was too wide for the beat itself in 8 kt, the jib luffing a little at its own best course.
  */
 export const SAILS: Record<SailName, SailSpec> = {
+  // (the main's 25°: North's Folkboat guide sails medium air with the cars in the middle and the sheet tight, the top
+  // batten parallel to the boom, the boom about 2.5° off; on her own apparent wind beating in 6-12 kt, 28.1-28.8°, that
+  // is 25.5-26.2° (docs/rig/main-aoa.md). Not 22°, a second-hand estimate that put her crew's boom 4.5-5.6° off)
   main: { aoa: 25, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
   jib: { aoa: 16.5, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
 };
