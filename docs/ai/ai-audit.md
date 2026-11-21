@@ -29,44 +29,40 @@ The probes are throwaway test files, kept outside the repository; the numbers be
 
 | # | Finding | Where | Size |
 |---|---|---|---|
-| 1 | She overstands the windward mark by about 20 m (2.6 lengths) at 12 and 22 kt. | ai.ts:448, :855 | S |
+| 1 | ~~She overstands the windward mark by about 20 m.~~ Remeasured by her ground track: a median of about 6 m (0.7 length). The 20 m was a measuring error. No fix. | ai.ts:448, :855 | – |
 | 2 | Her fleet lists filter by `!isUser`, which goes wrong when the player's boat sails on the AI. | ai.ts:285, :383 | S |
 | 3 | The fleet starts late: a median of 27 m behind the line at 12 kt, 36 m at 4 kt, the worst 146 m. | ai.ts:717, world.ts:789 | M |
-| 4 | In 4 kt against the tide, the fleet doesn't make the first mark in 50 minutes. Boats make 20 to 37 tacks, some of them flickers in irons, and don't look for current relief. | ai.ts:848–886 | M |
+| 4 | In 4 kt against the tide, the fleet doesn't make the first mark in 50 minutes. Probed: it's the tide in the lulls, not the flickers. In slack water all 21 boats round. | ai.ts:848–886 | M |
 | 5 | After AP over A, the fleet stays by the line for 11–50 minutes instead of sailing home (Debrief's report). | ai.ts:680, homeCourse | M, to probe |
 | 6 | Up to 13 tacks on a beat at 12 kt and 19 at 22 kt, some within 40 m of the mark. | ai.ts:848 | M |
 | – | Good, no change: she almost never tacks in dirty air (0–1 of 141–331 turns per wind); roundings are close (median 7–8 m at A); no boat was OCS. | | |
 
-## 1. Overstanding the windward mark (S)
+## 1. Overstanding the windward mark: remeasured, no fix
 
-**What happens:** at her last tack before mark A (taken more than 25 m out), the mark lay this far beyond her layline, measured across her track. Positive means overstood.
+**First measure, withdrawn:** at her last tack before mark A (more than 25 m out), how far the mark lay beyond her layline, taking her heading at the polar beat angle. That gave medians of 19 m (12 kt) and 20 m (22 kt). It ignored the current and her leeway. She already steers up-current of the mark: the fetch test (ai.ts:855) includes the current, and `crabFor` (ai.ts:810) allows for it. So her bow points well above the mark while her track over the ground lays it.
 
-| Wind | Overstand (m), each rounding | Median |
-|---|---|---|
-| 4 kt | −50 −39 −18 −15 −10 −6 0 14 21 | −10 (short) |
-| 12 kt | −2 1 3 5 9 10 17 18 19 19 19 20 20 22 22 23 24 24 26 32 35 | 19 |
-| 22 kt | −5 2 4 8 13 16 16 17 19 19 20 20 21 21 21 22 23 26 33 33 36 | 20 |
+**Second measure:** her ground track over every final tack's last leg. This is how far the mark lies off the straight line from her position 5 s after the tack to where she tacks again, rounds, or comes within 12 m. Positive means overstood. It was run at 12 and 22 kt, seeds 1–3, the first beat, 37 final tacks (3 had less than 5 s and were left out):
 
-A sample line from the 22 kt log, seed 2: `t 324 ROUND Black mark A (beat) closest 11.2 m; leg turns 3; last turn t 293 overstand 65°`.
+| Final leg | n | Median (m) | Each (m) |
+|---|---|---|---|
+| 5–15 s (tacked 25–50 m out) | 11 | +12 | −10 0 7 11 12 12 13 14 15 17 17 |
+| 15 s or more | 23 | +3 | −19 −14 −12 −11 −11 −11 −10 −10 −10 −9 2 3 3 5 5 6 6 10 10 12 13 14 17 |
+| All | 34 | +6 | |
 
-**Why:**
-- More than 35 m from a rounding mark, she steers for a point 10 m off the mark on its passing side (ai.ts:448, `P = off(…, 10)`).
-- She tacks for it only once she can fetch that point with 3 m more to spare (ai.ts:855, `lat > 3`).
-- She looks only once 9 s have passed since her last tack (ai.ts:848). At about 2 m/s that's another 18 m.
+- Inside 25 m of the mark, 12 of the 37 boats tacked again, 14 tacks in all, which is the cost of coming up short. They pinched (more than 5° above her polar beat angle) for a median of 4 s, at most 20 s.
+- The close tacks lay a point about 12 m wide, which is ai.ts:448's aim point, 10 m off on the passing side. The long legs scatter both ways, by up to 19 m, from shifts and the set changing under her. So the median is about 0.7 of a length.
+- Caveat on the measure: a line that ends 12 m from the mark can't show an offset much beyond 12 m, so the close tacks' figure is a floor, not an exact value.
 
-So she lays a point about 13 m wide of the mark on purpose, before her reaction time.
+**The aim point tried (fix 1, withdrawn):** aiming 4 m off instead of 10 m left her heading measure at 12 m and moved her ground track to about 10 m short, measured 10–25 s after the tack. It caused more underlays, and an underlay costs two more tacks (Dellenbaugh, "Five Familiar Layline Dilemmas": overstanding a little is the cheaper side). It was not committed.
 
-**Is it wrong?** Yes.
-- Dellenbaugh's rule: "tack on your layline". Every boat length overstood costs about 1.4 lengths of sailing at 45° (geometry, not a quote). The source is Dellenbaugh, Speed & Smarts / Wind Check, "Five Familiar Layline Dilemmas".
-- A strategic rounding, with nobody close, passes close to the mark (Dellenbaugh, Speed & Smarts #131, "Mark Rounding").
-- 20 m is 2.6 Folkboat lengths, about 3.6 lengths of extra sailing at each windward mark. A club racer would call it overstanding.
+| Aim / fetch margin (m) | Heading measure, median | Ground track 10–25 s after, median | n | Mark touches |
+|---|---|---|---|---|
+| 10 / 3, as now | 19.6 | −3.6 | 37 / 22 | 0 |
+| 4 / 3 | 12.4 | −9.6 | 37 / 26 | 0 |
+| 4 / 0 | 14.8 | −8.5 | 38 / 25 | 0 |
+| 1 / 0 | 12.1 | −8.1 | 36 / 23 | 0 |
 
-**Fix (S):**
-- Aim about half a length off the mark: 4 m, room for her half-beam and the rounding swing.
-- Keep the 3 m fetch margin. The tide is already in the fetch test.
-- The risk to watch is touching the mark (rule 31) in a set. fouls-pair and the mark-touch tests guard that.
-
-**At 4 kt she tacks short instead,** a median of 10 m. That belongs to finding 4: the tide sets her down while she beats.
+**Verdict:** not the fault it looked like. By the ground track she overstands by about two-thirds of a length at the median, with a spread a club racer would recognise. The part worth improving is the spread, not the aim. That belongs with finding 6's trace (the tacks at the mark), not a separate fix.
 
 ## 2. The fleet filtered by `!isUser` (S)
 
@@ -124,6 +120,26 @@ t   0                d -19.4 v 2.08
 - Measure the plan's error and lead the leave decision by it: have timeToCover count the approach angle and the set.
 - This changes every race's start, so it needs the start tests, fouls-pair and the berth test. It's a design change to agree first.
 
+### Proposal 3, for the Coordinator's approval
+
+**Cause:**
+- The hold is a fixed distance, 55–100 m below the line in every wind and set (world.ts:789). At 4 kt against 0.4 m/s that's over 100 s from the line. At 12 kt it's about 50 s.
+- The leave decision (ai.ts:711–717) predicts too short a time. From the moment she leaves, her own live tReach runs 6–10 s over the time left. Whether that's the approach angle, the set or the acceleration curve in timeToCover is not yet traced.
+
+**Fix:**
+1. **Hold depth by time, not metres.** Depth = her speed made good toward the line on the approach, in the actual wind and set, × a hold time.
+   - The speed: targetFor at the approach's angle, resolved onto the line's normal, plus the current along it.
+   - The hold time: 30 + r()·25 s. It keeps the same r() draw, so the seeds still give the same races.
+   - It's clamped to 15–100 m. 30–55 s is an ESTIMATE from "at most about 30 s of sailing from the line" (MIT notes; Ian Williams, time-on-distance), with room to wait.
+   - In a foul set, the depth shrinks by itself, and she holds close and up-current as a sailor does.
+2. **A truthful leave time.** Trace the 6–10 s first. Then make the plan's speed toward the line the same number the depth uses, rather than raising the fixed 8 s margin to hide the error.
+3. **Tests:** a start test asserting the median boat is within 1–2 lengths of the line at the gun at 4, 12 and 22 kt, with no rise in OCS. Then the start tests, fouls-pair (12/22 and 4/6) and the berth test.
+
+**Expected effect (ESTIMATES):**
+- *Finish times:* earlier by the lateness at the gun, about 13 s at 12 kt (27 m at 2.1 m/s), about 12 s at 22 kt, and 30–40 s at 4 kt.
+- *Fouls:* more boats arrive at the line together and on time, so more pre-start and start incidents (rules 11, 15, 16). A guess is +0.1–0.3 a race at 12–22 kt. fouls-pair will show it; if it fails, the start's room logic gets looked at before the depth is.
+- *OCS:* a few may appear (none in 63 now). A real fleet has some.
+
 ## 4. Light air against the tide: the first beat isn't sailed (M)
 
 **What happens:**
@@ -159,6 +175,49 @@ t 2904 TURN Green beat to P v 0.56 dist 36 m
 2. Then a light-air rule: no tack on a header in under about 6 kt unless it's held twice as long (ai.ts:870, the header tack).
 3. Then current relief in her plan. That's a strategy change, after the sprint.
 
+### Probe of 4, and proposal 4, for the Coordinator's approval
+
+**The probe:**
+- The setup: 4 kt, seeds 1–3, real tide (14 Nov 2026) against slack water, 3000 s. Every boat's turns, and its "flicker triples" (three turns inside 7 s) were counted. Green, seed 2, was traced every 5 s.
+
+| Current | Seed 1 | Seed 2 | Seed 3 |
+|---|---|---|---|
+| Real | 2/7 round A (2010, 2058 s) | 0/7 | 7/7 (1272–2115 s) |
+| Slack | 7/7 (534–1080 s) | 7/7 (534–1254 s) | 7/7 (504–882 s) |
+
+- **Turns per boat, real:**
+  - seed 1: 7–23;
+  - seed 2: 22–37;
+  - seed 3: 2–8.
+- **Turns per boat, slack:** 2–19.
+- **Flicker triples, all boats:** real 6+1, 2+2+1, 0; slack 0, 1+1, 0. Ten in 42 races-worth of boats.
+- **Green, seed 2, real:**
+  - The wind she felt averaged 2.9 kt, from 1.4 to 4.7 kt (the gusts and lulls, environment/gusts.ts).
+  - Her speed averaged 0.66 m/s.
+  - The current toward the mark was −0.42 m/s throughout, the same from 330 m out to 50 m.
+  - Her speed made good toward the mark over the ground: port −0.44 m/s, starboard −0.20 m/s (means of the 5 s samples, out of tacks). **She lost ground on both tacks.**
+  - For scale, the class polar's lightest row (4 kt, src/boat/data/nordic-folkboat-orc.json) gives a best upwind VMG of 1.667 kt, 0.86 m/s. Below 4 kt the polar has no data.
+
+**Cause:** mostly no way to make ground. In the lulls below about 3 kt, a Folkboat's VMG through the water is about the ebb's 0.42 m/s or less, and she goes backwards whatever she does. This is the tide's real physics: in slack water every boat rounds. The flickers are too few to matter (seed 3 rounded with none). The slow-tack hold isn't the cause either; Green's goTack was mostly clear.
+
+What the AI does wrong on top of the physics:
+- **She tacks as if in a breeze:** 22–37 times in seed 2. Each light-air tack loses most of her way.
+- **She splits her time between the tacks** although one loses twice as much ground (port −0.44 against starboard −0.20). The rhumb-line width tack (ai.ts:877) brings her back.
+- **She ignores current relief,** although the model has it: current.ts:27 `shoreRelief` gives a quarter of the stream at the beach, rising to full at 350 m out. Nothing in src/ai reads it.
+
+**Fix, in order:**
+1. **(S, mine)** In under about 6 kt true wind:
+   - she tacks on a header only if it's held twice the usual time (ai.ts:866);
+   - the width tack waits until the other tack makes better ground toward the mark (the fetch test's current-aware track, ai.ts:851, is already there to compare).
+2. **(M)** Current relief in her tack choice: compare each tack's ground VMG with `currentAt` along it, so she works the shore when it's in reach. First check whether course 10's beat comes within 350 m of the shore at all.
+3. **(Owner's call, a big design change, not to build without asking):**
+   - *Kedging:* RRS 45 allows anchoring, and it is real SF Bay light-air practice against the ebb.
+   - *The committee:* a time limit, or shortening course (RRS 32) when the fleet can't make the mark. That's the race committee, not the AI.
+
+**Expected effect (ESTIMATES):**
+- *Fouls:* about unchanged. At 4 kt the fleet spreads out (2 incidents in 3 races in the audit).
+- *Finish times:* fix 1 saves the tacks' losses in the marginal races, like seeds 1 and 3. A guess is a few minutes to mark A where she now makes 15–35 tacks. It won't make seed 2 roundable: nothing but relief, kedging or the committee can.
+
 ## 5. After AP over A, the fleet stays by the line (M, to probe)
 
 **Debrief's report:** after a call-off for wind, every AI boat stays near the line for 11–50+ minutes. The repro: 5de4d67c, west 22 kt, seq 1, raceFrom water, the Practice race, seed 1523510690, the call at t = −180.
@@ -187,6 +246,28 @@ t 2904 TURN Green beat to P v 0.56 dist 36 m
 
 **Fix (M):** trace Red and Black's tacks by cause first. Finding 1's fix may take care of the tacking at the mark.
 
+### Proposal 6, for the Coordinator's approval
+
+**Cause:** not traced yet. Candidates, as before:
+- the header tack (a hazard-rate draw each think while headed more than 4° for more than 15 s, ai.ts:866–870);
+- the rhumb-line width tack (ai.ts:877);
+- tacking below the mark when she can't fetch it, which finding 1's remeasure puts at 12 of 37 boats inside 25 m.
+
+**Note:** main's newer skipper knobs (src/ai/skipper.ts, after 5de4d67c) scale the header tack by her strategy, down to a 1° header held 3 s. 1° is under the wind's own short swing of 2–3° (the ai.ts comment on beat hysteresis). If that's in v216, expect more tacks than this audit measured. Its author should check that against the same trace.
+
+**Fix:**
+1. A probe first. Tag each tack with its trigger (header, width, dirty air, layline, at the mark) at 12 and 22 kt, seeds 1–3.
+2. Then, by what it finds:
+   - header tacks only on a header larger than the short swing;
+   - inside about 3 lengths of the layline, tack only on the layline;
+   - if at-mark tacks dominate, nothing more: they're finding 1's underlays.
+3. The test: median tacks per beat at most 4 at 12 kt, with the incidents bound unchanged.
+
+**Expected effect (ESTIMATES):**
+- *Tacks:* the median per beat from 7 to about 4 at 12 kt.
+- *Finish times:* each tack saved is about a length (Dellenbaugh), so about 3 lengths, 23 m, about 10 s a beat at 12 kt.
+- *Fouls:* fewer crossings mean slightly fewer rule-10 port-starboard incidents. A guess is −0.1 a race.
+
 ## Good, and left alone
 
 - **Dirty air:** she tacked in another boat's wind shadow 0 times of 331 turns at 4 kt, and once of 158 at 12 kt and of 141 at 22 kt. A sailor in breeze may hold in bad air; in light air it's very slow (US Sailing, wind shadows).
@@ -205,7 +286,7 @@ t 2904 TURN Green beat to P v 0.56 dist 36 m
 
 ## Next
 
-1. Fix 1 and 2 (S), each with a test, test:fast, and perf-pair --ai and fouls-pair through Capacity.
-2. Probe 5 (AP over A), then fix it.
-3. Probe 4's triples.
-4. Agree the start redesign (3) and the light-air tacking (4) with the Coordinator before building.
+1. Done: fix 2 (claude/ai-standoff-identity, 77892ae6). test:fast and fouls-pair pass; perf-pair --ai waits for Capacity.
+2. Withdrawn: fix 1. See the remeasure in finding 1.
+3. Probe 5 (AP over A), then fix it.
+4. Proposals 3, 4 and 6 above are for the Coordinator's approval, and 4.3 for the owner's.
