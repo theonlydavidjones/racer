@@ -359,7 +359,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   $('rRule').textContent = RULES[inc.rule][1] + (exonerated ? ' ' + EXONERATION : '');
   $('rVerdict').className = 'verdict' + (youFault ? '' : ' ok');
   $('rWhat').textContent = ex.what;
-  $('rTip').textContent = ex.tip;
+  $('rTip').textContent = ex.tip; $('rTip').title = ex.more ?? ''; // (one line; any detail on hover)
   const turns = w.penaltyDeg === 720 ? 'two turns' : 'one turn';
   // (a boat not racing, finished or retired, that breaks rule 23.1 can't take turns for it: rule 44.1's penalties are for
   // an incident while racing; she can be protested)

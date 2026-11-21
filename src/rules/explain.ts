@@ -44,10 +44,10 @@ export interface ExplainInput {
   exoneratedBy?: string;
 }
 
-/** Plain-language "what happened" and a tip, from the user's point of view. */
-export function explain(e: ExplainInput): { what: string; tip: string } {
+/** Plain-language "what happened" and a tip, from the user's point of view; `more`, where a tip needs it, is the detail behind its hover. */
+export function explain(e: ExplainInput): { what: string; tip: string; more?: string } {
   const you = e.youFouled, o = e.other;
-  let what = '', tip = '';
+  let what = '', tip = '', more: string | undefined;
   switch (e.rule) {
     case '10':
       what = you ? `You were on port tack. ${o} was on starboard, so you had to keep clear.` : `${o} was on port tack and you were on starboard. ${o} had to keep clear.`;
@@ -84,7 +84,10 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
     case '18.2(a)': {
       const mk = e.markName ?? 'the mark';
       what = you ? `At ${mk} you owed ${o} mark-room${e.markOverlapped ? ' as the outside boat' : ' because they reached the zone clear ahead'}.` : `${o} owed you mark-room at ${mk} and squeezed you.`;
-      tip = you ? 'Inside the zone, mark-room overrides windward/leeward and port/starboard on a run. Settle who is inside or ahead before you reach three lengths.' : 'You were entitled to room to round. Sail your proper course around the mark.';
+      tip = you ? 'Settle who is inside or ahead before you reach three lengths: that boat gets mark-room.' : 'You were entitled to room to round. Sail your proper course around the mark.';
+      // (rules 10 and 11 still apply in the zone: mark-room lets the inside boat sail to the mark and round it, and if she
+      // breaks 10 or 11 while taking the mark-room she's entitled to, she's exonerated, RRS 2025–2028 43.1(b))
+      more = 'In the zone, rules 10 and 11 still apply. Mark-room lets the inside boat sail to the mark and round it; if she breaks rule 10 or 11 while taking the mark-room she is entitled to, she is exonerated (Rule 43.1(b)).';
       break;
     }
     case '18.3': {
@@ -152,9 +155,9 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
   }
   if (e.exoneratedBy) { what += ` But ${e.exoneratedBy} broke a rule first and forced ${you ? 'you' : o} into it, so ${you ? 'you are' : `${o} is`} exonerated: no penalty (Rule 43.1(a)).`; }
-  if (e.kind === 'hail') return { what, tip };
+  if (e.kind === 'hail') return { what, tip, more };
   if (e.kind === 'swerve' && you) what += ` ${o} had to swerve to avoid contact. Forcing a right-of-way boat to change course is still a foul, even without a collision.`;
-  return { what, tip };
+  return { what, tip, more };
 }
 
 /** Short live banner text for the situation pod. */
