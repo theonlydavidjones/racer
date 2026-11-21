@@ -1117,8 +1117,9 @@ function drawNavLayer(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark, n
     const step = 15; let next = Math.ceil(tr[0].t / step) * step; if (next - tr[0].t < 3) next += step; // (none on top of her)
     for (const q of tr) if (q.t >= next) {
       const s = tf(q.p.x, q.p.y);
-      ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.edge; ctx.beginPath(); ctx.arc(s[0], s[1], 2, 0, 6.29); ctx.fill();
-      say(clockOf(q.t), s[0] + 6, s[1] + 3, I.edge, '600 10px "Saira Semi Condensed", sans-serif');
+      // (the tick and its clock in the chart's text color, dark by day, light at dusk: I.edge is black in both, unreadable on the dusk halo; chart audit #3)
+      ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(s[0], s[1], 2, 0, 6.29); ctx.fill();
+      say(clockOf(q.t), s[0] + 6, s[1] + 3, I.text, '600 10px "Saira Semi Condensed", sans-serif');
       while (next <= q.t) next += step;
     }
   }
