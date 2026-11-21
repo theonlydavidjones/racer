@@ -722,13 +722,17 @@ function renderCoach(): void {
  * open. From the Coach card (its Trim coach button, or All notes in the live note) or its key; Back, Esc or the key
  * again closes it, and the race carries on if it was sailing when it opened. */
 let notesPaused = false;
+/** The card's trim line as it reads, without its badges (the 1 and "1 of 3"). */
+function hintText(): string { const c = $('tpHint').cloneNode(true) as HTMLElement; c.querySelectorAll('.tp-n, .tp-of').forEach(n => n.remove()); return (c.textContent ?? '').trim(); }
 function openTrimNotes(): void {
   if (!w.running || !$('trimNotes').hidden) return;
   notesPaused = !w.paused; if (notesPaused) send({ k: 'pause', on: true });
   const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band }); // (the band the live note last said)
   // (in a race, the Strategist card's racing lines first, whole, and the one way into the strategist's view: r298)
-  const situ = $('situ'), race = $('tpRace'), lines = [!situ.hidden ? situ.title : '', !race.hidden ? $('tpRaceMsg').textContent ?? '' : ''].filter(Boolean);
-  const racing = w.freeSail ? '' : `<div class="tn-race"><div class="tn-race-h"><span>Racing</span><button type="button" class="tn-strat">Strategist ›</button></div>${lines.map(l => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('') || '<p class="tn-quiet">Nothing pressing: sail your plan.</p>'}</div>`;
+  // (the card's own lines, as the card shows them and in its order, whole: the same pick, never a second verdict)
+  const situ = $('situ'), race = $('tpRace'), esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const lines = [!situ.hidden ? situ.title : '', !race.hidden ? $('tpRaceMsg').textContent ?? '' : '', hintText()].filter(Boolean);
+  const racing = w.freeSail ? '' : `<div class="tn-race"><div class="tn-race-h"><span>Now</span><button type="button" class="tn-strat">Strategist ›</button></div>${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>`;
   $('trimNotesBody').innerHTML = racing + trimNotesHtml(w.user, s, notes);
   $('trimNotes').hidden = false; $<HTMLButtonElement>('bTrimNotesX').focus();
 }
