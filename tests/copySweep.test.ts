@@ -9,3 +9,13 @@ describe('copy sweep A: the Past races card is one short line', () => {
     expect(t.length).toBeGreaterThan(10); expect(t.length).toBeLessThanOrEqual(70);
   });
 });
+
+describe('copy sweep B: "Retire and head home?" is one line, the rules behind a Why?', () => {
+  it('as the motor dialog is', () => {
+    const html = read('index.html'), dlg = html.slice(html.indexOf('id="homeAsk"'), html.indexOf('id="homeAsk"') + 1500);
+    const open = dlg.replace(/<details[\s\S]*?<\/details>/, '');
+    expect(open).not.toMatch(/RRS|A5\.1|23\.1/);
+    expect(/<p class="ask-line">([^<]*(?:<b>[^<]*<\/b>[^<]*)*)<\/p>/.exec(dlg)?.[1].replace(/<[^>]*>/g, '').length).toBeLessThanOrEqual(80);
+    expect(dlg).toMatch(/<details[^>]*><summary><u>Why\?[\s\S]*RRS A5\.1[\s\S]*23\.1/);
+  });
+});
