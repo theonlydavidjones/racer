@@ -2379,3 +2379,5 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Real past races with real wind and current (goal 4).
 - More courses, and race-committee options (course changes, shortened courses).
 - Phone and tablet layout (on hold: desktop first).
+
+8s19. **Strategist / Trim Coach card** (owner, 21 November 2026; feature; later; Debrief; r298): a Strategist/Trim Coach card at the bottom-left of the game surface; options are at stills/coach-card, waiting on the owner to pick. Debrief first called it r297, but r297 is crew mistakes under load (8s18). Commits name r298. One card, no new buttons.
