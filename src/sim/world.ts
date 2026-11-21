@@ -463,6 +463,14 @@ export class World {
   startReport: StartReport | null = null;
   fouls = 0;
   fouledBy = 0;
+  /**
+   * The rules you broke, one an incident, and whether you took the penalty for each (the results' count). Under RRS 44.1
+   * (2025–2028) a boat that takes a penalty has still broken the rule: the penalty only spares her any further penalty
+   * for that incident (60.5(c)(2) at a hearing). So a breach is counted whether or not its turns were done, and the turns
+   * are counted beside it. `owing` is set once her turns are running after it; `taken` once they're done before she
+   * finishes (44.2). (Exonerated and not-racing incidents aren't breaches that carry a penalty: 43.1, the Part 2 preamble.)
+   */
+  breaches: { t: number; rule: string; owing: boolean; taken: boolean }[] = [];
   /** Protests made on the water (RRS 60), in order. */
   protests: Protest[] = [];
   /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
@@ -1443,6 +1451,7 @@ export class World {
     this.checkPairs();
     if (this.caseRun) this.caseStep();
     if (this.protestsOn) this.protestsStep();
+    if (this.breaches.length) this.breachTurns();
     if (!this.freeSail) this.signals(prevT);
     this.motorStep(dt);
     if (this.carWas || this.user.carCmd) this.carCallStep(); // (entered only with a car call pending: World.step's own cost per step, CAPACITY §8a)
@@ -1604,7 +1613,7 @@ export class World {
           if (this.protestsOn) this.touchSeen(b);
         } else if (exonerated && this.protestsOn) this.touchSeen(b, true); // (yours to protest still, if you saw it: the hearing finds the exoneration, 43.1)
         if (b.isUser) {
-          if (!sameIncident && !exonerated) this.fouls++;
+          if (!sameIncident && !exonerated) { this.fouls++; this.breaches.push({ t: this.t, rule: '31', owing: false, taken: false }); }
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
             : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
@@ -1824,7 +1833,7 @@ export class World {
       this.onIncident?.(A, B, incident);
       if (A.isUser || B.isUser) {
         this.paused = true;
-        if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
+        if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) { this.fouls++; this.breaches.push({ t: this.t, rule: incident.part ?? String(incident.rule), owing: false, taken: false }); } else this.fouledBy++; }
         const other = A.isUser ? B : A;
         this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part, notRacing: !!incident.notRacing, exonerated: incident.exoneratedBy != null };
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
@@ -3102,6 +3111,16 @@ export class World {
   }
 
   /** Is the fleet policing itself (a race, judged by protests), rather than umpired? */
+  /** Your breaches' turns: running after the breach, then done before you finish (RRS 44.2: done "as soon after the incident as possible", and before she finishes). */
+  private breachTurns(): void {
+    const u = this.user; if (u.finished || u.retired) return;
+    for (const r of this.breaches) {
+      if (r.taken) continue;
+      if (u.penalty > 0) r.owing = true;
+      else if (r.owing) r.taken = true;
+    }
+  }
+
   get protestsOn(): boolean { // (a club's race: the practice area, a course with no club, is umpired, like the drills)
     return this.settings.mode === 'race' && this.settings.judging === 'protests' && !!this.file.group; }
 

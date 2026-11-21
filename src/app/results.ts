@@ -16,6 +16,7 @@ import { outlookFor } from '../sim/outlook';
 import { beatAngle } from '../boat/polar';
 import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from '../replay/versus';
 import { V, brg, dist, wrap } from '../core/math';
+import { breachLine, withHearings } from '../rules/tally';
 import { RULES, hearings, ptsText, raceScores, scoreOrder, type Decision, type ScoreOut } from '../rules';
 import { ReplayView } from '../replay/replayView';
 import { keepSeasonRace } from '../club/season';
@@ -367,7 +368,10 @@ function showResults(): void {
   const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (${b.scoring === 'DSQ' ? 'turns not taken, Appendix UF3.4(a)(5)' : `Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'}`})` : ''; };
   const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' || s.code === 'DSQ' ? 'DSQ' : s.code === 'RET' && b.finished ? 'RET' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
   $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no.replace(/^US\s+/, 'USA ')}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
-  $('resFouls').textContent = `Fouls you committed: ${app.w.fouls}. Fouls against you: ${app.w.fouledBy}.`
+  // (every rule you broke, penalty or not: a penalty taken doesn't undo the breach, RRS 44.1; rules/tally.ts)
+  const found = heard().decisions.filter(d => d.protest.vs === app.w.user.id && (d.outcome === 'penaltyTaken' || d.outcome === 'DSQ' || d.outcome === 'pending'))
+    .map(d => ({ t: d.protest.t, rule: d.rule, taken: d.outcome === 'penaltyTaken' }));
+  $('resFouls').textContent = breachLine(withHearings(app.w.breaches, found), app.w.fouledBy)
     + (app.w.user.scoring === 'DSQ' ? ' You finished with your penalty turns not done: the umpire disqualified you (Appendix UF3.4(a)(5)).' : '');
   protestSection();
   { const rr = app.realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
