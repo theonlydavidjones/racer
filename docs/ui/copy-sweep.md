@@ -46,3 +46,25 @@ Left on the results page, the Debrief session's: the debrief's per-leg verdict s
 242 m further (about 410 s lost) and were faster over the ground (about 24 s). Green's line…", 92–233 characters each, nine
 legs), the start summary (198) and the rig and pace notes (107–121). They are the race's own numbers written as sentences
 (`src/sim/startDebrief.ts`, `src/ui/tacticsView.ts`), not canned copy; shortening them is a design call for the debrief.
+
+## Every hover `shortTip` cuts (the check, 21 Nov)
+
+`shortTip` (src/ui/hoverText.ts) cuts a hover over 110 characters at the last sentence, clause or word. The 32 cuts a
+run of the page makes (one per hover, the same hover often seen twice), before → after, and whether the cut loses something
+the player needs:
+
+| Hover (source) | After the cut | Loses a figure, rule or "not"? | Done |
+|---|---|---|---|
+| Line transit (hud.ts, the next-race card; ×15) | was cut before "X is N° left of it" | **the figure** | hand-written: `Line transit: X in line with the shore of Belvedere and Tiburon · 3° left of it` (tests/hoverText.test.ts) |
+| Sight the line (a toast; log row) | "…X lines up with the shore of Belvedere and Tiburon" | no (the next sentence repeats the transit) | cut is fine |
+| 5-minute sequence / Cruising line (setup cell) | "Current: Ebb 1.3 kt, building · turns to flood ~16:35. Sea: glassy · 0.4 ft swell, 11 s" | no: the figures stay, the rest is the cell's own row | cut is fine |
+| Preparatory signal (log row) | "P up, one sound. 4 minutes. P: the usual start" | no | cut is fine |
+| P / I / Z / U / Black (flag buttons) | each ends before its consequence ("…you must sail…", "…you get…") | **yes: the penalty, "must", the rule number** | hand-written (`PREP_TIP`, tests/hoverText.test.ts) |
+| Cruise boat approaching (log row; src/sim/world.ts, not ours) | "…The racing rules don't apply between you and her; the collision…" | **half a clause; the "keep clear" instruction** | see below |
+| Swell cell (setup) | "1 ft of swell here, 4 ft, 13 s outside the Gate (the buoy reads 5 ft with the ocean's own wind waves, which…" | the buoy figure stays; the half-sentence is cut mid-aside | see below |
+| Past-race caveats (course from a sailor; distance disagrees; course uncertain) | each cut mid-aside | the "as the sheet draws it" qualifier | see below |
+| Coach tips (smooth tacks; tune the rig; headed; shadow; downwind angle) | cut at a clause, still a full instruction | no | cut is fine |
+
+The ones that lose something are changed by hand where the text is ours (src/ui, src/app); the cruise boat's sentence comes
+from src/sim/world.ts and is the Coordinator's to shorten at the source (proposed: "Bay cruise boat approaching at 11 kt.
+Racing rules don't apply to her; keep clear, and expect a wake.").

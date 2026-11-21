@@ -241,7 +241,9 @@ export class Hud {
       const T = w.lineTransit; if (!T) { setHidden(el, true); return; }
       setHidden(el, false);
       setHtml(el, `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`);
-      setTitle($('nextCard'), (el.textContent ?? '') + ' · Click for the course and the strategist');
+      // the hover keeps the live figure (how far off the line), which a plain cut of the long sentence dropped
+      const off = transitOffset(u, C.pin, T.p);
+      setTitle($('nextCard'), `Line transit: ${C.pinLabel} in line with ${T.name} · ${Math.abs(off) < 0.8 ? 'in line now' : `${Math.abs(off).toFixed(0)}° ${off > 0 ? 'right' : 'left'} of it`}`);
       return;
     }
     const m = w.nextMark(u), L = laylinesFor(w, u);

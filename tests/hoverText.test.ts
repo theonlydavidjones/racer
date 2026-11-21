@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 // @ts-ignore node:fs for the source text
 import { readFileSync } from 'node:fs';
-import { shortTip, TIP_MAX } from '../src/ui/hoverText';
+import { shortTip, TIP_MAX, PREP_TIP } from '../src/ui/hoverText';
 
 // A hover is one short line (the owner's rule on copy; the in-race audit's item 10). Long ones are cut at a sentence or a
 // clause, else at a word; the detail that matters is in the page.
@@ -37,5 +37,20 @@ describe('the page\'s own hovers are one short line (audit 10)', () => {
     const d = readFileSync('src/app/drills.ts', 'utf8') as string;
     expect(d).not.toMatch(/title="Lost: what you gave away/);
     expect(d.match(/<details class="more"><summary><u>How it's scored/g)?.length).toBe(2);
+  });
+});
+
+describe('the line-transit hover keeps the figure', () => {
+  it('names how far off the line she is, not only what a transit means', () => {
+    const h = readFileSync('src/ui/hud.ts', 'utf8') as string;
+    expect(h).toMatch(/setTitle\(\$\('nextCard'\), `Line transit: \$\{C\.pinLabel\} in line with \$\{T\.name\} · /);
+    expect(h).toMatch(/of it`\}`\);/);
+  });
+});
+
+describe('the preparatory flags keep their penalty in the hover', () => {
+  it('each hand-written line is short and says what happens', () => {
+    for (const [k, v] of Object.entries(PREP_TIP)) expect(v.length, k).toBeLessThanOrEqual(TIP_MAX);
+    expect(PREP_TIP.Z).toMatch(/20%/); expect(PREP_TIP.U).toMatch(/disqualified/); expect(PREP_TIP.I).toMatch(/go round an end/);
   });
 });

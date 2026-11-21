@@ -13,7 +13,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { placeLabel } from '../ui/placeNames';
-import { shortTip } from '../ui/hoverText';
+import { shortTip, PREP_TIP } from '../ui/hoverText';
 import { asTheClubRunsIt, coursePicker, drillSeq, hostOf, practiceSeq } from '../club/practice';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -499,7 +499,7 @@ function paintDrillPage(): void {
 const DRILL_FLAGS: PrepFlag[] = ['P', 'I', 'Z', 'U', 'black'];
 function paintDrillFlags(): void {
   const cur = app.S.drillFlag ?? 'P';
-  morph($('drillFlagPick'), DRILL_FLAGS.map(f => `<button type="button" role="radio" data-flag="${f}" aria-checked="${f === cur}" title="${app.esc(shortTip(PREP_MEANING[f]))}"><img src="${flagUrl(f)}" alt="${f === 'black' ? 'Black flag' : f}"></button>`).join(''));
+  morph($('drillFlagPick'), DRILL_FLAGS.map(f => `<button type="button" role="radio" data-flag="${f}" aria-checked="${f === cur}" title="${app.esc(PREP_TIP[f] ?? shortTip(PREP_MEANING[f]))}"><img src="${flagUrl(f)}" alt="${f === 'black' ? 'Black flag' : f}"></button>`).join(''));
 }
 const flagUrls = new Map<PrepFlag, string>();
 const flagUrl = (f: PrepFlag): string => { let u = flagUrls.get(f); if (u == null) { try { u = flagCanvas(f).toDataURL(); } catch { u = ''; } flagUrls.set(f, u); } return u; };

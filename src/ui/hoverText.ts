@@ -16,3 +16,12 @@ export function shortTip(t: string, max = TIP_MAX): string {
   const amp = out.lastIndexOf('&'); if (amp > out.length - 8 && !out.slice(amp).includes(';')) out = out.slice(0, amp).trimEnd(); // (never half an entity)
   return out + '…';
 }
+
+/** The preparatory flags' hovers by hand (RRS 30): the penalty and the rule number are what a plain cut dropped. */
+export const PREP_TIP: Record<string, string> = {
+  P: 'P: the usual start. Over at the gun, return and start (Rule 29.1)',
+  I: 'I (30.1): on the course side in the last minute, go round an end to start',
+  Z: 'Z (30.2): in the triangle in the last minute, a 20% scoring penalty',
+  U: 'U (30.3): in the triangle in the last minute, disqualified',
+  black: 'Black (30.4): in the triangle in the last minute, disqualified, even after a general recall'
+};

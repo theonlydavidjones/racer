@@ -1,5 +1,5 @@
 /**
- * The boat editor, swept (21 Nov 2026): the Yacht Club's Boats tab, a boat's page, its editor, and every "Change" in it,
+ * The boat editor, swept (21 Nov 2026): the Yacht Club's Boats tab, a boat's page, its editor, and every section opened in it,
  * a still of each and the blocks of copy over 90 characters and the hovers over 110, as sweep.cjs counts them.
  *   node docs/ui/copy-sweep/boat-editor.cjs <out-dir>        (the dev server on :5199)
  */
@@ -30,14 +30,16 @@ const SCAN = () => {
   await p.evaluate(() => document.querySelector('[data-f="boat"]')?.click()); await p.waitForTimeout(1800); await snap('boat-editor-1-boat-page');
   const ed = await p.evaluate(() => { const bt = document.querySelector('[data-f="edit"]'); if (bt) { bt.click(); return true; } return false; });
   console.log('editor opened:', ed); await p.waitForTimeout(2500); await snap('boat-editor-2-editor');
-  // every "Change" (and its Done), one at a time
-  const n = await p.evaluate(() => [...document.querySelectorAll('button')].filter(x => /^change\b/i.test(x.textContent.trim()) && x.getClientRects().length).length);
-  console.log('Change buttons:', n);
-  for (let i = 0; i < n; i++) {
-    const label = await p.evaluate(i => { const bs = [...document.querySelectorAll('button')].filter(x => /^change\b/i.test(x.textContent.trim()) && x.getClientRects().length); const x = bs[i]; if (!x) return null; const sec = x.closest('section, .be-sec, .t-card, .tile, div'); x.scrollIntoView({ block: 'center' }); x.click(); return (sec?.querySelector('b, h3, .t-h, label')?.textContent || x.textContent).trim().slice(0, 30); }, i);
-    await p.waitForTimeout(1200); await snap(`boat-editor-3-change-${i + 1}`);
-    console.log('  change', i + 1, label);
-    await p.evaluate(i => { const bs = [...document.querySelectorAll('button')].filter(x => /^(change|done)\b/i.test(x.textContent.trim()) && x.getClientRects().length); const done = bs.find(x => /^done\b/i.test(x.textContent.trim())); if (done) done.click(); }, i); await p.waitForTimeout(600);
+  // every accordion section, opened one at a time (v215's editor: section.be-grp > header[data-act="grp"])
+  const ids = await p.evaluate(() => [...document.querySelectorAll('section.be-grp')].map(x => x.dataset.grp));
+  console.log('sections:', ids.join(', '));
+  for (const id of ids) {
+    await p.evaluate(id => { const h = document.querySelector(`section.be-grp[data-grp="${id}"] header[data-act="grp"]`); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); }, id);
+    await p.waitForTimeout(900);
+    await p.evaluate(id => document.querySelector(`section.be-grp[data-grp="${id}"]`)?.scrollIntoView({ block: 'start' }), id);
+    await snap(`boat-editor-3-${id}`);
+    await p.evaluate(id => { const h = document.querySelector(`section.be-grp[data-grp="${id}"] header[data-act="grp"]`); if (h && h.getAttribute('aria-expanded') === 'true') h.click(); }, id);
+    await p.waitForTimeout(400);
   }
   fs.writeFileSync(`${out}/boat-editor.json`, JSON.stringify(rep, null, 1));
   console.log('errors:', errs.join(' | ') || 'none');
