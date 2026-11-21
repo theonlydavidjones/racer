@@ -14,7 +14,7 @@ import { litWindows } from './night';
  */
 export const CITYFRONT_STRIP = data.strip;
 /** Beyond this distance (m) from a tile's middle a tile is drawn as boxes. */
-const FAR_M = 800, FAR_MIN_M2 = 60, FARTHER_M = 1600, FARTHER_MIN_M2 = 220, FARTHER_MIN_H = 18; // (past 1.6 km only the big and the tall: a boat sees the hillside's blocks and towers, not each house)
+const FAR_M = 800, FAR_MIN_M2 = 90, FARTHER_M = 1400, FARTHER_MIN_M2 = 450, FARTHER_MIN_H = 26; // (past 1.6 km only the big and the tall: a boat sees the hillside's blocks and towers, not each house)
 
 /** Is a point (degrees) inside the strip the real footprints cover, where the random boxes are left out? */
 export const inCityFront = (lat: number, lon: number): boolean => lat >= CITYFRONT_STRIP.s && lat <= CITYFRONT_STRIP.n && lon >= CITYFRONT_STRIP.w && lon <= CITYFRONT_STRIP.e;

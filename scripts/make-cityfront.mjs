@@ -28,18 +28,23 @@ import { openGeoTiff } from './lib/geotiff-f32.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const CACHE = arg('--cache', '');
-const STRIP = { s: 37.7920, n: 37.8150, w: -122.4900, e: -122.4070 }; // (Fort Point to Pier 39 and Telegraph Hill's west slope, and south to Pacific Heights and Cow Hollow: the old random boxes' seam is now inland and out of the sailing views)
+const STRIP = { s: 37.7790, n: 37.8150, w: -122.4900, e: -122.3850 }; // (Fort Point to Pier 39 and Telegraph Hill's west slope, and south to Pacific Heights and Cow Hollow: the old random boxes' seam is now inland and out of the sailing views)
 const COLS = [-122.4900, -122.4600, -122.4435, -122.4318, -122.4250, -122.4180];
 // (OSM's map call allows 50,000 nodes a box, so the dense parts are cut small. Boxes 0 to 4 are phase 1's and 2's, in the same order, so a cache from them still holds.)
 const box = (cols, s, n) => cols.slice(1).map((e, i) => [cols[i], s, e, n]);
 const BOXES = [...box(COLS.slice(0, 6), 37.7975, STRIP.n),
   ...box([-122.4900, -122.4700, -122.4520, -122.4400, -122.4320, -122.4250, -122.4180, -122.4125, -122.4070], STRIP.s, 37.7975), // the south band
-  ...box([-122.4180, -122.4125, -122.4070], 37.7975, 37.8062), ...box([-122.4180, -122.4125, -122.4070], 37.8062, STRIP.n)]; // the east end
+  ...box([-122.4180, -122.4125, -122.4070], 37.7975, 37.8062), ...box([-122.4180, -122.4125, -122.4070], 37.8062, STRIP.n), // the east end (the boxes above are the ones before, in their order)
+  // the downtown extension: Telegraph Hill's east side, North Beach, the Financial District and the Embarcadero (lon -122.4070 to -122.3850, lat 37.7790 to 37.8150),
+  ...[37.7790, 37.7840, 37.7890, 37.7940, 37.7990, 37.8040, 37.8090, 37.8150].slice(1).flatMap((n, i) => box([-122.4070, -122.4010, -122.3950, -122.3900, -122.3850], [37.7790, 37.7840, 37.7890, 37.7940, 37.7990, 37.8040, 37.8090][i], n)),
+  // and the south band west of it (Nob Hill, Russian Hill's south side, the Tenderloin's edge, lon -122.4500 to -122.4070, lat 37.7790 to 37.7920)
+  ...[37.7790, 37.7840, 37.7890, 37.7920].slice(1).flatMap((n, i) => box([-122.4500, -122.4390, -122.4280, -122.4170, -122.4070], [37.7790, 37.7840, 37.7890][i], n))];
 const MSL_NAVD88 = 0.969, DECK = 3; // (a pier's deck: about 3 m over the water, render/wharf.ts)
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = MLAT * Math.cos(LAT0 * Math.PI / 180);
 const sim = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];
 // landmarks drawn by hand in render/landscape.ts: [lat, lon, radius m]
-const CLEAR = [[37.81055, -122.47710, 75], [37.80292, -122.44840, 130], [37.80728, -122.44664, 60], [37.80773, -122.44259, 25]];
+const CLEAR = [[37.81055, -122.47710, 75], [37.80292, -122.44840, 130], [37.80728, -122.44664, 60], [37.80773, -122.44259, 25],
+  [37.80240, -122.40584, 60], [37.79519, -122.40279, 60], [37.7899, -122.3969, 55], [37.79554, -122.39369, 110], [37.7897, -122.39535, 35], [37.7904, -122.3961, 35], [37.7903, -122.3943, 35], [37.7919, -122.4038, 45], [37.7925, -122.4005, 40], [37.79285, -122.39793, 35]]; // (Coit Tower, the Transamerica Pyramid, Salesforce Tower, the Ferry Building and the towers drawn by hand: landscape.ts)
 // (the Fort Mason piers' sheds are drawn from src/geo/data/pile-piers.json, render/wharf.ts and harborLee)
 const PILE_IDS = new Set(JSON.parse(await readFile(new URL('../src/geo/data/pile-piers.json', import.meta.url), 'utf8')).piers.map(p => p.way));
 const SKIP_IDS = new Set([1560010162, 1560010163, 1560010164, 1560010165, 1560010166, 1560010167]); // the Golden Gate Bridge's south tower and anchorage
