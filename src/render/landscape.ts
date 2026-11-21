@@ -37,7 +37,7 @@ function rng(seed: number) { return () => { seed = (seed + 0x6d2b79f5) | 0; let 
 export async function addLandscape(scene: THREE.Scene, month: number): Promise<Terrain> {
   const terrain = await buildTerrain(scene, month);
   const alcatraz = await buildAlcatraz(scene);
-  await buildCityFront(scene);
+  await buildCityFront(scene, (x, y) => terrain.heightAt(x, y));
   await buildOraclePark(scene); // (the ballpark on McCovey Cove, from the lidar: render/oraclePark.ts)
   buildBridge(scene, (x, y) => terrain.heightAt(x, y));
   const grp = new THREE.Group(); scene.add(grp);

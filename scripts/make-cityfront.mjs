@@ -29,6 +29,8 @@ import { openGeoTiff } from './lib/geotiff-f32.mjs';
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const CACHE = arg('--cache', '');
 const STRIP = { s: 37.7790, n: 37.8150, w: -122.4900, e: -122.3850 }; // (Fort Point to Pier 39 and Telegraph Hill's west slope, and south to Pacific Heights and Cow Hollow: the old random boxes' seam is now inland and out of the sailing views)
+const MARIN = { s: 37.8400, n: 37.8950, w: -122.5100, e: -122.4350 }; // (the Marin shore: Sausalito, Strawberry Point, Belvedere and Tiburon; no DEM tile of ours, so its ground comes from the lidar's ground class)
+const STRIPS = [STRIP, MARIN], inStrips = (la, lo) => STRIPS.some(t => la >= t.s && la <= t.n && lo >= t.w && lo <= t.e);
 const COLS = [-122.4900, -122.4600, -122.4435, -122.4318, -122.4250, -122.4180];
 // (OSM's map call allows 50,000 nodes a box, so the dense parts are cut small. Boxes 0 to 4 are phase 1's and 2's, in the same order, so a cache from them still holds.)
 const box = (cols, s, n) => cols.slice(1).map((e, i) => [cols[i], s, e, n]);
@@ -38,7 +40,9 @@ const BOXES = [...box(COLS.slice(0, 6), 37.7975, STRIP.n),
   // the downtown extension: Telegraph Hill's east side, North Beach, the Financial District and the Embarcadero (lon -122.4070 to -122.3850, lat 37.7790 to 37.8150),
   ...[37.7790, 37.7840, 37.7890, 37.7940, 37.7990, 37.8040, 37.8090, 37.8150].slice(1).flatMap((n, i) => box([-122.4070, -122.4010, -122.3950, -122.3900, -122.3850], [37.7790, 37.7840, 37.7890, 37.7940, 37.7990, 37.8040, 37.8090][i], n)),
   // and the south band west of it (Nob Hill, Russian Hill's south side, the Tenderloin's edge, lon -122.4500 to -122.4070, lat 37.7790 to 37.7920)
-  ...[37.7790, 37.7840, 37.7890, 37.7920].slice(1).flatMap((n, i) => box([-122.4500, -122.4390, -122.4280, -122.4170, -122.4070], [37.7790, 37.7840, 37.7890][i], n))];
+  ...[37.7790, 37.7840, 37.7890, 37.7920].slice(1).flatMap((n, i) => box([-122.4500, -122.4390, -122.4280, -122.4170, -122.4070], [37.7790, 37.7840, 37.7890][i], n)),
+  // the Marin shore, in boxes of about 1 km (OSM's map call allows 50,000 nodes a box)
+  ...[37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800, 37.8950].slice(1).flatMap((n, i) => box([-122.5100, -122.4950, -122.4850, -122.4770, -122.4690, -122.4600, -122.4500, -122.4430, -122.4350], [37.8400, 37.8480, 37.8560, 37.8640, 37.8720, 37.8800][i], n))];
 const MSL_NAVD88 = 0.969, DECK = 3; // (a pier's deck: about 3 m over the water, render/wharf.ts)
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = MLAT * Math.cos(LAT0 * Math.PI / 180);
 const sim = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];
@@ -127,7 +131,7 @@ const out = [], stat = { n: 0, h2: 0, h1: 0, h0: 0, deck: 0, cleared: 0, outside
 for (const w of ways.values()) {
   if (SKIP_IDS.has(w.id) || PILE_IDS.has(w.id)) continue;
   const c = w.ring.reduce((a, p) => [a[0] + p[0] / w.ring.length, a[1] + p[1] / w.ring.length], [0, 0]);
-  if (c[0] < STRIP.s || c[0] > STRIP.n || c[1] < STRIP.w || c[1] > STRIP.e) { stat.outside++; continue; }
+  if (!inStrips(c[0], c[1])) { stat.outside++; continue; }
   if (inClear(c[0], c[1])) { stat.cleared++; continue; }
   const xy = simplify(w.ring.map(([la, lo]) => sim(la, lo).map(v => Math.round(v * 10)))); // dm
   let area = 0; for (let i = 0, j = xy.length - 1; i < xy.length; j = i++) area += (xy[j][0] + xy[i][0]) * (xy[j][1] - xy[i][1]); if (Math.abs(area / 2) / 100 < 8) { stat.tiny++; continue; }
@@ -135,7 +139,9 @@ for (const w of ways.values()) {
   if (h === null) { const lv = num(w.t['building:levels']); if (lv) { h = lv * 3.3; flag = 1; } else { h = DEFAULT[w.t.building] ?? 8; flag = 0; } }
   h = Math.max(2.5, Math.min(h, 250));
   let g = Infinity; for (const [la, lo] of w.ring) { const v = demAt(la, lo); if (v !== null) g = Math.min(g, v - MSL_NAVD88); }
-  if (!(g > 1)) { g = DECK; flag |= 4; stat.deck++; } // (no ground, or a shore sliver: a pier's deck)
+  // (the Marin shore has no DEM tile and no lidar of ours (the SF lidar project stops at the county line): its ground comes at run time from the terrain's 50 m grid, bit 8)
+  if (!Number.isFinite(g) && c[0] >= MARIN.s && c[0] <= MARIN.n && c[1] >= MARIN.w && c[1] <= MARIN.e) { g = 0; flag |= 8; stat.marin = (stat.marin || 0) + 1; }
+  else if (!(g > 1) || !Number.isFinite(g)) { g = DECK; flag |= 4; stat.deck++; } // (no ground, or a shore sliver: a pier's deck)
   stat['h' + (flag & 3)]++; stat.n++;
   out.push({ id: w.id, xy, g: Math.round(g * 100), h: Math.round(h * 10), flag, name: w.t.name || '' });
 }
@@ -148,23 +154,23 @@ if (process.argv.includes('--lidar')) {
   const { createRequire } = await import('node:module'), require = createRequire(import.meta.url), { createLazPerf } = require('laz-perf');
   const EPT = 'https://usgs-lidar-public.s3.amazonaws.com/CA_SanFrancisco_1_B23', DEPTH = +arg('--depth', 10);
   const merc = (lat, lon) => [lon * 20037508.342789244 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) * 6378137];
-  const todo = out.filter(b => (b.flag & 3) < 2);
-  for (const b of todo) { b.m = b.xy.map(([x, y]) => merc(LAT0 + y / 10 / MLAT, LON0 + x / 10 / MLON)); b.z = []; b.box = [Math.min(...b.m.map(p => p[0])), Math.min(...b.m.map(p => p[1])), Math.max(...b.m.map(p => p[0])), Math.max(...b.m.map(p => p[1]))]; }
+  const todo = out.filter(b => (b.flag & 3) < 2 || (b.flag & 4)); // (no OSM height, or no DEM ground under it: the Marin shore)
+  for (const b of todo) { b.zg = []; b.m = b.xy.map(([x, y]) => merc(LAT0 + y / 10 / MLAT, LON0 + x / 10 / MLON)); b.z = []; b.box = [Math.min(...b.m.map(p => p[0])), Math.min(...b.m.map(p => p[1])), Math.max(...b.m.map(p => p[0])), Math.max(...b.m.map(p => p[1]))]; }
   const CELLG = 64, grid = new Map(); // (Web Mercator metres, 64 m cells)
   for (const b of todo) for (let i = Math.floor(b.box[0] / CELLG); i <= Math.floor(b.box[2] / CELLG); i++) for (let j = Math.floor(b.box[1] / CELLG); j <= Math.floor(b.box[3] / CELLG); j++) { const k = `${i},${j}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(b); }
   const inside = (poly, x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if ((poly[i][1] > y) !== (poly[j][1] > y) && x < (poly[j][0] - poly[i][0]) * (y - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]) c = !c; return c; };
-  const lo = merc(STRIP.s, STRIP.w), hi = merc(STRIP.n, STRIP.e), X0 = lo[0], Y0 = lo[1], X1 = hi[0], Y1 = hi[1];
+  const rects = STRIPS.map(t => { const a = merc(t.s, t.w), c = merc(t.n, t.e); return [a[0], a[1], c[0], c[1]]; });
   const ept = await (await fetch(`${EPT}/ept.json`)).json(), [bx0, by0, , bx1] = ept.bounds, size = bx1 - bx0, nodes = [];
   const walk = async key => {
     const h = await (await fetch(`${EPT}/ept-hierarchy/${key}.json`)).json();
     for (const [k, n] of Object.entries(h)) {
       const [d, x, y] = k.split('-').map(Number), sz = size / 2 ** d, nx = bx0 + x * sz, ny = by0 + y * sz;
-      if (d > DEPTH || nx > X1 || nx + sz < X0 || ny > Y1 || ny + sz < Y0) continue;
+      if (d > DEPTH || !rects.some(r => nx <= r[2] && nx + sz >= r[0] && ny <= r[3] && ny + sz >= r[1])) continue;
       if (n === -1) await walk(k); else if (n > 0) nodes.push(k);
     }
   };
   await walk('0-0-0-0');
-  const lp = await createLazPerf(); let seen = 0;
+  const lp = await createLazPerf(); let seen = 0; const gmin = new Map();
   for (const k of nodes) {
     const f = CACHE && `${CACHE}/lidar_${k}.laz`; let buf;
     if (f && existsSync(f)) buf = await readFile(f); else { const r = await fetch(`${EPT}/ept-data/${k}.laz`); if (!r.ok) throw new Error(`${k}: HTTP ${r.status}`); buf = Buffer.from(await r.arrayBuffer()); if (f) await writeFile(f, buf); }
@@ -173,18 +179,25 @@ if (process.argv.includes('--lidar')) {
     if (z.getPointFormat() !== 1) throw new Error(`point format ${z.getPointFormat()}`);
     const n = z.getCount(), rec = lp._malloc(z.getPointLength());
     for (let i = 0; i < n; i++) {
-      z.getPoint(rec); const dv = new DataView(lp.HEAPU8.buffer, rec, 29); if ((dv.getUint8(15) & 31) !== 1) continue;
-      const x = dv.getInt32(0, true) * sc[0] + of[0], y = dv.getInt32(4, true) * sc[1] + of[1], cand = grid.get(`${Math.floor(x / CELLG)},${Math.floor(y / CELLG)}`); if (!cand) continue;
+      z.getPoint(rec); const dv = new DataView(lp.HEAPU8.buffer, rec, 29); const cls = dv.getUint8(15) & 31; if (cls !== 1 && cls !== 2) continue;
+      const x = dv.getInt32(0, true) * sc[0] + of[0], y = dv.getInt32(4, true) * sc[1] + of[1];
+      if (cls === 2) { const gk = `${Math.floor(x / 8)},${Math.floor(y / 8)}`, h = dv.getInt32(8, true) * sc[2] + of[2], o = gmin.get(gk); if (o === undefined || h < o) gmin.set(gk, h); continue; } // (the lowest ground in each 8 m cell: under a building there is none, so its ground is the lowest round it)
+      const cand = grid.get(`${Math.floor(x / CELLG)},${Math.floor(y / CELLG)}`); if (!cand) continue;
       seen++; for (const b of cand) if (x >= b.box[0] && x <= b.box[2] && y >= b.box[1] && y <= b.box[3] && inside(b.m, x, y)) { b.z.push(dv.getInt32(8, true) * sc[2] + of[2]); break; }
     }
     z.delete(); lp._free(ptr); lp._free(rec);
   }
   let used = 0; const pct = (a, p) => { a = a.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
+  let grounded = 0;
   for (const b of todo) {
-    if (b.z.length >= 5) { const h = pct(b.z, 0.75) - MSL_NAVD88 - b.g / 100; if (h >= 2.5 && h < 250) { b.h = Math.round(h * 10); b.flag = (b.flag & ~3) | 3; used++; } }
-    delete b.m; delete b.z; delete b.box;
+    if (b.flag & 4) { // (no DEM under it: the lowest lidar ground within 8 m of the footprint's box)
+      let lo = Infinity; for (let i = Math.floor((b.box[0] - 8) / 8); i <= Math.floor((b.box[2] + 8) / 8); i++) for (let j = Math.floor((b.box[1] - 8) / 8); j <= Math.floor((b.box[3] + 8) / 8); j++) { const v = gmin.get(`${i},${j}`); if (v !== undefined && v < lo) lo = v; }
+      const gm = lo - MSL_NAVD88; if (Number.isFinite(lo) && gm > 1) { b.g = Math.round(gm * 100); b.flag &= ~4; grounded++; }
+    }
+    if ((b.flag & 3) < 2 && b.z.length >= 5) { const h = pct(b.z, 0.75) - MSL_NAVD88 - b.g / 100; if (h >= 2.5 && h < 250) { b.h = Math.round(h * 10); b.flag = (b.flag & ~3) | 3; used++; } }
+    delete b.m; delete b.z; delete b.zg; delete b.box;
   }
-  console.log(`lidar: ${nodes.length} nodes to depth ${DEPTH}, ${seen} non-ground returns in the strip; ${used} of ${todo.length} buildings without an OSM height got the lidar's roof`);
+  console.log(`lidar: ${grounded} buildings got the lidar's ground; ${nodes.length} nodes to depth ${DEPTH}, ${seen} returns in the strips; ${used} of ${todo.length} buildings without an OSM height got the lidar's roof`);
 }
 
 
@@ -198,9 +211,9 @@ for (const b of out) {
 const packed = deflateSync(buf, { level: 9 });
 await writeFile(new URL('../src/render/data/cityfront.json', import.meta.url), JSON.stringify({
   source: 'OpenStreetMap contributors (ODbL), api.openstreetmap.org: building ways in the strip; ground from the USGS 3DEP 1 m DEM, CA_SanFrancisco_B23 tile x54y419 (public domain).',
-  made: 'scripts/make-cityfront.mjs', fetched: new Date().toISOString().slice(0, 10), strip: STRIP,
-  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 3 lidar roof height (--lidar), 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 3 m deck',
+  made: 'scripts/make-cityfront.mjs', fetched: new Date().toISOString().slice(0, 10), strip: STRIP, strips: STRIPS,
+  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 3 lidar roof height (--lidar), 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 3 m deck; bit 3 (8): the Marin shore, ground from the terrain at run time',
   count: out.length, mesh: packed.toString('base64'),
 }) + '\n');
-console.log(`${out.length} buildings (${stat.h2} OSM heights, ${stat.h1} from levels, ${stat.h0} default; ${stat.deck} on a deck); skipped: ${stat.cleared} in landmarks' ground, ${stat.outside} outside the strip, ${stat.tiny} under 8 m²; ${relations} relations seen, ${relBuildings} multipolygon buildings (${relChained} outer ways not closed on their own, skipped)`);
+console.log(`${stat.marin || 0} on the Marin shore (ground at run time); ${out.length} buildings (${stat.h2} OSM heights, ${stat.h1} from levels, ${stat.h0} default; ${stat.deck} on a deck); skipped: ${stat.cleared} in landmarks' ground, ${stat.outside} outside the strip, ${stat.tiny} under 8 m²; ${relations} relations seen, ${relBuildings} multipolygon buildings (${relChained} outer ways not closed on their own, skipped)`);
 console.log(`${(buf.length / 1024).toFixed(1)} KB packed, ${(packed.length / 1024).toFixed(1)} KB deflated, ${(packed.length * 4 / 3 / 1024).toFixed(1)} KB as base64`);

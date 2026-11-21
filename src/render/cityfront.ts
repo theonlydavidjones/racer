@@ -14,10 +14,11 @@ import { litWindows } from './night';
  */
 export const CITYFRONT_STRIP = data.strip;
 /** Beyond this distance (m) from a tile's middle a tile is drawn as boxes. */
-const FAR_M = 800, FAR_MIN_M2 = 90, FARTHER_M = 1400, FARTHER_MIN_M2 = 450, FARTHER_MIN_H = 26; // (past 1.6 km only the big and the tall: a boat sees the hillside's blocks and towers, not each house)
+const TILE_M = 1500, FAR_M = 800, FAR_MIN_M2 = 90, FARTHER_M = 1400, FARTHER_MIN_M2 = 450, FARTHER_MIN_H = 26; // (past 1.6 km only the big and the tall: a boat sees the hillside's blocks and towers, not each house)
 
 /** Is a point (degrees) inside the strip the real footprints cover, where the random boxes are left out? */
-export const inCityFront = (lat: number, lon: number): boolean => lat >= CITYFRONT_STRIP.s && lat <= CITYFRONT_STRIP.n && lon >= CITYFRONT_STRIP.w && lon <= CITYFRONT_STRIP.e;
+const STRIPS: { s: number; n: number; w: number; e: number }[] = (data as { strips?: typeof CITYFRONT_STRIP[] }).strips ?? [CITYFRONT_STRIP];
+export const inCityFront = (lat: number, lon: number): boolean => STRIPS.some(t => lat >= t.s && lat <= t.n && lon >= t.w && lon <= t.e);
 
 async function inflate(b64: string): Promise<Uint8Array> {
   const bin = atob(b64), src = new Uint8Array(bin.length);
@@ -57,7 +58,7 @@ function enclosingBox(pts: THREE.Vector2[]): THREE.Vector2[] {
   return [at(best.u0, best.v0), at(best.u1, best.v0), at(best.u1, best.v1), at(best.u0, best.v1)];
 }
 
-export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group> {
+export async function buildCityFront(scene: THREE.Object3D, groundAt?: (x: number, y: number) => number): Promise<THREE.Group> {
   const raw = await inflate(data.mesh), dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength), list: Building[] = [];
   for (let o = 0; o < raw.length;) {
     const n = dv.getUint16(o, true), g = dv.getInt16(o + 2, true) / 100, h = dv.getUint16(o + 4, true) / 10, flag = raw[o + 6];
@@ -75,15 +76,16 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
   type Tile = { full: Acc; far: Acc; farther: Acc; cx: number; cz: number };
   const tiles = new Map<string, Tile>();
   const acc = (tx: number, tz: number, office: boolean) => { // (offices over 24 m are few, so all of them share one mesh drawn whole: one call, not one for each tile)
-    const k = office ? 'offices' : `${tx},${tz},0`; if (office) { tx = -1; tz = -1; } let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, farther: { pos: [], nrm: [], col: [] }, cx: office ? 0 : (tx + 0.5) * 1000, cz: office ? 0 : -(tz + 0.5) * 1000 }); return a; };
+    const k = office ? 'offices' : `${tx},${tz},0`; if (office) { tx = -1; tz = -1; } let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, farther: { pos: [], nrm: [], col: [] }, cx: office ? 0 : (tx + 0.5) * TILE_M, cz: office ? 0 : -(tz + 0.5) * TILE_M }); return a; };
   const wc = new THREE.Color(), rc = new THREE.Color();
   for (const b of list) {
     const pts: THREE.Vector2[] = [];
     for (let i = 0; i < b.xy.length; i += 2) pts.push(new THREE.Vector2(b.xy[i], b.xy[i + 1]));
     let area = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) area += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
     if (area < 0) pts.reverse(); // (counter-clockwise from above: walls face out)
-    const tile = acc(Math.floor(pts[0].x / 1000), Math.floor(pts[0].y / 1000), b.h > 24);
+    const tile = acc(Math.floor(pts[0].x / TILE_M), Math.floor(pts[0].y / TILE_M), b.h > 24);
     wc.copy(walls[Math.floor(hash(b.id) * walls.length)]).offsetHSL(0, 0, (hash(b.id + 91) - 0.5) * 0.05); rc.copy(roofs[Math.floor(hash(b.id + 7) * roofs.length)]);
+    if ((b.flag & 8) && groundAt) b.g = Math.max(0, Math.min(...pts.map(p => groundAt(p.x, p.y)))); // (the Marin shore: no DEM of ours, so the terrain's 50 m grid under the footprint's lowest corner)
     const y0 = b.g - 2.5, y1 = b.g + b.h;
     prism(tile.full, tile, pts, y0, y1, wc, rc, true);
     const m2 = Math.abs(area) / 2, box = m2 >= FAR_MIN_M2 ? enclosingBox(pts) : null; // (sheds and garages are too small to see from 800 m, and are many)
