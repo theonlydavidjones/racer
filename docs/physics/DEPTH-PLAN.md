@@ -164,6 +164,109 @@ and no NOAA or CDIP wave buoy is inside it (CO-OPS's and NDBC's station lists). 
   - **Deep water unchanged:** with depth set to 1,000 m everywhere, the sea is what it is today.
   - **The race unchanged where nothing's shallow:** fouls-pair --winds 4,6, and perf-pair.
 
+## Step 0: grounding on the charted depth, rocks and wrecks (addendum, 21 Nov 2026)
+
+Charts' ENC check (docs/charts/enc-check.md #6, on claude/leaderboard-b 4ab48de4) found that in the Central Bay a
+boat grounds only on the shore mask:
+
+- depth-grid.json covers only San Rafael and San Leandro Bays;
+- physics.ts's `solidAt` (the shore, the docks and the moored boats) is all that stops her, and its comment says the
+  charted rocks aren't in yet;
+- there are 92 charted rocks, wrecks and obstructions in the race areas at under 1.8 m or drying, 36 of them more than
+  40 m from any sim land. Examples: Anita Rock (1.5 m), a 0.9 m obstruction off the St. Francis YC, a drying rock west
+  of Alcatraz, a wreck at 0.3 m off Yerba Buena.
+
+A Folkboat draws 1.141 m (ORC). So step 0 is to ground her where the chart says she would. It comes ahead of the
+waves, and the waves' depth grid (step 1) comes from the same data.
+
+### The data
+
+- **NOAA's ENC.** The depth areas (DEPARE: each a band, shoal edge to deep edge, below MLLW) and the soundings are
+  already in src/geo/data/enc-chart.json. The hazards come from Charts' JSON of the 92: UWTROC, WRECKS, OBSTRN, each
+  with its least depth (VALSOU) and its kind.
+- **The owner's bathymetry** (USGS 1 m DEM, at 3 m) where its tiles cover: each 25 m cell's shallowest 3 m point,
+  NAVD88 to MLLW by CO-OPS 9414290's datums, as in step 1.
+- **Which wins where they differ.**
+  - A charted hazard always stands, at its charted least depth. The chart is what a sailor navigates by, and a rock
+    smaller than a cell must not be averaged away.
+  - Elsewhere, the shallower of the DEM's cell and the depth area's shoal edge. That's conservative, as a navigator
+    reads a band.
+
+### The grid
+
+- **The race areas' depth, at 25 m cells,** as the shallowest depth below MLLW in each cell, in 0.1 m steps
+  (one byte, like depth-grid.json):
+  - from the Gate to the Bay Bridge and Angel Island to the Cityfront, about 15 × 10 km: 240,000 cells, 240 KB raw;
+  - mostly deep and the same, so about 30–40 KB gzipped (an estimate, to measure).
+  - Deeper than 4 m stored as "deep": no tide or heel could ground her there, so the byte only needs the shallow
+    water's detail.
+- **The hazards stay points too:** each with its least depth and a radius (from its ENC geometry where it's an area,
+  else 10 m: an estimate, a rock's charted symbol). They're filed in a spatial hash of 100 m squares, about 3 KB.
+
+### What she meets, and when she grounds
+
+- **The water's depth** where her keel is: the cell's depth below MLLW plus the tide's height there now
+  (tide.ts tideHeightAt). Heeled, her keel draws less: about 1.141·cos(heel) (an estimate, the keel's tip swinging
+  up; the hull's own draft at the turn of the bilge is checked against the lines drawing).
+- **Grounded** when her keel's depth is more than the water's at its point under the hull. That's one point at her
+  keel's deepest part, or two (its leading and trailing ends) if one proves too coarse at a rock's edge.
+- **What it does:**
+  - On a depth area's mud or sand: she stops, aground, as on the shore today. She gets off as a sailor does: by
+    heeling her (the crew to leeward), going astern under motor, or waiting for the tide to float her.
+  - On a charted rock, wreck or obstruction: a strike, as on a wharf (boat/damage.ts), by her speed.
+  - The ENC's bottom quality (NATSUR) says which, where it's charted.
+  - How hard the damage is, is the owner's to set: a question below.
+
+### The cost
+
+- **The test is cheap:** grounding is checked only in cells that could ground her, those shallower than her draft
+  plus the highest tide (about 1.1 + 2.2 = 3.3 m; to take from 9414290's datums). Everywhere else is one byte read:
+  "deep".
+- **It's folded into the step's existing land test** (physics.ts solidAt, which every boat already makes at her hull's
+  points), not a line in World.step (CLAUDE.md). The cell index is remembered per boat, so a boat in the same cell
+  pays a comparison.
+- **The target:** perf-pair, plain and --ai, within the budget, expected well under 1%. Most of the course is deep, so
+  most steps read "deep" and stop.
+
+### The AI
+
+A boat that grounds where the AI doesn't know there's a rock is a fleet aground. The router and the AI's
+keep-clear (src/ai, src/sim/router.ts) read the same grid. A cell she'd ground in at the tide's height for the
+hour is land for planning. That's Skipper Model's side of src/ai: I'll tell it before editing.
+
+### The tests
+
+- **The data:**
+  - each of Charts' 92 hazards is in the grid at its charted least depth;
+  - the ENC's soundings in the race area are reproduced, to the cell, by the grid;
+  - the DEM and the chart are compared at their overlap (a report, not a bound).
+- **The physics of it, at named places:**
+  - Anita Rock (1.5 m): she sails over it at MLLW (1.5 > 1.141) and grounds at a minus tide below −0.36 m.
+    Heeled 20°, she clears at about −0.43 m.
+  - The 0.9 m obstruction off the St. Francis: she grounds below a +0.24 m tide.
+  - The drying rock west of Alcatraz grounds her at any tide below its drying height plus her draft.
+  - Each case is checked by sailing a line over it at the tide's height on a real day.
+- **Getting off:** heeled by her crew, astern under motor, and on a rising tide, each frees her where the arithmetic
+  says it should.
+- **Unchanged where it's deep:**
+  - fouls-pair --winds 4,6 and perf-pair;
+  - in the fleet races, no AI boat aground: the fleet gate, as the traffic work's was.
+
+### Size and order
+
+About 2–3 days, as step 0 of the order below:
+
+1. The grid and the hazards from the ENC, Charts' JSON and the DEM: 1 day.
+2. Grounding in the step, getting off, and the damage on rocks: 1 day.
+3. The router and the AI reading it, with Skipper Model: ½–1 day.
+
+Then the physics review.
+
+**Questions for the owner:**
+
+- How hard is a rock strike? A wreck, as a wharf at speed is now, or a scrape that costs the race?
+- Should the chart's hazards also be drawn on the chart (Charts' side)?
+
 ## The order of work (for after Tuesday)
 
 | # | Step | Size (estimate) | Depends on |
