@@ -3,7 +3,9 @@ import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { V, wrap } from '../src/core/math';
+import { V, brg, wrap } from '../src/core/math';
+import { X_FLAG_MAX } from '../src/sim/signals';
+import train from '../src/courses/data/training-windward-return.json';
 import type { Boat } from '../src/boat/boat';
 
 /** Your helm put over toward a heading (the World's turn to a heading: physics.ts turnTarget), once. */
@@ -85,5 +87,80 @@ describe('Part 2 calls, sailed (you hold your course, the AI boat sails as she w
       Object.assign(o, { ...at(30, 0), h: S(from), tack: 'S', v: 2.5 });
     });
     expect(calls[0], 'the first call').toMatchObject({ rule: '23', part: '23.1', fouler: w.user });
+  });
+});
+
+
+describe('the start, sailed: the X flag (RRS 29.1) and returning boats (21.1)', () => {
+  const TRAIN = train as unknown as CourseFile;
+  const overAtGun = (fleet: number) => {
+    const w = new World(TRAIN, settings({ fleet, seq: 2 }), 1), u = w.user, to = brg(w.N.x, w.N.y);
+    w.t = -0.5; Object.assign(u, { x: w.center.x + w.N.x * 6, y: w.center.y + w.N.y * 6, h: to, v: 0, prevD: null, luff: true });
+    let horns = 0, said = '';
+    for (let i = 0; i < 60; i++) { w.step(DT); for (const e of w.drainEvents()) { if (e.type === 'horn') horns++; if (e.type === 'toast') said += e.msg; } }
+    return { w, u, to, horns, said };
+  };
+
+  it('a boat over at the gun: X goes up with one sound (29.1), and comes down once she has returned', () => {
+    const { w, u, to, horns, said } = overAtGun(0);
+    expect(u.ocs).toBe(true);
+    expect(w.flags).toContain('X');
+    expect(horns).toBe(2); // (the start's, and the recall's one sound)
+    expect(said).toMatch(/Individual recall: X flag up, one sound/);
+    Object.assign(u, { x: w.center.x - w.N.x * 12, y: w.center.y - w.N.y * 12, h: to }); w.step(DT); w.step(DT);
+    expect(u.ocs).toBe(false);
+    expect(w.flags).not.toContain('X');
+  });
+
+  it('a boat that never returns: X comes down four minutes after the start (29.1)', () => {
+    const { w } = overAtGun(0);
+    // (she stays on the course side, never coming back: held 20 m above the line, as the flag's clock is what's tested)
+    const above = () => { const u = w.user; u.x = w.center.x + w.N.x * 20; u.y = w.center.y + w.N.y * 20; u.prevD = null; };
+    while (w.t < X_FLAG_MAX - 1) { above(); w.step(DT); w.drainEvents(); }
+    expect(w.user.ocs).toBe(true);
+    expect(w.flags).toContain('X');
+    while (w.t < X_FLAG_MAX + 1) { above(); w.step(DT); w.drainEvents(); }
+    expect(w.flags).not.toContain('X');
+  });
+
+  it('nobody over: no X', () => {
+    const w = new World(TRAIN, settings({ fleet: 0, seq: 2 }), 1), u = w.user, to = brg(w.N.x, w.N.y);
+    w.t = -0.5; Object.assign(u, { x: w.center.x - w.N.x * 20, y: w.center.y - w.N.y * 20, h: to, v: 0, prevD: null, luff: true });
+    for (let i = 0; i < 60; i++) { w.step(DT); w.drainEvents(); }
+    expect(w.flags).not.toContain('X');
+  });
+
+  it('rule 21.1: you, over early and sailing back to start, meet a boat that has started; you keep clear, and are called', () => {
+    const w = new World(TRAIN, settings({ fleet: 1, seq: 2 }), 1), [u, o] = w.boats, to = brg(w.N.x, w.N.y);
+    w.t = 30;
+    const p = { x: w.center.x + w.N.x * 15, y: w.center.y + w.N.y * 15 };
+    Object.assign(u, { ...p, h: (to + 180) % 360, desired: (to + 180) % 360, v: 2.5, started: false, ocs: true, luff: false, prevD: null });
+    const sh = (w.wind.from - 45 + 360) % 360;
+    Object.assign(o, { x: p.x - w.N.x * 8, y: p.y - w.N.y * 8, h: sh, desired: sh, tack: 'S', v: 1.2, started: true, ocs: false, leg: 0 });
+    for (const b of [u, o]) { const v = V(b.h); b.vx = v.x * b.v; b.vy = v.y * b.v; }
+    const calls: { rule: string; fouler: Boat }[] = [];
+    w.onIncident = (_a, _b, inc) => { calls.push({ rule: inc.rule, fouler: inc.fouler as Boat }); };
+    while (w.t < 50 && !calls.length) { w.step(DT); w.paused = false; w.drainEvents(); }
+    expect(u.returning).toBe(true);
+    expect(calls[0], 'the first call').toMatchObject({ rule: '21.1', fouler: u });
+  });
+});
+
+describe('one penalty for the incident, sailed (RRS 44.1(a))', () => {
+  it('you foul a boat at the mark and touch the mark in the same incident: the foul\'s turns, no extra turn for rule 31', () => {
+    const w = new World(SS2, settings({ fleet: 1 }), 7), [u, o] = w.boats;
+    w.t = 30; for (const b of w.boats) Object.assign(b, { started: true, ocs: false, leg: 0, penalty: 0, lastTackT: -999 });
+    const m = w.C.marks[0].p, h = (w.wind.from + 180) % 360, back = V(w.wind.from), side = V(w.wind.from + 90);
+    Object.assign(o, { x: m.x + back.x * 4 + side.x * 1, y: m.y + back.y * 4 + side.y * 1, h, desired: h, v: 0.4 });
+    Object.assign(u, { x: m.x + back.x * 16 + side.x * 0.5, y: m.y + back.y * 16 + side.y * 0.5, h, desired: h, v: 2.2 });
+    for (const b of [u, o]) { const v = V(b.h); b.vx = v.x * b.v; b.vy = v.y * b.v; }
+    const calls: string[] = []; let said = '', touched = false;
+    w.onIncident = (_a, _b, inc) => { calls.push(`${inc.rule} ${(inc.fouler as Boat).name}`); };
+    for (let i = 0; i < 60 * 15; i++) { w.step(DT); w.paused = false; touched ||= !!u.markTouch; for (const e of w.drainEvents()) if (e.type === 'toast') said += e.msg + ' | '; }
+    // (here the foul is mark-room, 18.2(a): she was clear ahead at the zone; any Part 2 foul does)
+    expect(calls[0]).toMatch(/ You$/);
+    expect(touched, 'you touched the mark').toBe(true);
+    expect(said).toContain('only owe the penalty for the foul (Rule 44.1(a))');
+    expect(u.penaltyTotal, 'no One-Turn Penalty for the touch').toBe(0); // (your foul's turns come with the incident review)
   });
 });

@@ -28,27 +28,24 @@ S is a test of about 30 lines. M needs a scripted boat, a mark or shore set-up, 
 | 19.2(b), 19.2(c) | none | `rules-more.test.ts:109, 130` | M: the shore or the committee boat |
 | 20, the hailed boat doesn't respond | `sim.test.ts:237`, `rule20-obstructions.test.ts:95` | `rules.test.ts:613` | — |
 | 20.2(d), the hailer doesn't tack; the "You tack" foul | none (`sim.test.ts:288, 314` sail the reply only) | `rules.test.ts:633, 642` | M: an obstruction and a hail |
-| 21.1 | `sim.test.ts:70–99` assert her `returning` state, not a call | `rules.test.ts:393` | S–M: a returning boat meeting one that has started |
+| 21.1 | **new**: you, over early and sailing back, meet a boat that has started; also `sim.test.ts:70–99` (her `returning` state) | `rules.test.ts:393` | — |
 | 21.2 | `ai-berth-turns.test.ts` (a count over 124 races), `rules-finish.test.ts:285` | `rules.test.ts:436–500` | — |
 | 21.3 | none | `rules-more.test.ts:8` | M: backing a sail |
-| 22, 24 | not in the engine | — | not judged |
+| 22 (24 doesn't exist in 2025–28) | not in the engine | — | not judged; see proposals.md |
 | 23.1 | **new**: a finished boat in the way of one racing | `rules-more.test.ts:180` | — |
 | 23.2 | none | `rules.test.ts:508`, `rules-more.test.ts:142` | M: a boat doing turns or on another leg, and you leaving your proper course |
 | 28 | not a call: wrong-side and missed-mark toasts only (`world.ts` ~1642) | — | Engine: no penalty for sailing the course wrong. Owner/Coordinator call. |
-| 29.1 (OCS) | `sim.test.ts:52, 119` | — | S: the X flag itself (`world.ts:1956`) |
+| 29.1 (OCS, the X flag) | `sim.test.ts:52, 119`; **new**: X up with one sound, down when she returns, down at four minutes, none if nobody's over | — | — |
 | 30.1–30.4 | `signals.test.ts:57–69` | — | — |
 | 31 | `sim.test.ts:265, 329`, `protest-touch.test.ts`, `breaches.test.ts` | — | — |
 | 42 (paddling) | `paddle.test.ts:84–135` | — | — |
 | 42.3(d) (sculling) | physics only (`irons.test.ts`) | — | Engine: sculling is allowed when 42.3(d) permits it and never called otherwise (checked 20 Nov) |
 | 43.1 | `sim.test.ts:393–463` (the compelling foul seeded by hand) | `hearing.test.ts:22` | S–M: a compulsion sailed end to end |
-| 44.1, 44.1(a), 44.2 | `sim.test.ts:416, 506, 522`; `breaches.test.ts` | `boat.test.ts:299` | 44.1(a) with a real foul rather than a seeded one: S |
+| 44.1, 44.1(a), 44.2 | `sim.test.ts:416, 506, 522`; `breaches.test.ts`; **new**: 44.1(a) after a real foul at the mark | `boat.test.ts:299` | — |
 
 ## What's left
 
-**S gaps:**
-- The X flag's signal.
-- 44.1(a) after a real foul.
-- 21.1 called on a returning boat. It may be M, depending on the line's geometry.
+**S gaps:** none left (the X flag, 44.1(a) after a real foul and 21.1 were added on 21 Nov).
 
 **M gaps:**
 - 13, 15 and 16.2 need a scripted boat.
@@ -60,7 +57,7 @@ S is a test of about 30 lines. M needs a scripted boat, a mark or shore set-up, 
 **Not judged by the engine:**
 - Rule 14 as a call on the right-of-way boat.
 - Rule 28 as a penalty.
-- Rules 22 and 24.
+- Rule 22 (there is no rule 24 in 2025–28).
 
 These are design questions for the Coordinator, not test gaps.
 
