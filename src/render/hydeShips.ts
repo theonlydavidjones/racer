@@ -10,7 +10,7 @@ import data from './data/hyde-ships.json';
  * © OpenStreetMap contributors): the outlines measure within 3% of NPS's lengths and beams (nps.gov/safr: Balclutha
  * 256.5 × 38.65 ft, Hercules 151 × 26, Eureka 299.5 × 78, Thayer 219 ft overall and 156 on deck, Alma 59 registered), and
  * give each ship its berth. OSM notes that all but Alma are "moved to Mare Island/Vallejo while Hyde Street Pier is being
- * rebuilt": the berths are where they lay before. The bow is the narrower end of the outline, which is a guess for a berth.
+ * rebuilt": the berths are where they lay before, and all six are shown there by the owner's choice (21 Nov 2026). The bow is the narrower end of the outline, which is a guess for a berth.
  * Freeboard, masts, yards, stacks and houses are massing from the ships' general arrangement and ESTIMATES (no measured
  * dimensions found yet: the HAER drawings at LoC, CA-54 and CA-60 to 63, give them). Merged into one draw a material.
  */

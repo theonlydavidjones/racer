@@ -25,5 +25,5 @@ for (const m of xml.matchAll(/<way id="(\d+)"[^>]*>([\s\S]*?)<\/way>/g)) {
   ships.push({ osm: +m[1], name, type: t['ship:type'], built: +t.start_date || null, away: !t.name && !!t['removed:name'], ring: ring.map(([a, b]) => [r7(a), r7(b)]) });
 }
 if (ships.length !== 6) throw new Error(`expected six ships, found ${ships.length}`);
-await writeFile(new URL('../src/render/data/hyde-ships.json', import.meta.url), JSON.stringify({ source: 'OpenStreetMap contributors (ODbL), via api.openstreetmap.org: historic=ship ways at Hyde Street Pier; names from the ways\' name or removed:name', made: 'scripts/make-hyde-ships.mjs', fetched: new Date().toISOString().slice(0, 10), ships }) + '\n');
+await writeFile(new URL('../src/render/data/hyde-ships.json', import.meta.url), JSON.stringify({ source: 'OpenStreetMap contributors (ODbL), via api.openstreetmap.org: historic=ship ways at Hyde Street Pier; names from the ways\' name or removed:name', made: 'scripts/make-hyde-ships.mjs', note: "OSM marks every ship here except Alma as away (moved to Mare Island/Vallejo while Hyde Street Pier is being rebuilt); they are shown at their historic berths by the owner's choice (21 Nov 2026).", fetched: new Date().toISOString().slice(0, 10), ships }) + '\n');
 console.log(ships.map(s => `${s.name} (${s.type}, ${s.ring.length} pts${s.away ? ', away per OSM' : ''})`).join('; '));
