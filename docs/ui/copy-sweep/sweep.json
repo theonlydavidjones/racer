@@ -1,0 +1,164 @@
+{
+ "home-start-page": {
+  "blocks": [],
+  "tips": []
+ },
+ "race-choose": {
+  "blocks": [
+   {
+    "el": "#bPast > span",
+    "n": 107,
+    "text": "A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start"
+   }
+  ],
+  "tips": []
+ },
+ "race-setup-practice": {
+  "blocks": [],
+  "tips": []
+ },
+ "race-setup-practice-lower": {
+  "blocks": [],
+  "tips": []
+ },
+ "cruise-setup": {
+  "blocks": [],
+  "tips": []
+ },
+ "drills": {
+  "blocks": [],
+  "tips": [
+   {
+    "el": "#drillFlagPick > button",
+    "n": 114,
+    "text": "P: the usual start. If you're over at the gun, come back across the line and start (individual recal"
+   },
+   {
+    "el": "#drillFlagPick > button",
+    "n": 148,
+    "text": "I (Rule 30.1): if you're on the course side of the line or its extensions in the last minute, you mu"
+   },
+   {
+    "el": "#drillFlagPick > button",
+    "n": 132,
+    "text": "Z (Rule 30.2): if you're in the triangle between the line ends and the first mark in the last minute"
+   },
+   {
+    "el": "#drillFlagPick > button",
+    "n": 122,
+    "text": "U (Rule 30.3): if you're in the triangle between the line ends and the first mark in the last minute"
+   },
+   {
+    "el": "#drillFlagPick > button",
+    "n": 160,
+    "text": "Black flag (Rule 30.4): if you're in the triangle between the line ends and the first mark in the la"
+   }
+  ]
+ },
+ "past-races": {
+  "blocks": [],
+  "tips": [
+   {
+    "el": "span",
+    "n": 128,
+    "text": "The course from the owner, who sailed it: \"it was a last minute course change. we sailed course #2\" "
+   },
+   {
+    "el": "span.warn",
+    "n": 182,
+    "text": "The results give course 13 as 8.9 nm; the 2026–27 course sheet, drawn here, has it as 5 nm (that sea"
+   },
+   {
+    "el": "span.warn",
+    "n": 356,
+    "text": "Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Poi"
+   },
+   {
+    "el": "span.warn",
+    "n": 262,
+    "text": "The results give course 3 as 6.1 nm; the 2026–27 course sheet, drawn here, has it as 3.7 nm (that se"
+   }
+  ]
+ },
+ "season": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-boats": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-members": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-season": {
+  "blocks": [
+   {
+    "el": ".sfoot > span",
+    "n": 119,
+    "text": "Low point · level ratings (the real fleet's equal PHRF time on time) · one throwout only once all five races are sailed"
+   }
+  ],
+  "tips": [
+   {
+    "el": ".sfoot > span",
+    "n": 115,
+    "text": "The Kelp Chowder's own sailing instructions couldn't be read; these are the best-supported answers ("
+   }
+  ]
+ },
+ "boat-editor": {
+  "blocks": [],
+  "tips": []
+ },
+ "settings-training-aids": {
+  "blocks": [],
+  "tips": []
+ },
+ "settings-keys": {
+  "blocks": [
+   {
+    "el": ".krow > span.klab",
+    "n": 91,
+    "text": "Autopilot on (Auto, holding her course) / standby / lift off the tiller pin (cruising only)"
+   },
+   {
+    "el": ".krow > span.klab",
+    "n": 164,
+    "text": "At the dock: push off from her berth (the crew walks her out; held head to wind, let her go); coming in, lines ready (again: stand down); ly"
+   },
+   {
+    "el": ".krow > span.klab",
+    "n": 93,
+    "text": "Wind indicator: the true and apparent wind in the air beside her, at three heights (on / off)"
+   },
+   {
+    "el": ".krow > span.klab",
+    "n": 112,
+    "text": "Weather helm at the foot of the tiller guide: the tiller's average, teal when balanced, amber past 8° (on / off)"
+   }
+  ],
+  "tips": []
+ },
+ "tools-tray": {
+  "blocks": [],
+  "tips": []
+ },
+ "pause-screen": {
+  "blocks": [],
+  "tips": []
+ },
+ "lessons": {
+  "blocks": [],
+  "tips": []
+ },
+ "results": {
+  "blocks": [],
+  "tips": []
+ }
+}
