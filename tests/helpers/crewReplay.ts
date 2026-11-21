@@ -58,3 +58,24 @@ export function replayHelmKnee(rec: CrewRecording, from: number): number {
   }
   return top;
 }
+
+/** Drawn as replayDeepest draws it, from `from` (s) on: the frames in which two crew figures touch (any bone of one within
+ * 6 cm of any of the other's, every quarter bone: crewfig's "Two crew keep to themselves"), and the frames in which a
+ * crew figure is drawn walking while the physics has them where they're going. */
+export function replayCrewApart(rec: CrewRecording, from: number): { touching: number; walkingStill: number; frames: number } {
+  const c = newCrew(rec.spec, rec.frames[0]!.w > 0 ? 'S' : 'P'), cr = buildCrew(rec.spec.helm, rec.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1);
+  let prev = rec.frames[0]!.t, touching = 0, walkingStill = 0, frames = 0;
+  const w = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0));
+  const pts = (f: Figure) => { f.root.updateMatrixWorld(true); const o: THREE.Vector3[] = []; const seg = (a: THREE.Vector3, b: THREE.Vector3) => { for (let t = 0; t <= 1.0001; t += 0.25) o.push(a.clone().lerp(b, t)); };
+    f.leg.forEach(l => { seg(w(l.root), w(l.mid)); seg(w(l.mid), w(l.mid, -BONE.shin)); }); f.arm.forEach(a => { seg(w(a.root), w(a.mid)); seg(w(a.mid), w(a.mid, -BONE.fore)); }); seg(w(f.root), w(f.head)); return o; };
+  for (const r of rec.frames) {
+    c.clock = r.clock; (c as { roll?: unknown }).roll = r.roll;
+    r.people.forEach((p, i) => Object.assign(c.people[i]!, { goal: undefined, job: null, ready: false, outUntil: 0, lean: 0 }, p));
+    syncCrew(cr, r.w, c, Math.max(1e-3, r.t - prev), false, undefined, r.heel, !!r.tacking); prev = r.t;
+    if (r.t < from) continue;
+    frames++;
+    for (let i = 1; i < cr.crew.length; i++) for (let j = 0; j < i; j++) { const A = pts(cr.crew[i] as Figure), B = pts(cr.crew[j] as Figure); if (A.some(a => B.some(b => a.distanceTo(b) < 0.06))) touching++; }
+    cr.crew.forEach((f, i) => { const a = r.people[i + 1] as { x: number; z: number; goal?: { x: number; z: number } }; if ((f as Figure).walking && a.goal && Math.hypot(a.goal.x - a.x, a.goal.z - a.z) < 0.05) walkingStill++; });
+  }
+  return { touching, walkingStill, frames };
+}

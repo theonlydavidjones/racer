@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mirrored, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
+import { mirrored, replayCrewApart, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
 import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 import SIDE_DECK from './fixtures/crew-sidedeck-8kt.json';
 import EDGE_1 from './fixtures/crew-cabinedge-20kt-1.json';
 import EDGE_2 from './fixtures/crew-cabinedge-20kt-2.json';
 import EDGE_3 from './fixtures/crew-cabinedge-20kt-3.json';
 import FOREDECK from './fixtures/crew-foredeck-8kt.json';
+import TWO_MID from './fixtures/crew-two-mid-12kt.json';
 
 // The sprint's soak (19 Nov 2026, Crew Habits' harness, seed 3, west, real sea), replayed: stretches of its races recorded
 // frame by frame from the harness (each person's place, pose, lean, goal and job, her heel, the windward side, tacking,
@@ -46,4 +47,19 @@ describe('The soak, replayed: the crew clear of the boat (render/crew.ts)', () =
       expect(replayDeepest(rec, 173)).toBe('');
     }, 120_000);
   }
+});
+
+// The crew audit (21 Nov 2026, docs/crew/crew-audit.md item 1): the race at 12 kt, Green, 234.9 to 241.9 s, light between
+// puffs. The physics has both crew in the middle of the cockpit (x 0.06), where two are drawn on the bench's edge (x 0.3,
+// syncCrew onBench). travelling() measured the physics' goal against that drawn place, 0.36 m off it for good, so both
+// were drawn walking on the spot, stood facing forward 0.22 m apart, the one's knees in the other's back, for 466 s.
+// Sat where they're drawn: no walking on the spot, and the two clear of each other once sat (from 239 s: in the second
+// before, they come down off their feet onto the bench beside each other and brush, as crewfig's gybe allows).
+describe('The crew audit, replayed: two crew in the middle sit, apart (render/crew.ts)', () => {
+  for (const [tack, rec] of [['port', TWO_MID], ['starboard', mirrored(TWO_MID as unknown as CrewRecording)]] as const)
+    it(`light air, both in the middle, 12 kt, ${tack} tack`, () => {
+      const r = replayCrewApart(rec as unknown as CrewRecording, 239);
+      expect(r.walkingStill, `walking on the spot in ${r.walkingStill} of ${r.frames} frames`).toBe(0);
+      expect(r.touching, `touching in ${r.touching} of ${r.frames} frames`).toBe(0);
+    }, 120_000);
 });

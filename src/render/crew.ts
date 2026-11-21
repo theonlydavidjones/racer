@@ -37,6 +37,8 @@ export interface Figure extends Body {
   pianoHeld?: { side: number; i: number; holds: [boolean, boolean]; up: 0 | 1 };
   /** the foot hooked under the thwart (or on its way out from under it): ease reads what's under it at its height */
   hookFoot?: number;
+  /** sat on a bench with the other crew close aft of them on it: facing straight across (syncCrew) */
+  seatAcross?: boolean;
   /** walking this frame: the pose's feet step (syncCrew) */
   walking?: boolean;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
@@ -553,11 +555,14 @@ function onCabinSide(s: number, z: number, lean: number, k: number): PoseT {
   const hands: [THREE.Vector3, THREE.Vector3] = [kneeAt.clone().addScaledVector(r, -0.1), kneeAt.clone().addScaledVector(r, 0.1)];
   return { hip, yaw, pitch: -0.1 - 0.5 * Math.min(1, lean), roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone() };
 }
-function onSeat(s: number, x: number, z: number, k: number): PoseT {
+function onSeat(s: number, x: number, z: number, k: number, across = false): PoseT {
   const c = chz(z), hx = Math.min(c - 0.1, Math.max(benchEdge(z) + 0.12, Math.abs(x) + 0.08));
   // (facing inboard and a little forward; at the bench's forward end, inboard and a little aft, the knees clear of the
   // bulkhead, and kept clear as they turn to go forward)
-  const yaw = s * (Math.PI / 2 - 0.45 + 0.65 * (1 - smooth01((z - COCK0 - 0.3) / 0.35))), r = right(yaw), f = fwd(yaw);
+  // (with the other crew sat close aft of them on the same bench, straight across, as two sit side by side: turned aft
+  // at the bench's forward end, their knees went into the other's, who's turned a little forward (the crew audit, 21 Nov
+  // 2026, item 1))
+  const yaw = across ? s * Math.PI / 2 : s * (Math.PI / 2 - 0.45 + 0.65 * (1 - smooth01((z - COCK0 - 0.3) / 0.35))), r = right(yaw), f = fwd(yaw);
   const hip = V(s * hx, SEAT_Y + 0.09 * k, z);
   const foot = (j: number) => onGround(V(s * (hx - 0.4 * k), 0, z - 0.12).addScaledVector(r, (j ? 1 : -1) * 0.11 * k));
   const kneeAt = hip.clone().addScaledVector(f, 0.4 * k).add(V(0, 0.1, 0));
@@ -897,7 +902,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   }
   let p: PoseT;
   if (onDeckHere) p = onDeck(s, zc, lean, k);
-  else if (ax >= 0.3) p = onSeat(s, x, zc, k);
+  else if (ax >= 0.3) p = onSeat(s, x, zc, k, !!fig.seatAcross);
   else p = onSole(x, zc, k);
   if (job === 'winch') {
     // cranking the jib sheet in on the winch at the coaming's forward end (on the leeward side), one hand on the handle
@@ -1734,7 +1739,11 @@ function aftSide(f: Figure, x: number, z: number): number {
  */
 function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: number): boolean {
   const g = a?.goal; if (!a || !g) return false;
-  const gx = aftSide(f, g.x, g.z);
+  // (sat on the bench's edge for the middle (syncCrew onBench: two in the middle at once), a goal in the middle is the
+  // seat they're on: measured against the physics' middle, 0.3 m off the drawn place for good, they were drawn walking on
+  // the spot, stood facing forward a few centimetres apart, as long as the light air kept them there (the crew audit,
+  // 21 Nov 2026, item 1: 466 s in a 12 kt race))
+  const gx = f.benchSide != null && Math.abs(g.x) < 0.3 ? x : aftSide(f, g.x, g.z);
   const across = Math.sign(gx) !== Math.sign(x) && Math.abs(gx - x) > 0.25, along = Math.abs(g.z - a.z) > 0.4;
   if (f.going) return Math.abs(gx - x) > 0.08 || Math.abs(g.z - a.z) > 0.08;
   return across || along;
@@ -1824,6 +1833,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (on the side they're on, kept while they sit there: the weight a few centimetres either side of the middle isn't a crossing)
     if (onBench[i]) x = (f.benchSide ??= Math.sign(f.cur?.hip.x ?? x) || windward) * 0.3; else f.benchSide = undefined;
     const lean = a?.lean ?? 0, pose = a?.pose ?? 'sit';
+    // (the other crew sat close aft of them on the same side: they sit straight across, not turned aft at the bench's
+    // forward end into the other's knees (onSeat). The one aft stays as they are: the main hand there, turned across, had
+    // the arm on the mainsheet back through the thwart)
+    { const sideOf = (j: number) => onBench[j] ? (cr.crew[j]!.benchSide ?? 0) : Math.sign(ppl?.[j + 1]?.x ?? 0), me = onBench[i] ? x : Math.sign(x);
+      f.seatAcross = cr.crew.some((_, j) => j !== i && (ppl?.[j + 1]?.pose === 'sit' || ppl?.[j + 1]?.pose === 'lee') && sideOf(j) !== 0 && sideOf(j) === Math.sign(me) && zs[j] > zs[i] && zs[j] - zs[i] < 0.75); }
     // (two in the middle at once too: each where the physics has their weight, at their own place fore and aft, already a
     // shoulder's width apart. Brought together abreast at one place, either side of the centreline by their order aboard,
     // the pair came together, one crossing the other's line, and parted again each time the light air's puffs took the
