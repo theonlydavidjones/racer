@@ -305,7 +305,10 @@ export interface Visibility {
   says: string;
 }
 
-/** A forecast grid cell's half-width (2.5 km cells): beyond this from every cell centre, the grid says nothing. */
+/** How far a point can be from its nearest cell centre and still be in the forecast grid (m); beyond this from every
+ * centre, the grid says nothing. Not the half-width: the farthest a point inside a square cell is from its centre is a
+ * corner, half the diagonal. The NWS's 2.5 km cells are 2,464–2,479 m apart here (the shipped grid, measured in the
+ * sim's own projection; w050), half the diagonal 1,747 m, rounded up so the grid's own outer corners are in it. */
 const CELL_REACH = 1800;
 
 /**
