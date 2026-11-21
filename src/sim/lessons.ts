@@ -106,13 +106,17 @@ const FIRST: Record<LessonId, string> = {
  * wind from astern, 160° to 180°. */
 const POINTS: { key: 'close' | 'closeReach' | 'beam' | 'broad' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
   // (the bands meet, so no angle between two points drains the hold unseen)
-  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 8]; }, cue: 'Close-hauled: trim till the jib\'s luff telltales stream, windward and leeward' },
-  { key: 'closeReach', band: b => [beatFor(b) + 8, 75], cue: 'Bear away a little to a close reach, and ease to match' },
+  // (the beat angle can run past 67° in light air in a chop, boat/seaway.ts beatInChop: the close-hauled band is held
+  // under the beam reach's 75°, so the close reach's band can't turn inside out; the v213 review)
+  { key: 'close', band: b => { const a = beatFor(b); return [Math.min(a - 3, 72), Math.min(a + 8, 75)]; }, cue: 'Close-hauled: trim till the jib\'s luff telltales stream, windward and leeward' },
+  { key: 'closeReach', band: b => [Math.min(beatFor(b) + 8, 75), 75], cue: 'Bear away a little to a close reach, and ease to match' },
   { key: 'beam', band: () => [75, 105], cue: 'Bear away to a beam reach: the wind on the side' },
   { key: 'broad', band: () => [105, 160], cue: 'Bear away to a broad reach: the wind on the quarter' },
   { key: 'run', band: () => [160, 180], cue: 'Bear away to a run: sheets out, wind from astern' }
 ];
 /** The point of sail lesson 4 is asking for now (render/windRose.ts shows it teal on the water), or null. */
+/** The points-of-sail lesson's band for step k, as it judges her (tests/lessons.test.ts). */
+export const pointBand = (k: number, b: Boat): [number, number] => POINTS[k].band(b);
 export const pointTarget = (L: { id: LessonId; step: number; passed: boolean } | null): 'close' | 'closeReach' | 'beam' | 'broad' | 'run' | null =>
   L && L.id === 'points' && !L.passed ? POINTS[L.step]?.key ?? null : null;
 
