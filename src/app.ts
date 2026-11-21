@@ -1141,6 +1141,12 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); sendLayers(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
+  // (one list for both charts' pickers, the planner's and the full chart's: w037; the streaks' speed-ups as mapLayers draws them)
+  const FIELD_PICKS: [string, string, string][] = [
+    ['wind', 'Wind', 'Wind speed in color; streaks blow its way at 6× speed'],
+    ['current', 'Current', 'Current speed in color; streaks flow its way at 20× speed'],
+    ['sea', 'Waves', 'Wave heights, and the way the swell runs'], ['fog', 'Fog', 'Where the forecast has fog'], ['off', 'Off', 'No color on the water']];
+  for (const id of ['planField', 'chartField']) $(id).innerHTML = FIELD_PICKS.map(([f, name, tip]) => `<button type="button" data-field="${f}" role="radio" title="${tip}">${name}</button>`).join('');
   const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
   const syncField = () => { const f = fieldLayer(S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
