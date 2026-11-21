@@ -577,18 +577,27 @@ export class SceneView {
   /**
    * The start page (app/firstRun.ts): her alone behind it, sailing; the rest of the fleet, the course's marks and line,
    * and the laylines hidden. Only hidden and shown again: nothing built, nothing freed, so the race after it starts as
-   * one with nothing behind the page would. A new World's scene (setWorld) starts with it off.
+   * one with nothing behind the page would. Her page and the boat editor (the showroom) are quiet too: a fleet sailing
+   * past behind her page is nothing to look at, and its shadows cost the frame (the frame gate, v215: a rival 40 m off
+   * cast 33 draw calls of shadow). It holds through a new World (setWorld, a boat rebuilt, the course rebuilt) until
+   * it's turned off.
    */
   private quietOn = false;
+  private quietWant = false;
   quiet(on: boolean): void {
-    if (on === this.quietOn) return; this.quietOn = on;
+    this.quietWant = on;
+    if (on === this.quietOn) return;
+    this.applyQuiet(on);
+  }
+  private applyQuiet(on: boolean): void {
+    this.quietOn = on;
     this.boatMeshes.forEach((m, i) => { if (i > 0) m.grp.visible = !on; });
     for (const o of this.courseObjs) o.visible = !on;
     if (on) for (const l of this.laylines) l.visible = false;
   }
 
   setWorld(w: SimView): void {
-    this.quietOn = false; // (her new fleet and course are built visible)
+    this.quietOn = false; // (her new fleet and course are built visible: quiet again below, if it's wanted)
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
@@ -610,6 +619,7 @@ export class SceneView {
     this.buildCourse(w);
     disposeUnused(oldBoats, this.scene);
     this.warmShaders();
+    if (this.quietWant) this.applyQuiet(true);
   }
 
   /**
@@ -657,12 +667,13 @@ export class SceneView {
     m.grp.position.copy(old.grp.position); m.grp.quaternion.copy(old.grp.quaternion); m.grp.rotation.order = old.grp.rotation.order;
     boatShadows(m.grp);
     this.scene.remove(old.grp); this.scene.add(m.grp); this.boatMeshes[i] = m;
+    if (i > 0 && this.quietOn) m.grp.visible = false;
     this.fittings.set(this.boatMeshes.map(x => x.grp));
     disposeUnused([old.grp], this.scene);
   }
 
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
-  refreshCourse(w: SimView): void { this.buildCourse(w); }
+  refreshCourse(w: SimView): void { this.buildCourse(w); if (this.quietOn) for (const o of this.courseObjs) o.visible = false; }
   /** New conditions mid-sail (SimView.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
   conditionsChanged(w: SimView): void {
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
