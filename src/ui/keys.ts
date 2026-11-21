@@ -11,13 +11,13 @@ export type Action =
 /** Actions that last while the key is held (the rest fire once per press). */
 export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'travUp', 'travDown', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
 
-export const ACTIONS: { id: Action; label: string; group: string }[] = [
+export const ACTIONS: { id: Action; label: string; group: string; /** the detail, a hover on the row (the label stays a few words) */ tip?: string }[] = [
   { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
-  { id: 'steerPort', label: 'Turn to port (push the tiller to starboard)', group: 'Helm' },
-  { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
+  { id: 'steerPort', label: 'Turn to port', tip: 'Turn to port: push the tiller to starboard', group: 'Helm' },
+  { id: 'steerStbd', label: 'Turn to starboard', tip: 'Turn to starboard: push the tiller to port', group: 'Helm' },
   { id: 'centreTiller', label: 'Center the tiller', group: 'Helm' },
   { id: 'lashTiller', label: 'Lash the tiller where it is (heaving to) / unlash', group: 'Helm' },
-  { id: 'turnHo', label: 'Call the turn: "Ready to jibe" … "Jibe-ho!" on a run, or "Ready about" … "Tacking!" upwind; the crew turn her', group: 'Helm' },
+  { id: 'turnHo', label: 'Call the turn', tip: '"Ready to jibe" … "Jibe-ho!" on a run, or "Ready about" … "Tacking!" upwind; the crew turn her', group: 'Helm' },
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
