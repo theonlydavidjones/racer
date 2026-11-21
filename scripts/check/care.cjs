@@ -11,11 +11,18 @@ const { chromium } = require('playwright');
   await p.addInitScript(j => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('fbsim-settings-v2', j); sessionStorage.setItem('seeded', '1'); } }, json);
   await p.goto(URL); await p.waitForTimeout(4500);
   // the setup: her bottom's line
-  await p.evaluate(() => document.querySelector('[data-home="race"]')?.click()); await p.waitForTimeout(2000);
+  await p.evaluate(() => document.querySelector('[data-home="race"]')?.click()); await p.waitForTimeout(1500);
+  await p.evaluate(() => document.querySelector('[data-home="create"]')?.click()); await p.waitForTimeout(2000); // (Practice: the race setup)
+  if (await p.evaluate(() => document.getElementById('setup').hidden)) throw new Error('not at the setup');
+  // (the Boat row closed first: its summary says so too)
+  console.log('row summary:', await p.evaluate(() => document.querySelector('#row-boat .srow-main')?.textContent));
+  await p.screenshot({ path: `${OUT}/care-setup-closed.png` });
   await p.evaluate(() => { const r = document.querySelector('#row-boat .srow-head'); r?.click(); }); await p.waitForTimeout(800);
   const line = await p.evaluate(() => [...document.querySelectorAll('#crewRows small')].map(e => e.textContent));
   console.log('setup line:', JSON.stringify(line));
-  await p.screenshot({ path: `${OUT}/care-setup-line.png` });
+  if (!line.some(t => /^Her bottom's foul/.test(t))) throw new Error('no foul-bottom line at the setup');
+  await (await p.$('#row-boat')).screenshot({ path: `${OUT}/care-setup-line.png` });
+  await p.screenshot({ path: `${OUT}/care-setup.png` });
   await p.evaluate(() => document.querySelector('[data-crew="care"]')?.click()); await p.waitForTimeout(2000);
   const care = await p.evaluate(() => ({ tabs: [...document.querySelectorAll('#fleetBoat .yctabs button')].map(e => e.textContent + (e.getAttribute('aria-pressed') === 'true' ? '*' : '')), word: document.querySelector('.careword')?.textContent, btn: !!document.querySelector('[data-f="mike"]') }));
   console.log('care tab:', JSON.stringify(care));

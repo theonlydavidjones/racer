@@ -80,3 +80,4 @@ button.t-av.dim:hover{opacity:.8}
 #drillView #raceFromRow,#drillView #raceFromNote{display:none}
 /* room under the When row while it's open, so it can scroll up and the date's calendar opens in full below it */
 .panel.whenroom{margin-bottom:380px}
+.t-text .t-s.warn{color:#ffb35c} /* her bottom foul, in the Boat row (r294) */
