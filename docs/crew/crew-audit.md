@@ -95,12 +95,15 @@ Sizes: **S** is under 1 h with its test; **M** is 2–4 h.
 - **Cause:** the cabin-end seat (`onCabinSide` and `DECK_FWD`, `src/render/crew.ts:796–801`) used for `lee` too.
 - **Fix:** to leeward at the cabin's end, the seat on the leeward bench.
 
-### 7. The main hand sitting out: an arm across their own chest (S–M)
+### 7. The main hand sitting out: an arm across their own chest (M)
 
 `hiker-arm-across-chest_*.jpg`.
 
 - **What it looks like:** hiking with the mainsheet, the main hand's arm nearer the boat reaches across their own chest toward the crew member beside them, its forearm through their torso. This happens outside tacks: 111 runs, up to 9 s, in the races at 4 and 12 kt.
-- **Cause:** not yet found. `hikeHold` (`src/render/crew.ts:1138`) already gives each line to the hand on its side (`sideHand`, `:1058`). This is the main hand hiking with no line in hand, where the hands go elsewhere.
+- **Cause:** sat out facing inboard (yaw 1.4) with the mainsheet, both hands go to the sheet's tail beside the forward shoulder, 0.1–0.15 m in front of the spine. The aft arm reaches across the chest to it, through the torso. This held at 12 kt, race Green, 950.9–951.2 s.
+- **Scope:** `hikeHold` (`src/render/crew.ts:1138`) already gives each line to the hand on its own side (`sideHand`, `:1058`). It's where the hold is that's wrong, not which hand.
+- **Fix:** the hold at least an arm's bend in front of the chest, the second hand beside the first along the line, across `hikeHold`'s cases.
+- **Size:** M.
 
 ### 8. (Withdrawn) The helm's free arm folded into their side
 
