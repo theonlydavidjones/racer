@@ -292,7 +292,9 @@ export function mooredIn(harborId: string): MooredBoat[] {
     const HULLS = [0xf6f4ee, 0xf6f4ee, 0xf6f4ee, 0xefece2, 0xefece2, 0xe4e0d4, 0x1f3550, 0x2b4a3a, 0x8a2a24], COVERS = [0x1f4f7a, 0x1f4f7a, 0x16314f, 0xb59a6a, 0x6e2a2a, 0x3d5c47];
     for (const s of SLIPS) {
       if (s.marina !== H.id) continue;
-      const keep = r() <= (OCCUPIED[H.id] ?? 0.78), len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
+      // (a guest dock is kept free for visitors, as a club's is: Berkeley's one berth is Berkeley YC's guest dock. The roll's
+      // still made, so every other slip keeps its boat)
+      const keep = r() <= (OCCUPIED[H.id] ?? 0.78) && !/guest/i.test(s.dock), len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
       const kind: MooredKind = r() < POWER_SHARE ? 'power' : 'sail';
       if (keep) out.push({ slip: s, kind, len, colour: kind === 'power' ? HULLS[Math.floor(r() * 6)] : colour, cover }); // (powerboats in white gelcoat)
     }
