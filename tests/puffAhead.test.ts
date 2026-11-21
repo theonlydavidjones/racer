@@ -38,7 +38,8 @@ describe('puffAhead: the wind coming down to her', () => {
  * minutes each. A call is honest when her wind (windHere) is under the cue's own 1.5 kt over the base (baseFactor: the
  * sim's wind where she is without its puffs and gusts) until 2 s before the second it named, and over it within ±1 s of that second.
  * The null: the same test at random seconds, with the calls' own spread of seconds ahead. The calls must be honest at
- * least 70% of the time and at least twice as often as the null.
+ * least 70% of the time and at least twice as often as the null. 6 kt is thin evidence: one puff reached the cue's
+ * 1.5 kt in its 30 minutes (a quarter of the wind), so this shows nothing proven there; 12 and 18 kt carry the claim.
  */
 describe('puffAhead in the World: the seconds it names are honest', () => {
   const REPORT = '/tmp/puffAhead-report.txt';
