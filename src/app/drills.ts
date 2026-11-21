@@ -2,6 +2,7 @@
  * The practice drills: the tack and gybe drill and the mark-rounding drill (their lines in the Coach card and the Pause screen), and the start practice's debrief (its panel, the run of attempts, its buttons).
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { numPickHtml, numPickStep, seqMinutes } from '../ui/numPick';
 import { fleetChoiceHtml } from '../ui/tiles';
 import { type ReplayClip } from '../replay/replayView';
 import { MAX_OPPONENTS, drillFleetSize, saveSettings } from '../settings';
@@ -98,15 +99,18 @@ const closeDrill = () => { $('drill').hidden = true; app.drillView.stop(); };
 /** The drill's two choices (inside its panel): how long before the gun each attempt starts, and alone or with the fleet. */
 function drillOptions(): void {
   const from = app.S.drillFrom ?? app.DRILL_FROM, solo = app.S.drillSolo ?? true;
-  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
+  const minM = (app.S.drillFlag ?? 'P') === 'P' ? 1 : 2; // (a non-P flag needs two minutes to be flown, r275)
+  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span>${numPickHtml('from', seqMinutes(from / 60, minM), minM, 5, 'min', 'Minutes to the gun')}`
     + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">${fleetChoiceHtml(false, 0)}</button><button type="button" data-v="0" aria-pressed="${!solo}">${fleetChoiceHtml(true, drillFleetSize(app.S))}</button>`
     + (solo ? '' : '<button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button>') + '</div>';
 }
 $('dOpts').addEventListener('click', e => {
   const n = (e.target as HTMLElement).closest<HTMLElement>('button[data-fn]');
   if (n) { app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); saveSettings(app.S); drillOptions(); return; }
+  const st = numPickStep(e);
+  if (st) { const minM = (app.S.drillFlag ?? 'P') === 'P' ? 1 : 2; app.S.drillFrom = seqMinutes(seqMinutes((app.S.drillFrom ?? app.DRILL_FROM) / 60, minM) + st.d, minM) * 60; saveSettings(app.S); drillOptions(); return; }
   const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
-  if (g === 'from') app.S.drillFrom = +b.dataset.v!; else app.S.drillSolo = b.dataset.v === '1';
+  app.S.drillSolo = b.dataset.v === '1';
   saveSettings(app.S); drillOptions();
 });
 /** What cost the most, as 2–3 short lines, biggest loss first, each with its fix (the owner, 15 Nov 2026: "short, sharp

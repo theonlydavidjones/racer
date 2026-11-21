@@ -104,11 +104,16 @@ body.lashed .tg-lash{display:block}
 #siBox{margin:2px 0 4px}
 #seqField.seqpick{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;text-align:left}
 #seqField.seqpick>span{margin:0}
-.seqpick input[type=range]{flex:0 1 220px;accent-color:var(--accent)}
-.seqpick output{font:600 13px var(--f-inst);min-width:44px}
 /* the start drill's preparatory flag: the flags themselves, the one chosen ringed (the owner, 21 Nov 2026) */
 .flagpick{display:flex;gap:6px;flex-wrap:wrap}
 .flagpick button{padding:3px;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;line-height:0}
 .flagpick button[aria-checked="true"]{border-color:var(--accent)}
 .flagpick button:hover{border-color:var(--rule)}
 .flagpick img{width:34px;height:23px;display:block;outline:1px solid rgba(255,255,255,.35)} /* (the black flag shows against the dark card) */
+/* the count up/down picker (the owner, 21 Nov 2026): − the number + */
+.numpick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule);border-radius:8px;padding:2px}
+.numpick button{width:28px;height:28px;border:0;border-radius:6px;background:var(--btn);color:var(--text);font:600 16px/1 var(--f-inst);cursor:pointer}
+.numpick button:hover:not(:disabled){background:var(--btn-hi)}
+.numpick button:disabled{opacity:.35;cursor:default}
+.numpick b{font:700 16px/1 var(--f-inst);min-width:14px;text-align:center}
+.numpick small{color:var(--muted);font-size:12px;margin-right:2px}
