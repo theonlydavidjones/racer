@@ -39,3 +39,13 @@ index.html (not src/sim, src/boat, src/ai, src/rules, src/environment).
 Not findings, for the record: the Messages box shows only its header when empty (by design); "DTW 78 m" turning into
 "0.2 nm" is the unit switch at 0.1 nm; the stock boats go by color name in the order board (the owner's ruling, see
 `ui/leaderboard.ts`); the wind arrow on the chart reading backwards is r287.
+
+## Fixed on ui-small-tasks (stills in `docs/ui/in-race/after/`, test:fast 279 files / 2128 tests)
+
+- 1, 2: the Strategist card's headline and race line take two lines (`08-chase.css`). The coach's own rig line
+  (`src/boat/coach.ts:681`) is still long: src/boat's.
+- 5: the chart's north arrow and wind readout have a halo (`hud.ts`).
+- 6: the chart's info box sits above the scale bar (`04-screens.css`).
+- 7: the bottom-left helm buttons are 40 px (`07-band.css`).
+- 8: the nav strip is 44 px (`18-layout-d.css`).
+- Left: 3, 4 (the boat tags), 9 (w035), 10 (hovers; w037), 11 (the setup note), and the coach's rig line.

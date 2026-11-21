@@ -1,0 +1,1324 @@
+{
+ "race-01-prestart": {
+  "truncated": [],
+  "overlaps": [
+   "#leftCol × #nextCard",
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "#nextCard",
+    "n": 152,
+    "text": "Line transit: X in line with the shore of Belvedere and Tiburon means you're on "
+   },
+   {
+    "el": "li.cut",
+    "n": 188,
+    "text": "Sight the line: from the Dorado YC flagpole end, X lines up with the shore of Be"
+   },
+   {
+    "el": "li.cut",
+    "n": 135,
+    "text": "5-minute sequence. Current: Ebb 1.3 kt, building · turns to flood ~16:35. Sea: g"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SOG 3.5",
+   "108° TRUE",
+   "0.4 FT SWELL",
+   "351°",
+   "NEXT",
+   "A ▶ STBD",
+   "276°",
+   "0.2nm",
+   "2.7kn",
+   "START IN",
+   "4:59",
+   "START LINE",
+   "100m",
+   "DORADO",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "4:59Sight the line",
+   "5:005-minute sequence. Current",
+   "STRATEGIST",
+   "Trim's set. 2.9 kt; ease to slow, trim to go.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "LOADED",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Broad reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "388 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-02-one-minute-to-go": {
+  "truncated": [],
+  "overlaps": [
+   "#leftCol × #nextCard",
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "#nextCard",
+    "n": 153,
+    "text": "Line transit: X in line with the shore of Belvedere and Tiburon means you're on "
+   },
+   {
+    "el": "li.cut",
+    "n": 162,
+    "text": "Preparatory signal: P up, one sound. 4 minutes. P: the usual start. If you're ov"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SOG 4.2",
+   "118° TRUE",
+   "CHOP · 0.5 FT SWELL",
+   "036°",
+   "NEXT",
+   "A ▶ STBD",
+   "220°",
+   "0.3nm",
+   "1.1kn",
+   "START IN",
+   "1:39",
+   "START LINE",
+   "DORADO",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "1:39Preparatory signal",
+   "STRATEGIST",
+   "Trim's set. 3.0 kt; ease to slow, trim to go.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "LOADED",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Beam reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "141 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-03-just-started": {
+  "truncated": [],
+  "overlaps": [
+   "#leftCol × #nextCard",
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "#nextCard",
+    "n": 153,
+    "text": "Line transit: X in line with the shore of Belvedere and Tiburon means you're on "
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "S · protest",
+   "Blue",
+   "Green",
+   "S · turn 2 of 2",
+   "Dorado YC flagpole",
+   "SOG 3.5",
+   "124° TRUE",
+   "CHOP · 0.4 FT SWELL",
+   "165°",
+   "NEXT",
+   "A ▶ STBD",
+   "223°",
+   "0.2nm",
+   "3.3kn",
+   "START IN",
+   "0:23",
+   "START LINE",
+   "DORADO",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "0:23One-minute signal",
+   "STRATEGIST",
+   "Trim's set. 3.2 kt; ease to slow, trim to go.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close-hauled",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "13 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-04-beating": {
+  "truncated": [],
+  "overlaps": [
+   "#leftCol × #nextCard",
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 1
+  },
+  "titles": [
+   {
+    "el": "#nextCard",
+    "n": 153,
+    "text": "Line transit: X in line with the shore of Belvedere and Tiburon means you're on "
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SPACE · TACK",
+   "6 · Fort Mason",
+   "SOG 2.6",
+   "139° · LIFT 3°",
+   "0.4 FT SWELL",
+   "097°",
+   "RACE",
+   "+3:36",
+   "NEXT",
+   "A ▶ STBD",
+   "251°",
+   "290m",
+   "-1.9kn",
+   "OVER EARLY",
+   "DORADO ★",
+   "OCS · DIP BACK BELOW THE LINE AND START",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "+3:36Favored end: Dorado YC flagpole",
+   "+3:36X flag down: all boats over early have returned",
+   "STRATEGIST",
+   "Trim's right: 4.5 kt against her target 4.6.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "LOADED",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close-hauled",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "13 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-05-near-the-mark": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "Green",
+   "SOG 6.7",
+   "123° TRUE",
+   "0.4 FT SWELL",
+   "249°",
+   "RACE",
+   "+5:19",
+   "NEXT",
+   "A ▶ STBD",
+   "257°",
+   "159m",
+   "6.7kn",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "STRATEGIST",
+   "The crew is catching up: the jib is stalled for a moment.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Broad reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "426 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-06-rounding": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SOG 6.9",
+   "132° TRUE",
+   "0.4 FT SWELL",
+   "247°",
+   "RACE",
+   "+5:50",
+   "NEXT",
+   "A ▶ STBD",
+   "262°",
+   "6.9kn",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "STRATEGIST",
+   "Trim's right: 5.1 kt against her target 5.2.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Broad reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "340 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-07-next-leg": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "S · protest",
+   "Blue",
+   "Green",
+   "6 · Fort Mason",
+   "SOG 2.5",
+   "153° TRUE",
+   "0.4 FT SWELL",
+   "083°",
+   "lifted 14°",
+   "RACE",
+   "+9:50",
+   "NEXT",
+   "X ▶ STBD",
+   "098°",
+   "2.3kn",
+   "4TH/4",
+   "Blue",
+   "Green",
+   "+134",
+   "+322",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "STRATEGIST",
+   "Trim's right: 4.5 kt against her target 5.0.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "LOADED",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "99 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "race-08-finished-or-late": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 1,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "li.cut",
+    "n": 148,
+    "text": "Bay cruise boat approaching at 11 kt. The racing rules don't apply between you a"
+   },
+   {
+    "el": "li.cut",
+    "n": 148,
+    "text": "Bay cruise boat approaching at 11 kt. The racing rules don't apply between you a"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "S · protest",
+   "Blue",
+   "6 · Fort Mason",
+   "SOG 1.0",
+   "182° TRUE",
+   "0.3 FT SWELL",
+   "092°",
+   "RACE",
+   "+59:51",
+   "NEXT",
+   "6 ▶ STBD",
+   "094°",
+   "256m",
+   "1.0kn",
+   "3RD/4",
+   "Blue",
+   "+139",
+   "Green",
+   "+228",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "+59:51Bay cruise boat approaching at 11 kt",
+   "+59:51Bay cruise boat approaching at 11 kt",
+   "STRATEGIST",
+   "Trim's right: 2.9 kt against her target 3.3.",
+   "CREW · AUTO",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "LOADED",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Beam reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "160 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "cruise-01-setup": {
+  "truncated": [],
+  "overlaps": [],
+  "wordy": [
+   {
+    "el": "#windKindNote",
+    "n": 441,
+    "text": "You chose a westerly day, from the November records. Across the course: the lie of the lan"
+   }
+  ],
+  "uk": [],
+  "mixed": {
+   "stbd": 0,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "div",
+    "n": 138,
+    "text": "1 ft of swell here, 4 ft, 13 s outside the Gate (the buoy reads 5 ft with the oc"
+   }
+  ],
+  "pods": [],
+  "offscreen": [],
+  "visibleText": [
+   "‹ Start page",
+   "Cruise",
+   "WHERE",
+   "Start",
+   "Destination",
+   "Start: the yacht clubs · To: nowhere in particular",
+   "Click the water, a place or her slip to start there.",
+   "START FROM HER SLIP",
+   "JOSEPHINE",
+   "Helm",
+   "Crew 1",
+   "Crew 2",
+   "507 lb aboard",
+   "Change ▾",
+   "Sat, Nov 21 · leaving at 12:00",
+   "Sunset 16:54",
+   "Change ▾",
+   "CONDITIONS",
+   "ADJUSTED",
+   "12 kt",
+   "from W",
+   "1.3 kt",
+   "1 ft",
+   "13 s swell",
+   "16:54",
+   "sunset",
+   "More about the day",
+   "CHANGE THE CONDITIONS…",
+   "PASSAGE PLAN",
+   "CAST OFF"
+  ]
+ },
+ "cruise-02-start": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 0,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "li.cut",
+    "n": 137,
+    "text": "Cruising: no race. 12 kt from 275°, ebb 1.3 kt, building · turns to flood ~16:35"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ],
+   [
+    16,
+    208,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SAILING",
+   "+0:00",
+   "12:00 · CRUISING",
+   "SOG 4.3",
+   "273° · LULL",
+   "CHOP · 0.7 FT SWELL",
+   "005°",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "+0:00Cruising: no race",
+   "TRIM COACH",
+   "Building speed: 3.9 kt of her target 6.1.",
+   "CREW · AUTO",
+   "AUTOPILOT",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Beam reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "312 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "cruise-03-sailing": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 0,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "li.cut",
+    "n": 137,
+    "text": "Cruising: no race. 12 kt from 275°, ebb 1.3 kt, building · turns to flood ~16:35"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ],
+   [
+    16,
+    208,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SAILING",
+   "+0:20",
+   "12:00 · CRUISING",
+   "SOG 6.4",
+   "275° · HEAD 2°",
+   "CHOP · 0.7 FT SWELL",
+   "339°",
+   "© OpenStreetMap contributors",
+   "MESSAGES",
+   "+0:00Cruising: no race",
+   "TRIM COACH",
+   "Trim's right: 5.6 kt against her target 5.6.",
+   "CREW · AUTO",
+   "AUTOPILOT",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "100 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "cruise-04-chart": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 0,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "button",
+    "n": 129,
+    "text": "The current's speed in color; the streaks go the way the water goes, 20 times it"
+   },
+   {
+    "el": "label",
+    "n": 157,
+    "text": "Where the wind is lighter for what stands upwind: the lee of the land, boats' di"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ],
+   [
+    16,
+    208,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SAILING",
+   "+0:20",
+   "12:00 · CRUISING",
+   "SOG 6.4",
+   "275° · LULL",
+   "CHOP · 0.7 FT SWELL",
+   "339°",
+   "© OpenStreetMap contributors",
+   "CHART · PICK A DESTINATION",
+   "RECENTER",
+   "CLOSE · ESC",
+   "© OpenStreetMap contributors",
+   "WIND",
+   "CURRENT",
+   "WAVES",
+   "DUSK",
+   "LAYERS ▾",
+   "Ships",
+   "Laylines",
+   "Wind shadows",
+   "No destination set. Click the water or a place to choose one.",
+   "MESSAGES",
+   "TRIM COACH",
+   "Trim's right: 5.6 kt against her target 5.6.",
+   "CREW · AUTO",
+   "AUTOPILOT",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "100 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ },
+ "cruise-05-navigator": {
+  "truncated": [],
+  "overlaps": [
+   "#viewBar × #controls",
+   ".sailband × #controls",
+   "#controls × #helmBar"
+  ],
+  "wordy": [],
+  "uk": [],
+  "mixed": {
+   "stbd": 0,
+   "starboard": 0,
+   "port": 0,
+   "jibe": 0,
+   "tack": 0
+  },
+  "titles": [
+   {
+    "el": "button",
+    "n": 129,
+    "text": "The current's speed in color; the streaks go the way the water goes, 20 times it"
+   },
+   {
+    "el": "label",
+    "n": 157,
+    "text": "Where the wind is lighter for what stands upwind: the lee of the land, boats' di"
+   }
+  ],
+  "pods": [
+   [
+    16,
+    16,
+    104,
+    58
+   ],
+   [
+    16,
+    80,
+    104,
+    58
+   ],
+   [
+    16,
+    144,
+    104,
+    58
+   ],
+   [
+    16,
+    208,
+    104,
+    58
+   ]
+  ],
+  "offscreen": [],
+  "visibleText": [
+   "SAILING",
+   "+0:20",
+   "12:00 · CRUISING",
+   "SOG 6.4",
+   "275° · LULL",
+   "CHOP · 0.7 FT SWELL",
+   "339°",
+   "© OpenStreetMap contributors",
+   "CHART · PICK A DESTINATION",
+   "RECENTER",
+   "CLOSE · ESC",
+   "© OpenStreetMap contributors",
+   "WIND",
+   "CURRENT",
+   "WAVES",
+   "DUSK",
+   "LAYERS ▾",
+   "Ships",
+   "Laylines",
+   "Wind shadows",
+   "No destination set. Click the water or a place to choose one.",
+   "MESSAGES",
+   "TRIM COACH",
+   "Trim's right: 5.6 kt against her target 5.6.",
+   "CREW · AUTO",
+   "AUTOPILOT",
+   "PAUSE",
+   "SPEED 1×",
+   "SOUND",
+   "TOOLS",
+   "COCKPIT",
+   "EXIT",
+   "AUTO-TRIM",
+   "JIB CAR",
+   "SHEET",
+   "MAIN",
+   "HAL.",
+   "CUNN",
+   "MAIN",
+   "CUNN",
+   "OUT-",
+   "HAUL",
+   "VANG",
+   "Close reach",
+   "▴ SAIL CONTROLS",
+   "VANG",
+   "OUT-",
+   "HAUL",
+   "CUNN",
+   "HAL.",
+   "SHEET",
+   "JIB CAR",
+   "LOADED",
+   "JUMPERS",
+   "BACKSTAY",
+   "MAINSHEET",
+   "100 in out",
+   "TRAVELER",
+   "BACKSTAY",
+   "JUMPERS"
+  ]
+ }
+}
