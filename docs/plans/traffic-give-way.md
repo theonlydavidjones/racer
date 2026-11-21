@@ -68,12 +68,19 @@ keep out of a sailing boat's way. Only the deep-draft ships in the lanes aren't.
    - Then the vessel takes one substantial action, not a series:
      - an alteration to starboard of TURN_DEG, or to pass astern of the boat, whichever gives the larger CPA and
        keeps her off land and the other boats;
-     - failing either, she slows (Rule 8(e)) to SLOW_KT.
+     - each candidate's line, out to its CPA time and along its rejoin leg, is tested against `onLand` and the
+       separation zone's polygons (enc-chart.json `areas`, k 'sepzone'), as tests/traffic.test.ts tests the routes
+       (Charts: a 35° turn off the tour route by Alcatraz's east end or under the Gate, or off the Alcatraz ferry by
+       Pier 33, reaches the shore within a few hundred meters);
+     - failing both, she slows (Rule 8(e)) to SLOW_KT.
    - She holds that until the CPA has opened and the boat is abaft her beam, then rejoins her route at the route's
-     own speed (no catching up: the schedule slips, as a real ferry's does).
-   - Near her berth (BERTH_M of the route's end) and for the first and last minute of a leg she stands on. The rules
-     still bind her there, but a maneuvering ferry can't give way, and the boat must keep clear by seamanship
-     (Rule 2).
+     own speed (no catching up: the schedule slips, as a real ferry's does). She rejoins toward her next waypoint, not
+    the nearest point of the route, which near a corner (the tour's turn mid-Gate, Alcatraz's east end) would cut it
+    over the shoal (Charts).
+   - Near her berth (BERTH_M of the route's end) she makes no alteration: she's maneuvering, and the boat must keep
+     clear by seamanship (Rule 2). But she still slows and stops for a boat she'd otherwise hit (Rules 2, 8(e) and
+     17(b): every vessel's last resort), so nothing is run down beside a pier. BERTH_M is 150 m: 300 m, with the first
+     and last minute, would leave about half the Alcatraz ferry's 2.4 km route standing on (Charts).
 2. **The ships in the lanes** (container, tanker): unchanged. Rule 9(b) as above.
 3. **The AI racers.** Today `keepClearOfShips` sends every AI boat astern of every vessel within 900 m. With the
    ferries giving way, that's prudence, not the rules: two choices for the owner (below).
@@ -90,7 +97,7 @@ The figures are ESTIMATES and design choices (no published number was found; Rul
 | LOOK_S | 240 s (ferries at 17 kt: about 2 km) | "early": a ferry seen 2 km off, as a lookout on the boat would see her |
 | TURN_DEG | 35° | "readily apparent" by eye; more than a 10° alteration, which an IMO case (secondhand) called too small |
 | SLOW_KT | 5 kt | steerage way for a 40–50 m vessel; she keeps way on |
-| BERTH_M | 300 m | a berth's approach and turn, as the Coast Pilot describes the ferries' |
+| BERTH_M | 150 m | a berth's approach and turn, as the Coast Pilot describes the ferries': about three of her lengths |
 
 ## How (the cost and the shape)
 
@@ -126,8 +133,13 @@ The figures are ESTIMATES and design choices (no published number was found; Rul
 7. A fleet of 20 in her way: she gets through on one action or by slowing, never stopping mid-Bay for more than a
    few minutes, and rejoins her route.
 8. Determinism: the same seed twice gives the same vessels to the bit; the mirror check passes under `?simguard`.
-9. Acceptance: nav-pier's two cases sail with traffic on again ("running along a pier's face", "in irons by a pier
-   head"), with every bound as it is.
+9. Acceptance: nav-pier's two cases sail with traffic on again, with every bound as it is.
+   - "Running along a pier's face": the Alcatraz ferry at 14 min, out on her route, gives way. It passes by the
+     ferry's alteration.
+   - "In irons by a pier head": the cruise boat at 1.2 min, leaving Pier 41, is inside BERTH_M. It passes by the
+     cruise boat's last-resort slowing, and by the pilot's own way off. It doesn't pass by an alteration (Charts).
+10. The altered tracks: every candidate turn and rejoin leg taken in tests 1–7 stays off the land and out of the
+    separation zones, sampled every 10 m as tests/traffic.test.ts samples the routes (Charts offers to add it there).
 
 ## Questions for the owner
 
