@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mirrored, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
+import { mirrored, replayDeepest, replayFloating, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
 import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 import SIDE_DECK from './fixtures/crew-sidedeck-8kt.json';
 import EDGE_1 from './fixtures/crew-cabinedge-20kt-1.json';
 import EDGE_2 from './fixtures/crew-cabinedge-20kt-2.json';
 import EDGE_3 from './fixtures/crew-cabinedge-20kt-3.json';
 import FOREDECK from './fixtures/crew-foredeck-8kt.json';
+import CABIN_ACROSS from './fixtures/crew-cabin-end-across-12kt.json';
 
 // The sprint's soak (19 Nov 2026, Crew Habits' harness, seed 3, west, real sea), replayed: stretches of its races recorded
 // frame by frame from the harness (each person's place, pose, lean, goal and job, her heel, the windward side, tacking,
@@ -46,4 +47,17 @@ describe('The soak, replayed: the crew clear of the boat (render/crew.ts)', () =
       expect(replayDeepest(rec, 173)).toBe('');
     }, 120_000);
   }
+});
+
+// The crew audit (21 Nov 2026, docs/crew/crew-audit.md item 6): the race at 12 kt, Blue, 408.6 to 416.2 s. The forward
+// hand back aft from the foredeck: the physics brought them aft on the port side to the port bench's forward end, the
+// figure along the starboard side deck. Arrived by the physics, not travelling, the figure was eased straight across from
+// the starboard deck to the port bench over the companionway's opening at deck height, 0.8 s sat on nothing with the
+// hands in the air, 0.6 m short of anything. Across the boat to their place, they walk there, down into the cockpit.
+describe('The crew audit, replayed: nobody floats across the cockpit (render/crew.ts)', () => {
+  for (const [tack, rec] of [['as sailed', CABIN_ACROSS], ['mirrored', mirrored(CABIN_ACROSS as unknown as CrewRecording)]] as const)
+    it(`back aft to the other side's bench at the cabin's end, 12 kt, ${tack}`, () => {
+      const r = replayFloating(rec as unknown as CrewRecording, 410);
+      expect(r.up, r.at).toBeLessThan(0.15);
+    }, 120_000);
 });

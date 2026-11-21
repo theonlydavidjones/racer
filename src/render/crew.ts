@@ -1732,10 +1732,16 @@ function aftSide(f: Figure, x: number, z: number): number {
  * them: crewPhys.ts goal), until they're nearly there. Moving out to hike, or in from it, on the same side is the body
  * leaning out and in, not a walk.
  */
-function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: number): boolean {
+function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: number, crew = false): boolean {
   const g = a?.goal; if (!a || !g) return false;
   const gx = aftSide(f, g.x, g.z);
   const across = Math.sign(gx) !== Math.sign(x) && Math.abs(gx - x) > 0.25, along = Math.abs(g.z - a.z) > 0.4;
+  // (and drawn across the boat from where the physics has them, well away: they go there, on their feet, down into the
+  // cockpit and across. Arrived by the physics on the other side, not travelling, the figure was eased straight across
+  // at the height it was, over the companionway's opening from one side deck to the other bench, sat on nothing (the
+  // crew audit, 21 Nov 2026, item 6))
+  // (the crew: the helm crosses the after deck by helmCrossing, in step with the physics)
+  const h = f.cur?.hip; if (crew && h && Math.sign(h.x) !== Math.sign(x) && Math.abs(h.x - x) > 0.5) return true;
   if (f.going) return Math.abs(gx - x) > 0.08 || Math.abs(g.z - a.z) > 0.08;
   return across || along;
 }
@@ -1841,7 +1847,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     f.goalSide = a?.goal && Math.abs(a.goal.x) > 0.3 ? Math.sign(a.goal.x) : undefined;
     const dir = track(f, x, a?.z ?? z, sdt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
-    const go = f.going = travelling(f, a, x);
+    const go = f.going = travelling(f, a, x, true);
     // (in the tack while it's under way, and until they're across; a job elsewhere, the mast or the car, comes first)
     const busy = pose === 'mast' || pose === 'car' || pose === 'piano' || pose === 'bow' || pose === 'fore';
     // (but only once the physics brings them in off the rail: a roll tack holds them out on the old high side as she comes
