@@ -2,7 +2,7 @@
  * The end of a race and the pause screen: the Pause button and its menu, the debriefs (the comparison with the winner, the tactical debrief and its chart, the race replay, a real past race's line), the boats' logbooks, the scores and the results screen.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
-import { place } from '../sim/places';
+import { destName, placeLabel } from '../ui/placeNames';
 import { keepGhost, setupKey, trackOf } from '../replay/ghost';
 import { addLog, type LogEntry, type RaceSetup } from '../boat/logbook';
 import { saveSettings } from '../settings';
@@ -236,8 +236,8 @@ function logOuting(): void {
   if (app.S.mode === 'drill') return;
   if (app.S.mode === 'sail' && app.w.freeSail && (app.w.t >= 60 || app.w.user.wrecked)) {
     app.send({ k: 'shown', logged: true });
-    const from = app.S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(app.S.boat.slip))})` : place(app.S.sailFrom)?.name ?? 'the Bay';
-    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${app.w.dest.name}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null, ...hurtOf() }]);
+    const from = app.S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(app.S.boat.slip))})` : placeLabel(app.S.sailFrom);
+    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${destName(app.w.dest)}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null, ...hurtOf() }]);
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.cancelled) {
     // racing called off for the wind: no result, but the outing goes in her logbook
     app.send({ k: 'shown', logged: true });

@@ -400,7 +400,6 @@ physics, ranked like the ten above:
 | BEAM | 2.21 | 23 | sourced | ORC beam |
 | BEAT_SMOOTH_KT, BEAT_SMOOTH_LIGHT, BEAT_SMOOTH_DEG (beatSearch) | 0.75 kt; ¼ of the wind; 4° | 102 | estimate | the beat angle in chop is the top of the speed made good averaged over this much wind (¼ ½ ¼; in light air a quarter of the wind at most) and angle either side: no helmsman reads finer, and the tables' corners made the raw top swing 5–7° on a quarter-knot puff (tests/beat-chop.test.ts) |
 | B0, B1 (beatSearch) | 30°, 90° | 102 | numerical | the window the beat in chop is searched over: to 90° so light air in a chop, footing off at 60–90°, isn't cut short (cut at 65°: 15% given up at 2 kt in 0.8 m; the physics review, 20 Nov 2026) |
-| BEAT_NO_WAY | 65° | 104 | estimate | the beat angle when she makes no headway at any angle: footing off, wide |
 | LEAN_FADE | 0.3 m | 134 | estimate | the smoothing leans the top 0.5–0.9° toward the wind in flat water; that lean is taken off whole at the first of a chop and faded out by this much chop, so she doesn't step closer to the wind as the chop passes 2 cm (beatFor's switch) and a big chop's sharp top isn't overshot |
 | C_AW | 0.034 | 25 | calibrated |  |
 | CHOP_MEMO | 16 | 77 | numerical |  |

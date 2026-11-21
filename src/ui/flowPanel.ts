@@ -10,7 +10,11 @@ import { camberLine, flowField, flowState, flowWords, gridField, streamline, typ
  */
 
 const W = 200, H = 180; // each cut's drawing (CSS px)
-const COL = { running: '#9aa7b3', attached: '#f4f1e8', luffing: '#ffd34d', stalled: '#ff6a5c', hull: 'rgba(36,56,75,0.55)', hullEdge: 'rgba(63,90,114,0.6)', wind: '#ffb627', port: '#e0281e', stbd: '#18a14a' };
+// (r037, the owner, 20 Nov 2026: "make sure the red and orange are distinct enough". Luffing yellow, stalled orange, the
+// wind violet, the port telltale red and the starboard one a light green: every pair of these apart by ΔE ≥ 9.8 (OKLab
+// ×100) under deuteranopia and protanopia and ≥ 17 with full color vision, on the panel's dark ground, by the dataviz
+// validator; lightness steps as well as hue, so they part in gray too)
+const COL = { running: '#9aa7b3', attached: '#f4f1e8', luffing: '#ffe45c', stalled: '#ff8a1f', hull: 'rgba(36,56,75,0.55)', hullEdge: 'rgba(63,90,114,0.6)', wind: '#b265ff', port: '#e0281e', stbd: '#3fd68a' };
 
 /** The flow's colour for its speed (share of the apparent wind): slow blue to fast mint. */
 function speedCol(s: number): string {
@@ -50,15 +54,19 @@ export class FlowPanel {
 
   constructor(parent: HTMLElement, private onClose: () => void) {
     const el = this.el = document.createElement('div'); el.id = 'flowPanel'; el.hidden = true;
-    el.innerHTML = `<header><b>Flow over the sails</b><span class="fp-tags"><span class="fp-tag sim">wind, trim, telltales: the sim's</span><span class="fp-tag">sections and streamlines: drawn from them</span></span><button class="fp-x" aria-label="Close the flow view">×</button></header>
+    el.innerHTML = `<header><b title="The wind, the trim and the telltales are the sim's; the sections and the streamlines are drawn from them, to show the idea.">Flow over the sails</b><span class="fp-tags"></span><button class="fp-x" aria-label="Close the flow view">×</button></header>
       <div class="fp-cuts"></div><div class="fp-key"></div><div class="fp-story"></div>`;
     const row = el.querySelector('.fp-cuts')!;
     for (let i = 0; i < 3; i++) {
       const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
       cv.style.width = `${W}px`; cv.style.height = `${H}px`; fig.append(cv, cap); row.append(fig); this.cuts.push({ cv, cap });
     }
-    el.querySelector('.fp-key')!.innerHTML = `<span><i style="background:${COL.attached}"></i>attached</span><span><i style="background:${COL.luffing}"></i>luffing</span><span><i style="background:${COL.stalled}"></i>stalled</span><span><i style="background:${COL.running}"></i>working stalled (off the wind)</span>`
-      + `<span><i style="background:${COL.stbd}"></i>starboard telltale</span><span><i style="background:${COL.port}"></i>port</span><span class="fp-speed">air: <i style="background:linear-gradient(90deg,${speedCol(0.6)},${speedCol(1.5)})"></i> slower · faster</span>`;
+    // the key: one swatch and a word or two each (the owner, 20 Nov 2026: "clean up the hard-to-read key")
+    const sw = (c: string, w: string, tip: string) => `<span title="${tip}"><i style="background:${c}"></i>${w}</span>`;
+    el.querySelector('.fp-key')!.innerHTML = sw(COL.attached, 'attached', 'The air following the sail round') + sw(COL.luffing, 'luffing', 'Too far out, or pinching: trim in or bear away')
+      + sw(COL.stalled, 'stalled', 'Too far in: ease, or head up') + sw(COL.running, 'off wind', 'Off the wind the sails work stalled, the air pushing on them')
+      + sw(COL.stbd, 'stbd tell', 'The starboard telltales') + sw(COL.port, 'port tell', 'The port telltales')
+      + `<span class="fp-speed" title="The streamlines' color: the air's speed against the apparent wind"><i style="background:linear-gradient(90deg,${speedCol(0.6)},${speedCol(1.5)})"></i>air slow–fast</span>`;
     this.story = el.querySelector('.fp-story')!;
     el.querySelector<HTMLButtonElement>('.fp-x')!.onclick = () => this.onClose();
     parent.append(el);
@@ -113,7 +121,7 @@ export class FlowPanel {
       }
     }
     // the separated air behind a stalled sail (from the sim's stall amount)
-    for (const d of dead) { g.beginPath(); d.forEach(([x, y], k) => k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.closePath(); g.fillStyle = 'rgba(255,106,92,0.18)'; g.fill(); g.setLineDash([3, 3]); g.strokeStyle = COL.stalled; g.lineWidth = 1; g.stroke(); g.setLineDash([]); }
+    for (const d of dead) { g.beginPath(); d.forEach(([x, y], k) => k ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y))); g.closePath(); g.fillStyle = 'rgba(255,138,31,0.16)'; g.fill(); g.setLineDash([3, 3]); g.strokeStyle = COL.stalled; g.lineWidth = 1; g.stroke(); g.setLineDash([]); }
     // the sails: coloured by the sim's flow state; a luffing sail's front lifting (waved over as much as it luffs)
     for (const s of c.sections) {
       const p = camberLine(s, 24), lift = s.trim.flow === 'luffing' ? 0.15 + 0.5 * s.trim.amount : 0;
@@ -155,7 +163,10 @@ export class FlowPanel {
     pts.forEach(([px, py], k) => k ? g.lineTo(X(px), Y(py)) : g.moveTo(X(px), Y(py))); g.stroke();
   }
 
+  /** The takeaways, a line a sail, each with its detail on hover; the notes (twist, slot, keel) on the whole box's hover. */
   private tell(st: FlowState, b: Boat, ctx: { preStart?: boolean }): HTMLElement[] {
-    return flowWords(st, b, ctx).map(([cls, html]) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; return e; });
+    const lines = flowWords(st, b, ctx);
+    this.story.title = lines.filter(([c]) => c === 'fp-note').map(l => l[2]).join('\n');
+    return lines.filter(([c]) => c !== 'fp-note').map(([cls, html, more]) => { const e = document.createElement('p'); e.className = cls; e.innerHTML = html; if (more) e.title = more; return e; });
   }
 }

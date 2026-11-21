@@ -29,10 +29,10 @@ const out = process.argv[2] || '.';
     console.log(`chart chip ${f}: ticked ${d.checked.join(',')}, drawn ${d.kind}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`chart chip ${f}`);
   }
   // the chart's own Layers menu: each row once
-  await p.click('#bChartLayers'); await p.waitForTimeout(600);
-  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartLayersPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
+  await p.waitForTimeout(600); // (the Layers panel is open by default)
+  const rows = await p.evaluate(() => [...document.querySelectorAll('#chartShowPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
   for (const r of rows) {
-    const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartLayersPop [data-field="${v}"]` : `#chartLayersPop [data-layer="${v}"]`;
+    const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartField [data-field="${v}"]` : `#chartShowPop [data-layer="${v}"]`;
     const before = await p.evaluate(s => document.querySelector(s).checked, sel);
     await p.click(sel); await settle();
     const after = await p.evaluate(s => document.querySelector(s)?.checked, sel);
@@ -42,10 +42,10 @@ const out = process.argv[2] || '.';
   await p.screenshot({ path: `${out}/layer-clicks-chart.png` });
   // Dusk colors, once each way
   for (const want of ['dusk', 'day']) {
-    await p.click('#bChartPal'); await settle();
-    const pal = await p.evaluate(() => sim().settings.chartPal ?? 'day'), label = await p.evaluate(() => document.getElementById('bChartPal').textContent);
-    const ok = pal === want && label === (want === 'day' ? 'Dusk colors' : 'Day colors');
-    console.log(`palette → ${want}: race has ${pal}, button says "${label}"`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
+    await p.click(`#chartPal [data-pal="${want}"]`); await settle();
+    const pal = await p.evaluate(() => sim().settings.chartPal ?? 'day'), on = await p.evaluate(() => document.querySelector('#chartPal [aria-checked="true"]')?.dataset.pal);
+    const ok = pal === want && on === want;
+    console.log(`palette → ${want}: race has ${pal}, toggle shows ${on}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
   }
   await p.click('#bChartClose'); await p.waitForTimeout(800);
   // the inset map has no buttons of its own (its choices are the chart's menu's: the owner)

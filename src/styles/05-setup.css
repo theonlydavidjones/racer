@@ -74,9 +74,10 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .ib:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ib.on{border-color:var(--accent);color:var(--accent)}
 .ib .mute{display:none} .ib.muted .mute{display:inline} .ib.muted .wave{display:none}
-#appBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:max(16px,env(safe-area-inset-right,0px))}
-#appBar .ib{min-width:46px;height:40px;opacity:.6}
-#appBar .ib:hover,#appBar .ib:focus-visible{opacity:1}
+/* the game's own buttons (the owner, 20 Nov 2026): small and dim, bottom right with the view's, Exit in the corner */
+#viewBar{gap:4px}
+#viewBar .ib.meta{min-width:44px;height:40px;opacity:.6}
+#viewBar .ib.meta:hover,#viewBar .ib.meta:focus-visible,#viewBar .ib.meta.on{opacity:1}
 #mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
 #viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}
 /* the trim panel's own line: who has the lines, in plain words */

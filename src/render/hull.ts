@@ -729,6 +729,13 @@ export function tillerClearance(turn: number, lift: number, n = 40): number {
   }
   return w;
 }
+/** The tiller's centerline turned `turn` rad (boat frame, n + 1 points from its root on the pin to its end), with its
+ * round at each (2.8 cm at the root, 1.8 cm at the end), as tillerClearance and the drawing have it. */
+export function tillerAxis(turn: number, n = 40): { p: THREE.Vector3; r: number }[] {
+  const piv = tillerPivot(), d = tillerRestDir(), out: { p: THREE.Vector3; r: number }[] = [];
+  for (let i = 0; i <= n; i++) out.push({ p: piv.clone().addScaledVector(d, TILLER.len * i / n).applyAxisAngle(_Y, turn).applyAxisAngle(_X, RUDDER_RAKE).add(new THREE.Vector3(0, HEEL.y, HEEL.z)), r: 0.028 - 0.01 * i / n });
+  return out;
+}
 /**
  * How far the tiller's lifted on its pin (rad) when turned `turn` rad: not at all. It turns about the raked rudder line,
  * so its end comes down as it swings out, and it stops where it meets the after deck, the same both sides (the owner,

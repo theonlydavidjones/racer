@@ -29,6 +29,8 @@ export class Labels {
   private hintEl: HTMLDivElement | null = null;
   private hintSince = 0; private hintKind: 'jibe' | 'tack' | null = null;
   hint: (() => string | null) | null = null;
+  /** Coming in to a berth: the key and what it does (G · lines ready), by her while it's of use, or null (app.ts). */
+  dockHint: (() => string | null) | null = null;
   private tmp = new THREE.Vector3();
   constructor(private root: HTMLElement) {}
   /** The helm's called the turn (app.ts, its key): the call shows by her. */
@@ -92,7 +94,8 @@ export class Labels {
       if (d !== this.destOf) { // (a new destination, or none: its words and its look, once)
         this.destOf = d;
         const pin = !!d && isSpot(d.name);
-        de.textContent = d && !pin ? d.name : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
+        // (bound for her own slip: "Home", the owner, 18 Nov 2026)
+        de.textContent = d && !pin ? (d.key === 'slip' ? 'Home' : d.name) : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
         if (pin) de.title = d!.name; else de.removeAttribute('title');
       }
       if (d) this.place(de, camera, d.p.x, d.p.y, 6); else if (!de.hidden) de.hidden = true;
@@ -122,7 +125,9 @@ export class Labels {
     const he = this.hintEl, key = this.hint?.() ?? null, twa = Math.abs(u.twa ?? 90);
     const kind: 'jibe' | 'tack' | null = !key || say || word || u.turnTarget != null || !w.running || (u.v ?? 0) < 0.8 ? null : twa >= 150 ? 'jibe' : twa <= 50 ? 'tack' : null;
     if (kind !== this.hintKind) { this.hintKind = kind; this.hintSince = w.t; }
-    const show = kind && w.t - this.hintSince > 2 ? `${key} · ${kind === 'jibe' ? 'jibe-ho' : 'tack'}` : '';
+    // (and coming in to a berth, the lines: shown by her as the tack's is, not only in the Crew panel: the owner, 18 Nov 2026)
+    const dock = !say && !word ? this.dockHint?.() ?? null : null;
+    const show = kind && w.t - this.hintSince > 2 ? `${key} · ${kind === 'jibe' ? 'jibe-ho' : 'tack'}` : dock ?? '';
     if (he) { if (!show) { if (!he.hidden) he.hidden = true; } else { this.place(he, camera, u.x, u.y, 1.2); if (he.textContent !== show) he.textContent = show; } }
   }
 }

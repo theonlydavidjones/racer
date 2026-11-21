@@ -35,6 +35,11 @@ describe('the beat angle in chop holds steady through a puff', () => {
   });
   // (the physics review of beat-chop, 20 Nov 2026: the smoothed top leaned 0.6–0.9° toward the wind of the polar's
   // flat-water angle, so as the chop passed 2 cm, where beatFor turns from one to the other, she stepped toward pinching)
+  // (the v213 review: with no headway at any angle it gave 65°, 21–25° off its neighbors that made way at 86–90°)
+  it('under 2 kt in a chop, no 20° jumps at the edge of headway: each 2 cm of chop moves it under 10°', () => {
+    for (const kt of [0.5, 0.75, 1, 1.25, 1.5]) { let prev = beatInChop(kt, 0.1, 2.2);
+      for (let hs = 0.12; hs <= 1.2; hs += 0.02) { const a = beatInChop(kt, hs, 2 + 2 * hs); expect(Math.abs(a - prev), `${kt} kt, ${hs.toFixed(2)} m`).toBeLessThan(10); prev = a; } }
+  });
   it('as the chop gets up from nothing she doesn\'t step closer to the wind: at 2 cm, the flat-water angle within 0.15°', () => {
     for (let kt = 2; kt <= 30; kt += 0.5) expect(Math.abs(beatInChop(kt, 0.02, 1.5) - beatAngle(kt)), `${kt} kt`).toBeLessThan(0.15);
   });
