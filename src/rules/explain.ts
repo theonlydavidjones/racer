@@ -6,7 +6,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '11': ['Rule 11 · Same tack, overlapped', 'When boats on the same tack are overlapped, the windward boat keeps clear of the leeward boat.'],
   '12': ['Rule 12 · Same tack, not overlapped', 'When boats on the same tack are not overlapped, the boat clear astern keeps clear of the boat clear ahead.'],
   '13': ['Rule 13 · While tacking', 'After a boat passes head to wind, she keeps clear of other boats until she is on a close-hauled course; rules 10, 11 and 12 don\'t apply meanwhile. If two boats are tacking at the same time, the one on the other\'s port side, or the one astern, keeps clear.'],
-  '15': ['Rule 15 · Acquiring right of way', 'When a boat acquires right of way, she must at first give the other boat room to keep clear.'],
+  '15': ['Rule 15 · Acquiring right of way', 'When a boat acquires right of way, she must at first give the other boat room to keep clear, unless she acquires right of way because of the other boat\'s actions.'],
   '16.1': ['Rule 16.1 · Changing course', 'When a right-of-way boat changes course, she shall give the other boat room to keep clear.'],
   '16.2': ['Rule 16.2 · Changing course on a beat', 'On a beat to windward, when a port-tack boat is keeping clear by sailing to pass to leeward of (behind) a starboard-tack boat, the starboard boat shall not bear away if as a result the port boat must change course immediately to keep clear.'],
   '17': ['Rule 17 · On the same tack; proper course', 'If a boat clear astern becomes overlapped within two of her hull lengths to leeward of a boat on the same tack, she shall not sail above her proper course while they remain on the same tack and overlapped within that distance, unless in doing so she promptly sails astern of the other boat.'],
@@ -63,11 +63,11 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
     case '13':
       what = you ? `You tacked near ${o} and were still turning when they had to avoid you.` : `${o} tacked too close and was still turning when you met.`;
-      tip = you ? 'Before tacking near a boat, make sure you will be close-hauled with clear water. About three boat lengths is a safe rule of thumb.' : 'A boat that is mid-tack has no rights. Hold your course.';
+      tip = you ? 'Before tacking near a boat, make sure you will be close-hauled with clear water. About three boat lengths is a safe rule of thumb.' : 'A boat that is mid-tack must keep clear of you. Hold your course.';
       break;
     case '15':
       what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
-      tip = you ? 'Right of way you have just acquired is not enforceable straight away. Leave the other boat time and space to get clear.' : 'You were the boat that had to keep clear, but the other boat changed the situation too suddenly for you to respond.';
+      tip = you ? 'Right of way you have just acquired comes with a duty: at first, give the other boat room to keep clear (Rule 15).' : 'You were the boat that had to keep clear, but the other boat changed the situation too suddenly for you to respond.';
       break;
     case '16.1':
       what = you ? `You had right of way, but you turned ${e.turned ? Math.round(e.turned) + '° ' : ''}toward ${o} just before, and they had no time to get out of the way.` : `${o} had right of way but turned into you just before, without giving you time to keep clear.`;
@@ -131,15 +131,15 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
     case '21.1':
       what = you ? `After the starting signal you were sailing back toward the pre-start side of the line to start (over early, or not yet below it), so you had to keep clear of ${o}.` : `${o} was sailing back toward the pre-start side of the line to start, and had to keep clear.`;
-      tip = you ? 'With an ebb, hang back farther before the gun. The current carries you toward the line while you luff. Coming back, you have no rights until your whole hull is below the line.' : 'Boats coming back to start have no rights until their whole hull is back on the pre-start side.';
+      tip = you ? 'With an ebb, hang back farther before the gun. The current carries you toward the line while you luff. Coming back, you keep clear of everyone until your whole hull is below the line.' : 'Boats coming back to start keep clear of you until their whole hull is back on the pre-start side.';
       break;
     case '21.2':
       what = you ? 'You were doing penalty turns, so you had to keep clear of everyone.' : `${o} was doing penalty turns and had to keep clear.`;
-      tip = you ? 'Do your turns in clear water, away from traffic.' : 'A boat doing turns has no rights.';
+      tip = you ? 'Do your turns in clear water, away from traffic.' : 'A boat doing turns must keep clear of you, but don\'t go out of your way to hinder her (Rule 23.2).';
       break;
     case '21.3':
       what = you ? `You were moving backwards (or sideways to windward) by backing a sail, so you had to keep clear of ${o}.` : `${o} was backing a sail and moving astern, and had to keep clear.`;
-      tip = you ? 'Backing a sail to get out of irons or off the line is fine, but while you go backwards you have no rights.' : 'A boat backing down has no rights over you.';
+      tip = you ? 'Backing a sail to get out of irons or off the line is fine, but while you go backwards you keep clear of everyone.' : 'A boat backing down must keep clear of you.';
       break;
     case '23':
       if (e.part === '23.1') {
