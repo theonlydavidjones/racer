@@ -68,3 +68,10 @@ the player needs:
 The ones that lose something are changed by hand where the text is ours (src/ui, src/app); the cruise boat's sentence comes
 from src/sim/world.ts and is the Coordinator's to shorten at the source (proposed: "Bay cruise boat approaching at 11 kt.
 Racing rules don't apply to her; keep clear, and expect a wake.").
+
+## The boat editor (21 Nov)
+
+`docs/ui/copy-sweep/boat-editor.cjs` opens the editor and then each section in turn (Registration, Hull, Deck and cabin, Rig,
+Sails, Lines, Home berth, Speed; v215's editor uses accordion headers, not "Change" buttons). Every page and every section:
+0 blocks of copy over 90 characters, 0 hovers over 110, no page errors. Nothing to cut. Stills and the scan are in
+`docs/ui/copy-sweep/editor/`.
