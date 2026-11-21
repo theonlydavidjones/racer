@@ -35,6 +35,17 @@ describe('the beat angle in chop holds steady through a puff', () => {
   });
   // (the physics review of beat-chop, 20 Nov 2026: the smoothed top leaned 0.6–0.9° toward the wind of the polar's
   // flat-water angle, so as the chop passed 2 cm, where beatFor turns from one to the other, she stepped toward pinching)
+  // (the v214 review: the chop is raised by the day's mean wind, the angle read in the wind at her, so a lull puts her in
+  // 1–2 kt over 0.5 m: it gave 75° at 1.5 kt in 0.5 m where she's stopped, and 90.2° at 0.25 kt in 0.2 m, and in no wind
+  // the flat-water lean, −43°, ran it 50–90° by the chop's depth)
+  it('in light air in a chop, an angle she makes way at wherever one exists, and within 30–90°', () => {
+    for (let kt = 0; kt <= 2; kt += 0.125) for (let hs = 0.04; hs <= 1.2; hs += 0.04) {
+      const tp = 2 + 2 * hs, a = beatInChop(kt, hs, tp);
+      expect(a, `${kt} kt, ${hs.toFixed(2)} m`).toBeGreaterThanOrEqual(30); expect(a, `${kt} kt, ${hs.toFixed(2)} m`).toBeLessThanOrEqual(90);
+      let way = false; for (let t = 30; t <= 90 && !way; t += 0.5) way = speedInChop(Math.round(kt * 4) / 4, t, Math.round(hs * 50) / 50, Math.round(tp * 10) / 10) > 0;
+      if (way) expect(speedInChop(Math.round(kt * 4) / 4, a, Math.round(hs * 50) / 50, Math.round(tp * 10) / 10), `${kt} kt, ${hs.toFixed(2)} m at ${a.toFixed(1)}`).toBeGreaterThan(0);
+    }
+  });
   // (the v213 review: with no headway at any angle it gave 65°, 21–25° off its neighbors that made way at 86–90°)
   it('under 2 kt in a chop, no 20° jumps at the edge of headway: each 2 cm of chop moves it under 10°', () => {
     for (const kt of [0.5, 0.75, 1, 1.25, 1.5]) { let prev = beatInChop(kt, 0.1, 2.2);
