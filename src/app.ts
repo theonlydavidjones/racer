@@ -635,8 +635,9 @@ function chaseFrame(): void {
   view.setChaseFrame({ top: 0, bottom: wx && wx.height > 0 ? wx.top - gl.top : r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
 }
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
-/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, beside the 3D view; off until you open it. The
- * picture moves left by half the panel, so she stays in the middle of what's left of the view. */
+/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, over the 3D view; off until you open it. The
+ * picture doesn't move: she stays where she was, in the middle of the screen (the owner, 15 Nov 2026: "when I engage
+ * wind-over-sails, don't bump the boat to the left. keep her center screen."). */
 /** Re-draw the layer menus if open (a training view switched by its key: the menu's tick follows). */
 let refreshMenus = () => {};
 const flowPanel = new FlowPanel(document.body, () => openFlow(false));
@@ -644,9 +645,7 @@ function openFlow(open = !flowPanel.open): void {
   flowPanel.show(open);
   refreshMenus();
   document.body.classList.toggle('flow-open', open);
-  look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
 }
-addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 // (the owner OKd the mock-up, 13 Nov: no Sail controls button. The ▾ tab on the band's edge puts the band away; put away,
