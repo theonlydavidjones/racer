@@ -26,6 +26,17 @@ describe('NOAA chart data', () => {
     expect(ENC.aids.some(a => a.k === 'light' && /Alcatraz/.test(a.name ?? ''))).toBe(true);
   });
 
+  it('charts the dangers, with their depths and names, and what else a small boat looks out for (ENC check #7)', () => {
+    const H = ENC.hazards as { k: string; d?: number; wl?: number; n?: string; p?: [number, number] }[], n = (k: string) => H.filter(h => h.k === k).length;
+    expect(n('rock')).toBeGreaterThan(250); expect(n('wreck')).toBeGreaterThan(50); expect(n('obstn')).toBeGreaterThan(500);
+    expect(n('rip')).toBeGreaterThanOrEqual(7); expect(n('sandw')).toBeGreaterThanOrEqual(5); expect(n('hulk')).toBe(1);
+    expect(n('pile')).toBeGreaterThan(20); expect(n('pile')).toBeLessThan(150); // (the race areas' piles only, not the marinas')
+    // Anita Rock off the St. Francis YC, 1.5 m: charted with its depth; Berkeley Reef, awash
+    const near = (lat: number, lon: number, k: string) => H.find(h => h.k === k && h.p && Math.abs(h.p[1] / 1e5 - lat) < 2e-4 && Math.abs(h.p[0] / 1e5 - lon) < 2e-4);
+    expect(near(37.8082, -122.45333, 'rock')?.d).toBe(1.5);
+    expect(H.find(h => h.n === 'Berkeley Reef')?.wl).toBe(5);
+  });
+
   it('charts the soundings in the deep channel under the Golden Gate deeper than 30 m', () => {
     const g = LL(37.8175, -122.4783); let best = 1e9, d = 0;
     for (let i = 0; i < ENC.soundings.length; i += 3) { const p = LL(ENC.soundings[i + 1] / 1e5, ENC.soundings[i] / 1e5), r = Math.hypot(p.x - g.x, p.y - g.y); if (r < best) { best = r; d = ENC.soundings[i + 2] / 10; } }

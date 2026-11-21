@@ -278,11 +278,16 @@ for (const f of all('LIGHTS')) {
   aids.push(a);
 }
 
-// dangers: rocks, wrecks and obstructions (points), with their depth where charted
+// dangers: rocks, wrecks and obstructions, with their depth where charted (and their name, and what an obstruction is);
+// and what else a small boat wants to see (ENC check #7): tide rips and breakers (WATTUR), sand waves (SNDWAV), the
+// hulk, and the piles and stakes in and round the race areas (PILPNT; not the hundreds in the marinas farther off)
 const hazards = [];
-for (const [n, k] of [['UWTROC', 'rock'], ['WRECKS', 'wreck'], ['OBSTRN', 'obstn']]) for (const f of all(n)) {
+const RACE = { south: 37.79, north: 37.90, west: -122.50, east: -122.30 };
+for (const [n, k] of [['UWTROC', 'rock'], ['WRECKS', 'wreck'], ['OBSTRN', 'obstn'], ['WATTUR', 'rip'], ['SNDWAV', 'sandw'], ['HULKES', 'hulk'], ['PILPNT', 'pile']]) for (const f of all(n)) {
   const p = P(f), g = f.geometry, h = { k };
+  if (k === 'pile' && (g.type !== 'Point' || !inside(RACE, ...ll(g)))) continue;
   if (p.VALSOU != null) h.d = p.VALSOU; if (p.WATLEV != null) h.wl = p.WATLEV; if (p.CATWRK != null) h.cw = p.CATWRK;
+  if (p.CATOBS != null) h.co = p.CATOBS; if (p.CATWAT != null) h.cwt = p.CATWAT; if (p.OBJNAM) h.n = p.OBJNAM;
   if (g.type === 'Point') { if (!inBox(ll(g))) continue; h.p = qp(ll(g)); }
   else { const ps = polys(g).map(fillPoly).filter(Boolean); if (ps.length) h.f = ps; const ls = lines(g).flatMap(clipLine); if (ls.length) h.o = ls; if (!ps.length && !ls.length) continue; }
   hazards.push(h);

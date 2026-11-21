@@ -42,3 +42,12 @@ Requested by Coordinator 2: a one-by-one check of the sim's chart features again
 ## Fixed here
 
 - **#1:** the chart data regenerated from the 2026-11-21 catalog, with US4CA2CJ at update 2 and US5OAKFF at update 3, in 3e0ad73e. It's data under src/, so the batch it's in needs the full `npm test` (CLAUDE.md).
+- **#3:** Harding Rock (mark 17) moved to the ENC's "HR" in f878e1d3, with `tests/encMarks.test.ts` (Harding within 3 m; the other lighted marks and beacons within 10 m of the ENC).
+- **#4, #5:** the ships' routes in a16bb939. The inbound and outbound ship lanes each run one way on NOAA's scheme; the tour, the Alcatraz ferry and the Coast Guard routes are clear of land. `tests/traffic.test.ts` checks every route at 10 m steps for onLand, and that the ships never enter a separation zone. perf-pair 0.968.
+- **#6:** the 92 shallow hazards, `enc-check/shallow-hazards.json` (1182339e). For grounding, every rock, wreck and obstruction in the race areas at any depth, with its LNAM, position (and outline for areas), depth, WATLEV, EXPSOU, QUASOU and category: `enc-check/hazards-race-areas.json` (382).
+- **#7 and the dangers on the chart:** the converter now keeps the dangers' names and categories, the tide rips and breakers, the sand waves, the hulk, and the piles in the race areas (62 of 248). They're drawn to US Chart No. 1:
+  - rocks: K12 covers and uncovers, with the drying height underlined; K13 awash; K14 and K15 under water;
+  - wrecks: K20 hull showing, K25 mast showing, K26 least depth known, K28 and K29 dangerous or not;
+  - obstructions: K40 and K41;
+  - H44 tide rips, J14 sand waves, F22 piles.
+  The depth figure, in feet, is shown where there's room. The dotted danger line rings what's 20 m or less (S-4 B-411). Each frame draws the symbols as one path per pen, not a stroke apiece, and the chart's text is kept off the figures. Per view, the paired old/new draw time is within +3.2% (limit +5%): bay 1.011, central 0.995, City Front 1.000, Anita Rock 1.010, Gate 1.000, Alcatraz 1.010, inset 1.032, wide inset 1.000. Stills: `enc-check/enc-05-anita-rock.png`, `enc-06-alcatraz.png`, `enc-07-gate-rip.png`.

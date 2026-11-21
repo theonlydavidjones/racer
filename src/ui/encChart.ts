@@ -17,7 +17,9 @@ type Pts = number[]; // [lon, lat, dlon, dlat, …] in 1e-5 degrees
 interface Area { k: string; name?: string; orient?: number; d?: number; restrn?: number[]; catrea?: number[]; catach?: number[]; o?: Pts[]; f?: Pts[][]; at?: [number, number]; size?: number }
 export interface Light { chr: number; col: number[]; grp?: string; per?: number; h?: number; r?: number; cat?: number[]; s1?: number; s2?: number; name?: string }
 export interface Aid { k: 'buoy' | 'beacon' | 'light'; cls?: string; p: [number, number]; name?: string; col?: number[]; pat?: number[]; shp?: number; cat?: number; spm?: number[]; priv?: number; lit?: Light[]; fog?: number; top?: number; topcol?: number[]; racon?: number }
-interface Hazard { k: 'rock' | 'wreck' | 'obstn'; p?: [number, number]; d?: number; wl?: number; cw?: number; f?: Pts[][]; o?: Pts[] }
+/** A danger, or what else a small boat looks out for: `d` its depth (m below MLLW; negative, a height it dries), `wl` WATLEV
+ * (1–2 dry, 3 always under, 4 covers and uncovers, 5 awash), `cw` CATWRK, `co` CATOBS, `cwt` CATWAT, `n` its name. */
+interface Hazard { k: 'rock' | 'wreck' | 'obstn' | 'rip' | 'sandw' | 'hulk' | 'pile'; p?: [number, number]; d?: number; wl?: number; cw?: number; co?: number; cwt?: number; n?: string; f?: Pts[][]; o?: Pts[] }
 interface Name { k: 'sea' | 'land' | 'bridge'; t: string; p: [number, number]; size: number; clr?: number }
 interface ChartData {
   source: string; cells: { name: string; title: string; scale: number; edition: number; update: number; updated: string; issued: string }[];
@@ -179,7 +181,7 @@ function built(): Built {
     contours: linePath(ENC.contours.flatMap(c => c.l)),
     land: polyPath(ENC.land), built: polyPath(ENC.built), structures: withPiers(polyPath(ENC.structures)), shore: linePath(ENC.shore), piers: linePath(ENC.piers),
     areas: ENC.areas.map(a => ({ a, o: a.o?.length ? linePath(a.o) : null, f: a.f?.length ? polyPath(a.f) : null, at: a.at ? at(a.at) : null, box: boxOfLines(a.o ?? []) })),
-    hazards: ENC.hazards.map(h => ({ h, p: h.p ? at(h.p) : null, f: h.f?.length ? polyPath(h.f) : null, o: h.o?.length ? linePath(h.o) : null })),
+    hazards: ENC.hazards.map(h => ({ h, p: h.p ? at(h.p) : h.k === 'sandw' && h.f?.length ? ringMid(h.f[0][0]) : null, f: h.f?.length ? polyPath(h.f) : null, o: h.o?.length ? linePath(h.o) : null })),
     soundings: snd,
     aids: ENC.aids.map(a => ({ a, ...at(a.p), text: aidText(a) })),
     islets: ENC.islets.map(at),
@@ -231,7 +233,7 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   }
   ctx.setLineDash([]);
   for (const H of G.hazards) {
-    if (H.f) { ctx.fillStyle = H.h.wl === 3 || H.h.wl == null ? 'rgba(0,0,0,0)' : I.structure; ctx.fill(H.f); }
+    if (H.f && (H.h.k === 'hulk' || (H.h.wl != null && H.h.wl !== 3))) { ctx.fillStyle = I.structure; ctx.fill(H.f); } // (a hulk, and what dries: drawn as the land's works are)
     if ((H.f || H.o) && scale > 0.15) { ctx.strokeStyle = I.ink; ctx.lineWidth = px(0.8); ctx.setLineDash([px(1.5), px(2)]); if (H.f) ctx.stroke(H.f); if (H.o) ctx.stroke(H.o); ctx.setLineDash([]); }
   }
   ctx.restore();
@@ -249,13 +251,18 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
     laneArrow(ctx, s[0], s[1], ang, L, I.magenta);
   }
   // hazard symbols
-  if (scale > 0.12) for (const H of G.hazards) if (H.p) {
-    const s = tf(H.p.x, H.p.y); if (!on(s[0], s[1])) continue;
-    hazard(ctx, s[0], s[1], H.h, I, detail === 'chart' && scale > 0.35);
+  const S = symbols();
+  if (scale > 0.12) {
+    const close = scale > 0.35, depthToo = detail === 'chart' && close;
+    for (const H of G.hazards) if (H.p && (H.h.k !== 'pile' || close)) {
+      const s = tf(H.p.x, H.p.y); if (on(s[0], s[1])) hazard(S, s[0], s[1], H.h, depthToo);
+    }
+    drawSymbols(ctx, S, I);
   }
   // the print: names first, then the aids' labels, each kept clear of what's already placed; soundings fill the gaps
   const P = new Placer(ctx, w, h);
   for (const b of avoid) P.block(...b); // the sim's own labels, drawn later over the chart
+  for (const f of S.fig) P.block(f.x - 8, f.y - 8, 16, 16); // (a danger's depth in its ring: the print keeps off it)
   ctx.textAlign = 'left';
   if (detail === 'chart') {
     for (const n of G.names) {
@@ -457,19 +464,74 @@ function aid(ctx: CanvasRenderingContext2D, x: number, y: number, a: Aid, I: Ink
   ctx.restore();
 }
 
-function hazard(ctx: CanvasRenderingContext2D, x: number, y: number, h: Hazard, I: Ink, depthToo: boolean): void {
+/** A ring's middle (the middle of its bounds), in metres: where an area's symbol goes. */
+function ringMid(r: Pts): { x: number; y: number } {
+  let x = r[0], y = r[1], x0 = x, x1 = x, y0 = y, y1 = y;
+  for (let i = 2; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return at([(x0 + x1) / 2, (y0 + y1) / 2]);
+}
+
+/**
+ * The dangers' symbols for one frame, gathered into one path for each pen (a handful of strokes a frame however many
+ * there are, not a stroke apiece): `line` solid ink, `dot` the dotted danger line, `fill` solid dots and hulls; `fig`
+ * the depth figures, in feet as the soundings are.
+ */
+interface Sym { line: Path2D; dot: Path2D; fill: Path2D; fig: { t: string; x: number; y: number; under: boolean }[] }
+const symbols = (): Sym => ({ line: new Path2D(), dot: new Path2D(), fill: new Path2D(), fig: [] });
+function drawSymbols(ctx: CanvasRenderingContext2D, S: Sym, I: Ink): void {
   ctx.save(); ctx.strokeStyle = I.ink; ctx.fillStyle = I.ink; ctx.lineWidth = 1;
-  const awash = h.wl === 4 || h.wl === 5, dries = h.wl === 1 || h.wl === 2;
-  if (h.k === 'rock') {
-    if (awash || dries) { for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(x - Math.cos(a) * 3.5, y - Math.sin(a) * 3.5); ctx.lineTo(x + Math.cos(a) * 3.5, y + Math.sin(a) * 3.5); ctx.stroke(); } }
-    else { ctx.beginPath(); ctx.moveTo(x - 3.5, y); ctx.lineTo(x + 3.5, y); ctx.moveTo(x, y - 3.5); ctx.lineTo(x, y + 3.5); ctx.stroke(); }
-  } else if (h.k === 'wreck') {
-    ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); for (const dx of [-3, 0, 3]) { ctx.moveTo(x + dx, y - 2.5); ctx.lineTo(x + dx, y + 2.5); } ctx.stroke();
-  } else {
-    ctx.setLineDash([1.5, 1.5]); ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.29); ctx.stroke(); ctx.setLineDash([]);
+  ctx.stroke(S.line); ctx.fill(S.fill);
+  ctx.setLineDash([1.2, 1.6]); ctx.stroke(S.dot); ctx.setLineDash([]);
+  if (S.fig.length) {
+    ctx.font = 'italic 9px Georgia, serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of S.fig) { ctx.fillText(f.t, f.x, f.y); if (f.under) ctx.fillRect(f.x - 4, f.y + 4.5, 8, 0.8); }
   }
-  if (depthToo && h.d != null) { ctx.font = 'italic 9px Georgia, serif'; ctx.textAlign = 'left'; ctx.fillText(String(Math.round(h.d * FT)), x + 5, y - 4); }
   ctx.restore();
+}
+
+/** S-4 B-411: a danger is "dangerous to surface navigation" at 20 m or less; the chart rings those with its danger line. */
+const DANGER_M = 20;
+const ring = (P: Path2D, x: number, y: number, r: number) => { P.moveTo(x + r, y); P.arc(x, y, r, 0, 6.2832); };
+const plus = (P: Path2D, x: number, y: number, r: number) => { P.moveTo(x - r, y); P.lineTo(x + r, y); P.moveTo(x, y - r); P.lineTo(x, y + r); };
+const waves = (P: Path2D, x: number, y: number, n: number, a: number) => { // (n crests, 3 px apart, a px high)
+  P.moveTo(x - n * 1.5, y); for (let i = 0; i < n; i++) P.quadraticCurveTo(x - n * 1.5 + i * 3 + 1.5, y + (i % 2 ? a : -a) * 2, x - n * 1.5 + i * 3 + 3, y);
+};
+const fig = (d: number) => String(Math.round(Math.abs(d) * FT));
+
+/**
+ * One danger's symbol, as US Chart No. 1 (13th ed.) draws it: section K (rocks K11–K15, wrecks K20–K29, obstructions
+ * K40–K43), H44 tide rips (K17 breakers the same marks), J14 sand waves, F22 a pile. Where its depth is charted (and
+ * there's room), the depth figure in feet, underlined where it dries; the dotted danger line round what's 20 m or less.
+ */
+function hazard(S: Sym, x: number, y: number, h: Hazard, depthToo: boolean): void {
+  const known = h.d != null, danger = !known || h.d! <= DANGER_M, figure = depthToo && known && h.wl !== 4 && h.wl !== 5;
+  if (h.k === 'pile') { ring(S.fill, x, y, 1.2); return; }
+  if (h.k === 'rip') { for (const dy of [-4.5, 0, 4.5]) waves(S.line, x + dy * 0.4, y + dy, 5, 0.9); return; }
+  if (h.k === 'sandw') { waves(S.line, x, y, 6, 1.2); return; }
+  if (h.k === 'rock') {
+    if (h.wl === 4 || h.wl === 1 || h.wl === 2) { // K12: covers and uncovers, an asterisk; its drying height underlined
+      plus(S.line, x, y, 3.5); const r = 2.5; S.line.moveTo(x - r, y - r); S.line.lineTo(x + r, y + r); S.line.moveTo(x - r, y + r); S.line.lineTo(x + r, y - r);
+      if (depthToo && known && h.d! < 0) S.fig.push({ t: fig(h.d!), x: x + 9, y: y - 5, under: true });
+      return;
+    }
+    if (h.wl === 5) { plus(S.line, x, y, 3.5); for (const [dx, dy] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) ring(S.fill, x + dx, y + dy, 0.7); return; } // K13: awash at the datum
+  }
+  if (h.k === 'wreck') {
+    if (h.wl === 1 || h.wl === 2 || h.cw === 5) { // K20: hull showing
+      S.fill.moveTo(x - 6, y); S.fill.quadraticCurveTo(x, y + 5, x + 6, y); S.fill.lineTo(x + 4, y - 1.2); S.fill.lineTo(x - 4, y - 1.2); S.fill.closePath(); return;
+    }
+    if (!figure) { // K28/K29: the wreck's bars (and K25, her mast showing), in the danger line where she's dangerous
+      S.line.moveTo(x - 6, y); S.line.lineTo(x + 6, y); for (const dx of [-3, 0, 3]) { S.line.moveTo(x + dx, y - 2.5); S.line.lineTo(x + dx, y + 2.5); }
+      if (h.cw === 4) { S.line.moveTo(x, y - 2.5); S.line.lineTo(x, y - 7); }
+      if (h.cw !== 1 && danger) { S.dot.moveTo(x + 8.5, y); S.dot.ellipse(x, y, 8.5, 5, 0, 0, 6.2832); }
+      return;
+    }
+  }
+  // K14/K15 rocks under water, K26 a wreck of known least depth, K40/K41 obstructions: the depth in the danger line,
+  // or where there's no figure, a rock's cross or an obstruction's ring alone
+  if (figure) { S.fig.push({ t: fig(h.d!), x, y, under: h.d! < 0 }); if (danger) ring(S.dot, x, y, 7); return; }
+  if (h.k === 'rock') plus(S.line, x, y, 3);
+  if (danger || h.k === 'obstn') ring(S.dot, x, y, h.k === 'rock' ? 5 : 4);
 }
 
 /** The outlined arrow that shows which way traffic goes in a lane of a traffic separation scheme. */
