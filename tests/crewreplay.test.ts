@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mirrored, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
+import { mirrored, replayDeepest, replayHeldBack, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
 import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 import SIDE_DECK from './fixtures/crew-sidedeck-8kt.json';
 import EDGE_1 from './fixtures/crew-cabinedge-20kt-1.json';
 import EDGE_2 from './fixtures/crew-cabinedge-20kt-2.json';
 import EDGE_3 from './fixtures/crew-cabinedge-20kt-3.json';
 import FOREDECK from './fixtures/crew-foredeck-8kt.json';
+import TACK_JIB from './fixtures/crew-tack-jibhand-12kt.json';
 
 // The sprint's soak (19 Nov 2026, Crew Habits' harness, seed 3, west, real sea), replayed: stretches of its races recorded
 // frame by frame from the harness (each person's place, pose, lean, goal and job, her heel, the windward side, tacking,
@@ -46,4 +47,20 @@ describe('The soak, replayed: the crew clear of the boat (render/crew.ts)', () =
       expect(replayDeepest(rec, 173)).toBe('');
     }, 120_000);
   }
+});
+
+// The crew audit (21 Nov 2026, docs/crew/crew-audit.md item 4): the race at 12 kt, Green, a tack at 1039.5 s, through by
+// 1042.58 s. Once she was through, the jib hand was kept in the tack's pose, kneeling at the new leeward winch (syncCrew
+// f.tack, kept until they'd arrived), while the physics carried their weight 1.8 m out to the new windward rail: drawn
+// still, 0.9 to 1.8 m from their weight, for 1.2 s. Once the tack's over and their weight's across the middle, they go
+// with it: never still for half a second while it's carried away from them (0.42 s: turning about from the winch to
+// step off; 1.12 s before). (Within the tack the role
+// keeps them at the winch while the physics already moves them: the tack's own choreography, the crew audit's item 4
+// note.)
+describe('The crew audit, replayed: after a tack nobody waits while their weight goes on (render/crew.ts)', () => {
+  for (const [tack, rec] of [['starboard', TACK_JIB], ['port', mirrored(TACK_JIB as unknown as CrewRecording)]] as const)
+    it(`the jib hand after a tack, 12 kt, to ${tack}`, () => {
+      const r = replayHeldBack(rec as unknown as CrewRecording, 1042.6);
+      expect(r.held, r.at).toBeLessThan(0.5);
+    }, 120_000);
 });

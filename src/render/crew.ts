@@ -1849,7 +1849,13 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // their weight was, and were carried there at 3.7 m/s as it began; then back out to the new rail)
     const inboard = !a || Math.abs(a.x) < benchEdge(a.z) || pose === 'cross';
     const wasTack = !!f.tack;
-    f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
+    // (and after it, still on their way across, only while the physics has their weight on the old side or in the middle:
+    // once it's across toward the new windward side, they go with it. The jib hand was held kneeling at the new leeward
+    // winch, 1.8 m from their weight, for 1.2 s after the tack, until the physics had them all the way out (the crew audit,
+    // 21 Nov 2026, item 4). Not before the tack's end: let go with it, they crossed with the main hand, the two through
+    // each other in the middle of the cockpit)
+    const outWindward = !!a && Math.sign(a.x) === windward && Math.abs(a.x) > 0.3;
+    f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go && !outWindward));
     // (back from facing aft at the mainsheet, round through facing inboard, away from the bench they're going to: round the
     // other way, the knee of a foot planted on the sole swung out over the bench, the shin through its edge)
     // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)

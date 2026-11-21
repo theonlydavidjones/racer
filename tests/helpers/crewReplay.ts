@@ -58,3 +58,26 @@ export function replayHelmKnee(rec: CrewRecording, from: number): number {
   }
   return top;
 }
+
+/** Drawn as replayDeepest draws it, from `from` (s) on: the longest any crew figure stands still (its hips not 1 cm on
+ * in 0.1 s) while the physics carries their weight on (5 cm or more in that 0.1 s) and it's already half a metre or more
+ * from them across the boat (s), and who and when. */
+export function replayHeldBack(rec: CrewRecording, from: number): { held: number; at: string } {
+  const c = newCrew(rec.spec, rec.frames[0]!.w > 0 ? 'S' : 'P'), cr = buildCrew(rec.spec.helm, rec.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1);
+  let prev = rec.frames[0]!.t, held = 0, at = '';
+  const hist = cr.crew.map(() => [] as { t: number; hx: number; hz: number; px: number }[]), run = cr.crew.map(() => -1);
+  for (const r of rec.frames) {
+    c.clock = r.clock; (c as { roll?: unknown }).roll = r.roll;
+    r.people.forEach((p, i) => Object.assign(c.people[i]!, { goal: undefined, job: null, ready: false, outUntil: 0, lean: 0 }, p));
+    syncCrew(cr, r.w, c, Math.max(1e-3, r.t - prev), false, undefined, r.heel, !!r.tacking); prev = r.t;
+    if (r.t < from) continue;
+    cr.crew.forEach((f, i) => {
+      const hp = (f as Figure).cur!.hip, px = (r.people[i + 1] as { x: number }).x, h = hist[i]!;
+      h.push({ t: r.t, hx: hp.x, hz: hp.z, px }); while (h.length > 1 && h[0]!.t < r.t - 0.1) h.shift();
+      const o = h[0]!, still = Math.hypot(hp.x - o.hx, hp.z - o.hz) < 0.01, carried = Math.abs(px - o.px) > 0.05, far = Math.abs(hp.x - px) > 0.5;
+      if (r.t - o.t > 0.07 && still && carried && far) { if (run[i]! < 0) run[i] = r.t; const d = r.t - run[i]!; if (d > held) { held = d; at = `crew${i + 1} from ${run[i]!.toFixed(2)} s, ${Math.abs(hp.x - px).toFixed(2)} m from their weight`; } }
+      else run[i] = -1;
+    });
+  }
+  return { held, at };
+}
