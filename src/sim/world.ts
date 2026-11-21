@@ -3224,7 +3224,8 @@ export class World {
 }
 
 /**
- * The tide in words at a place: "Ebb 1.4 kt, easing · turns to flood ~13:42". The speed is the sim's own
+ * The tide in words at a place: "Ebb 1.4 kt, easing · turns to flood about 13:42" (a tilde read as a minus in the
+ * instruments' lettering: the first-hour audit #16). The speed is the sim's own
  * current there (blended stations, eased near the shore), measured along the nearest station's flood/ebb axis.
  */
 export function describeTide(f: CurrentField, p: Vec, now: number): { label: string; button: string } {
@@ -3236,7 +3237,7 @@ export function describeTide(f: CurrentField, p: Vec, now: number): { label: str
   for (let m = 5; m <= 8 * 60; m += 5) if (Math.sign(at(now + m)) !== Math.sign(v)) { slack = sfClock(now + m); break; }
   if (Math.abs(v) < 0.15) return { label: `Slack, turning to ${later >= v ? 'flood' : 'ebb'}`, button: 'Slack' };
   const kind = v > 0 ? 'Flood' : 'Ebb', trend = Math.abs(later) > Math.abs(v) + 0.02 ? 'building' : Math.abs(later) < Math.abs(v) - 0.02 ? 'easing' : 'at its strongest';
-  return { label: `${kind} ${Math.abs(v).toFixed(1)} kt, ${trend}${slack ? ` · turns to ${v > 0 ? 'ebb' : 'flood'} ~${slack}` : ''}`, button: kind };
+  return { label: `${kind} ${Math.abs(v).toFixed(1)} kt, ${trend}${slack ? ` · turns to ${v > 0 ? 'ebb' : 'flood'} about ${slack}` : ''}`, button: kind };
 }
 
 /** Is replying "You tack" sensible for `to`? Only when she's clear ahead of the hailing boat with a
