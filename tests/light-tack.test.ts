@@ -15,9 +15,9 @@ import { FLAT_SEA } from '../src/environment/sea';
  */
 /** (asked for the port close-hauled course from settled on starboard close-hauled, wind from 0: whether she bore away past
  * the beam, a gybe round, and when she was round) */
-function askTack(b: Boat, s = 60): { gybed: boolean; round: number } {
+function askTack(b: Boat, s = 60, slow = false): { gybed: boolean; round: number } {
   const a = beatAngle(b.ww.kt);
-  b.isUser = false; b.ai = { turnCommit: 0, commitFor: 0 } as unknown as NonNullable<Boat['ai']>;
+  b.isUser = false; b.ai = { turnCommit: 0, commitFor: 0, goTack: slow ? { to: 'P', at: 0, mode: 'beat', leg: 0, slow } : null } as unknown as NonNullable<Boat['ai']>;
   b.desired = a;
   let gybed = false, round = -1;
   sail(b, s, t => { if (Math.abs(wrap(b.h - 180)) < 90) gybed = true; if (!gybed && Math.abs(wrap(b.h - a)) < 10) { round = t; return true; } });
@@ -25,20 +25,33 @@ function askTack(b: Boat, s = 60): { gybed: boolean; round: number } {
 }
 
 describe('A tack in light air (physics.ts slowTack)', () => {
-  it('in a deep lull in a breezy day\'s chop, where bearing away can\'t build the way, she tacks slowly round rather than footing forever', () => {
+  it('in a deep lull in a breezy day\'s chop, or at its edge, footing can\'t be counted on to build the way', () => {
     // (v213 review, 20 Nov 2026: the chop is the day's wind's (world.ts seaWind), her threshold the wind at her; in 0.5 m
     // with 2 kt at her, footed 10° her target is under slowTack × 1.15, so ai.ts footed her on every think and she never
-    // came round. In flat water footing does reach it.)
-    const chop = { ...FLAT_SEA, hsW: 0.5, tpW: 2.8 };
-    expect(footReaches({ ww: { kt: 2 }, sea: chop }), '2 kt in 0.5 m chop').toBe(false);
+    // came round. v214 review: at the edge the table's target clears it, but as sailed in chop she settles 7-9% under
+    // it (AI-steered 240 s: 0.428 m/s against a need of 0.433 in 2 kt and 0.4 m; 0.588 against 0.596 in 2.75 kt and
+    // 0.5 m; 0.827 against 0.866 in 4 kt and 0.8 m), so footed forever there too. The chop's periods here are the sea's
+    // for those heights, about: with a 3.3 s period the 4 kt case's target clears even the margin, so it rests on ai.ts
+    // asking the tack after FOOT_FOR_S of footing, whatever this says.)
+    for (const [kt, hsW, tpW] of [[2, 0.5, 2.8], [2, 0.4, 2.5], [2.75, 0.5, 2.8]])
+      expect(footReaches({ ww: { kt }, sea: { ...FLAT_SEA, hsW, tpW } }), `${kt} kt in ${hsW} m chop`).toBe(false);
     for (const kt of [1, 2, 4, 8]) expect(footReaches({ ww: { kt }, sea: FLAT_SEA }), `${kt} kt, flat`).toBe(true);
+  });
+  it('asked a tack slow where footing couldn\'t build the way, she tacks through the wind, sculled, sooner than she\'d wear round', () => {
+    // (v214 review, wearing against tacking: round at 97 s against 36 s in 2.5 kt and 0.5 m, 198 against 67 in 1 kt and
+    // 0.3 m, 156 against 63 in 1.5 kt and 0.4 m. Rule 42.3(d), World Sailing's SCULL 1: sculled onto either tack's
+    // close-hauled course. The wear won only from a dead stop, so from there she still wears.)
+    for (const [kt, hsW, tpW] of [[2.5, 0.5, 2.8], [1, 0.3, 2.3], [1.5, 0.4, 2.5], [2, 0.5, 2.8]]) {
+      const a = beatAngle(kt), b = testBoat({ heading: 360 - a, kt: 1, windKt: kt });
+      b.sea = { ...FLAT_SEA, hsW, tpW }; sail(b, 90);
+      const v0 = b.v, r = askTack(b, 90, true);
+      expect(r.gybed, `${kt} kt, ${hsW} m: gybed round`).toBe(false);
+      expect(r.round, `${kt} kt, ${hsW} m: round within 90 s, from ${v0.toFixed(2)} m/s`).toBeGreaterThan(0);
+    }
     const a = beatAngle(2), b = testBoat({ heading: 360 - a, kt: 1, windKt: 2 });
-    b.sea = chop; sail(b, 90);
-    const r = askTack(b, 60);
-    // (a slow tack, sculled round (rule 42.3(d), SCULL 1: onto either tack's close-hauled course), about 30 s; wearing
-    // round instead took about 195 s, and before that ai.ts never asked it at all)
-    expect(r.gybed, 'gybed round').toBe(false);
-    expect(r.round, `round, from ${b.v.toFixed(2)} m/s against slowTack ${slowTack(b).toFixed(2)}`).toBeGreaterThan(0);
+    b.sea = { ...FLAT_SEA, hsW: 0.5, tpW: 2.8 }; sail(b, 90);
+    b.vx = 0; b.vy = 0; b.v = 0;
+    expect(askTack(b, 240, true).gybed, 'from a dead stop, she wears').toBe(true);
   });
   it('in chop, she wants at least the way she would in flat water (a seaway stops her head to wind sooner, not later)', () => {
     // (the physics review, 20 Nov 2026: with the share of her speed in chop, the threshold fell as the chop rose, 0.28 to
