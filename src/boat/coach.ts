@@ -754,6 +754,9 @@ export class CoachMemory {
   pending: { done: string; speedKt: number; at: number } | null = null;
   /** When a lesson was last put on screen (for the brief headline while sailing). */
   shown = new Map<string, number>();
+  /** The crew line on the card, and since when: held HOLD_S as the headline is, so a puff's clause ("traveler down",
+   * "easing the main") doesn't come and go every few seconds; at once when what they're doing changes in kind. */
+  private crew: { line: string; kind: string; since: number } | null = null;
 
   /** Was the lesson we were teaching fixed by you (not handed back, not left behind by easing to slow down or a tack)? */
   private fixed(b: Boat, prev: NonNullable<CoachMemory['top']>, nextId: string): boolean {
@@ -799,6 +802,9 @@ export class CoachMemory {
     // a thing to fix goes on screen once she's settled (not the same one again within half a minute): one that became
     // the top while she was settling is said when the quiet's over
     { const tp = view.top; if (!fresh && tp.kind === 'fix' && t >= this.quietUntil && t - (this.shown.get(tp.id) ?? -1e9) > 30) { fresh = tp.head; this.shown.set(tp.id, t); } }
+    { const line = view.crew, kind = !line ? '' : /depowering/.test(line) ? 'depower' : / set for /.test(line) ? 'set' : line.slice(0, 18), c = this.crew;
+      if (!c || (line !== c.line && (kind !== c.kind || t - c.since >= HOLD_S))) this.crew = { line, kind, since: t };
+      else if (line !== c.line) view = { ...view, crew: c.line }; }
     const done = this.doneText && t < this.doneText.until ? this.doneText.text : null;
     const held = this.top ? Math.min(1, (t - this.top.since) / HOLD_S) : 1, of = (view.top.kind === 'fix' ? 1 : 0) + view.more.length;
     return { view, done, fresh, held, of };
