@@ -207,7 +207,12 @@ function tideBox(): void {
       : wx.source === 'forecast' ? `The National Weather Service forecast for ${day} (issued ${new Date(wx.issued!).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' })}): ${WIND_KIND_LABEL[wx.kind].toLowerCase()}, ${span} around the race${wx.realSwell ? ', and its swell forecast outside the Gate' : ''}. Hour by hour; the shifts and puffs within the hour are the sim's.`
       : wx.source === 'records' ? `No observations or forecast for ${day} yet: a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day, drawn from the ${month} records.`
       : `You chose a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day${f[app.w.windKind] < 0.02 ? ` (it almost never blows in ${month}; you get the westerly)` : ''}, from the ${month} records.`;
-    $('windKindNote').textContent = `${src} Across the course: ${wx.fieldSource}${app.S.aids ? ' (shaded on the map)' : ''}. ${month} race days at Fort Point, 2021–25: ${odds}. ${app.KIND_NOTE[app.w.windKind]}`.replace(/around the race/g, app.S.mode === 'sail' ? 'through the afternoon' : 'around the race');
+    // (one short line: where the wind comes from and how much; the rest on its hover. The in-race audit, item 11: it was 441 characters)
+    const full = `${src} Across the course: ${wx.fieldSource}${app.S.aids ? ' (shaded on the map)' : ''}. ${month} race days at Fort Point, 2021–25: ${odds}. ${app.KIND_NOTE[app.w.windKind]}`.replace(/around the race/g, app.S.mode === 'sail' ? 'through the afternoon' : 'around the race');
+    const kindW = WIND_KIND_LABEL[wx.kind];
+    const line = wx.source === 'observed' ? `${kindW}, ${span}: observed at Fort Point` : wx.source === 'forecast' ? `${kindW}, ${span}: the NWS forecast`
+      : wx.source === 'records' ? `${kindW}: no forecast yet, from the ${month} records` : `${kindW}: your choice, from the ${month} records`;
+    const note = $('windKindNote'); note.textContent = line; note.title = full;
     const issued = wx.issued ? new Date(wx.issued).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
     condSource = !app.w.seaBreeze ? 'Wind: as you set it' : wx.source === 'observed' ? 'Wind: observed at Fort Point' : wx.source === 'forecast' ? `Wind: NWS forecast, issued ${issued}`
       : wx.source === 'records' ? `Wind: no forecast yet; a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day from the ${month} records` : `Wind: a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day you chose, from the ${month} records`;
