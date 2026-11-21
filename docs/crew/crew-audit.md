@@ -61,10 +61,10 @@ Sizes: **S** is under 1 h with its test; **M** is 2–4 h.
 
 `helm-crossing-lag_*.jpg`.
 
-- **What it looks like:** in every tack, and whenever she comes through head to wind before a start, the helm is drawn crouched on the after deck. Their hands are off the tiller and a foot hangs over the side, while the physics already has them sitting on the new side, up to 1 m away.
+- **What it looks like:** in every tack, and whenever she comes through head to wind before a start, the helm is drawn crouched on the after deck. A foot hangs over the side while the physics already has them sitting on the new side, up to 1 m away.
 - **Duration:** about 1 s each time.
 - **Cause:** `helmCrossing` (`src/render/crew.ts:1033`) follows the figure's own walking pace (`moving`, `:669`), which falls behind the physics' crossing.
-- **Fix:** the crossing paced to the physics, the stick kept in hand.
+- **Fix:** the crossing paced to the physics. (The stills also show the hands off the tiller, but the harness drew a fixed tiller: see item 8.)
 - **Overlap with r010:** this sits beside r010's helm item, the stick hand chosen by the nearer shoulder, and could go in the same PR.
 
 ### 4. After a tack, a crew member stands upright in the cockpit while the physics has them hiking (M)
@@ -100,13 +100,13 @@ Sizes: **S** is under 1 h with its test; **M** is 2–4 h.
 - **What it looks like:** hiking with the mainsheet, the main hand's arm nearer the boat reaches across their own chest toward the crew member beside them, its forearm through their torso. This happens outside tacks: 111 runs, up to 9 s, in the races at 4 and 12 kt.
 - **Cause:** not yet found. `hikeHold` (`src/render/crew.ts:1138`) already gives each line to the hand on its side (`sideHand`, `:1058`). This is the main hand hiking with no line in hand, where the hands go elsewhere.
 
-### 8. The helm's free arm folded into their side (S)
+### 8. (Withdrawn) The helm's free arm folded into their side
 
 `helm-arm-folded_*.jpg`.
 
-- **What it looks like:** steering from the after deck in light air with the tiller near the middle, the helm's arm on the tiller side is folded back into their own ribs, the hand at the chest. Runs last up to 46 s, 171 s in all, in the 12 kt race.
-- **Cause (to confirm):** the helm's hand on the tiller side has no reachable place (`helmPose`, `src/render/crew.ts:949`). The arm is left bent at its last angle.
-- **Fix:** that hand to the knee or the deck beside them when the stick is out of reach.
+The harness drew the helm against a fixed tiller: like the soak before it, it passes `syncCrew` no tiller, so the tiller is
+the default `V(0, 0.8, 2.6)` (`src/render/crew.ts`, in `syncCrew`). In the game the tiller's real place is passed
+(`boatMesh.ts`, `tillerJointAt`). The helm's hands, here and below, aren't confirmed until the harness records the tiller.
 
 ### 9. Working the cabin-top lines, drawn 0.3 m forward of their weight (S once ruled)
 
