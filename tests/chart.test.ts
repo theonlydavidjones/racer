@@ -13,6 +13,9 @@ describe('NOAA chart data', () => {
     expect(ENC.source).toMatch(/NOAA/);
     expect(ENC.cells.length).toBeGreaterThanOrEqual(9);
     for (const c of ENC.cells) { expect(c.name).toMatch(/^US[45]/); expect(c.edition).toBeGreaterThanOrEqual(1); expect(c.issued).toMatch(/^\d{4}-\d\d-\d\d$/); }
+    // (NOAA's update of 12 Nov 2026 to the Golden Gate cells: Four Fathom Bank's bell buoy moved 35 m; ENC check #1)
+    const ed = (n: string) => ENC.cells.find(c => c.name === n)!;
+    expect(ed('US5OAKFF').update).toBeGreaterThanOrEqual(3); expect(ed('US4CA2CJ').update).toBeGreaterThanOrEqual(2);
   });
 
   it('has the chart\'s layers', () => {
