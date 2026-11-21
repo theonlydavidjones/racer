@@ -66,7 +66,8 @@ export class SetupChart {
     s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
     $('bPinNone').hidden = this.which !== 'to';
-    $('setupChartHint').textContent = this.which === 'from' ? 'Click the water, a place or her slip to start there.' : 'Click the water, a place or her slip to sail there.';
+    // (her slip named only if she has one: the audit, 21 Nov 2026)
+    $('setupChartHint').textContent = `Click the water${slip ? ', a place or her slip' : ' or a place'} to ${this.which === 'from' ? 'start' : 'sail'} there.`;
     if (refit || !this.fitted) this.fit();
     this.draw();
   }

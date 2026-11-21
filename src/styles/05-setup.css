@@ -117,3 +117,5 @@ body.lashed .tg-lash{display:block}
 .numpick button:disabled{opacity:.35;cursor:default}
 .numpick b{font:700 16px/1 var(--f-inst);min-width:14px;text-align:center}
 .numpick small{color:var(--muted);font-size:12px;margin-right:2px}
+/* her slip's button, she having none: plainly unavailable, the reason on hover (the audit, 21 Nov 2026) */
+#bPinSlip:disabled,#bPlanSlip:disabled{opacity:.4;cursor:not-allowed}
