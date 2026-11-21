@@ -108,6 +108,7 @@ const ctx = {
   get newGame() { return setup.newGame; },
   get drillRuns() { return drillRuns; },
   get favCall() { return favCall; },
+  get favLine() { return favLine; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
   get esc() { return esc; },
@@ -198,6 +199,8 @@ const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [
 /** The start practice's favored-end call this attempt (8za: the player reads the line and calls an end in the start
  *  line's card before the gun; the debrief scores it). */
 let favCall: 'pin' | 'committee' | null = null;
+/** Racing, the call's verdict, written at the gun (to Messages and the debrief's start: the owner, 20 Nov 2026). */
+let favLine = '';
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -675,8 +678,16 @@ const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera
 let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
-  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; } // (a new race: nothing carried over)
+  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; hud.favNow = null; favLine = ''; } // (a new race: nothing carried over)
   hud.favAsk = S.mode === 'drill' ? 'ask' : S.mode === 'race' ? 'race' : 'off'; // (racing: shown once called, the owner, 20 Nov)
+  // racing, at the gun: her call against the end favored at the gun (the card's last read before it, so a shift after
+  // the gun doesn't change the answer), one line in Messages and in the debrief's start
+  if (S.mode === 'race' && favCall && !favLine && w.t >= 0 && hud.favNow) {
+    // (one sentence, so the Messages card shows it whole: "the pin", "the X", "Dorado YC")
+    const the = (e: 'pin' | 'committee') => { const l = e === 'pin' ? w.C.pinLabel : w.C.committeeLabel; return /\s/.test(l) ? l : `the ${l.length > 2 ? l.toLowerCase() : l}`; };
+    favLine = `Favored end: ${hud.favNow === 'square' ? 'neither, a square line' : the(hud.favNow)}, and you called ${the(favCall)}`;
+    logMessage(favLine);
+  }
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
@@ -1078,8 +1089,8 @@ $('ncAsk').addEventListener('click', e => {
 // the flags in the start card: the flag index (the old Flags tile's click)
 $('ncFlags').addEventListener('click', e => { e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); });
 $('ncFlags').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); } });
-// the instruments sit under the start card while it's up (r272): its height, for the CSS
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { const c = $('nextCard'); document.body.style.setProperty('--nc-h', c.hidden ? '0px' : c.offsetHeight + 6 + 'px'); }).observe($('nextCard'));
+// the start card sits under the instruments (r272, the owner): their bottom, for the CSS, as the cards shown change
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { document.body.style.setProperty('--hud-b', Math.round($('hud').getBoundingClientRect().bottom) + 'px'); }).observe($('hud'));
 $('nextCard').addEventListener('click', () => (w.cruising ? navToggle() : courseView.toggle(w)));
 $('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navToggle() : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));

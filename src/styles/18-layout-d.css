@@ -29,10 +29,10 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 /* the four cards one width, the clock's (the owner, 20 Nov): a little less padding and spacing so each sub-line fits whole */
 #hud .pod{padding-left:5px;padding-right:5px}
 #hud .sub{letter-spacing:.05em}
-/* the start card (the owner, 20 Nov 2026): top left, above the instruments, its countdown large and the flags beside
-   it; the instruments move down under it while it's up (--nc-h, app.ts) and back up at the gun */
-#leftCol{top:calc(env(safe-area-inset-top,0px) + 16px)}
-#hud{top:calc(env(safe-area-inset-top,0px) + 16px + var(--nc-h,0px))}
+/* the start card (the owner, 20 Nov 2026): under the instruments on the left, so they never move (--hud-b, their
+   bottom: app.ts), and as narrow as they are (--nc-w); the countdown large, the flags under it. The finish line's and
+   the leaderboard's cards take the same spot (r272, r288) */
+#leftCol{top:calc(var(--hud-b,272px) + 8px)}
 #nextCard .nc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
 #nextCard .nc-top[hidden],#nextCard .nc-timer[hidden],#nextCard .nc-flags[hidden]{display:none}
 #nextCard .nc-timer{display:flex;flex-direction:column}
@@ -43,8 +43,15 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #nextCard .nc-flags .pennants,#nextCard .nc-flags .sig-over{display:flex;flex-direction:column;gap:2px}
 #nextCard .nc-flags .pennants canvas,#nextCard .nc-flags .sig-over canvas{height:13px}
 #linebox:empty{display:none}
-.nc-ask button:disabled{cursor:default}
-.nc-ask button.ok{border-color:var(--row);color:var(--row)} .nc-ask button.bad{border-color:var(--giveway);color:var(--giveway)}
 #navStrip .ns-race .ns-v{color:var(--accent)}
 #navStrip > div[hidden]{display:none}
 #navStrip > div[hidden] + div{border-left:0}
+/* (the card as narrow as the instruments: r272) */
+#leftCol{--nc-w:104px}
+#nextCard{width:var(--nc-w);padding:6px 6px 7px}
+#nextCard .nc-row{flex-direction:column;align-items:stretch;gap:4px}
+#nextCard .nc-row svg{width:100%;height:auto}
+#nextCard .nc-top{flex-direction:column;align-items:flex-start}
+#nextCard .nc-flags{margin-left:0}
+.nc-ask{flex-wrap:wrap;gap:4px}
+.nc-ask button{flex:1 1 100%;text-align:left}

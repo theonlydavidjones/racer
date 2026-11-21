@@ -87,12 +87,14 @@ export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) =>
 export class Hud {
   /** The start practice's favored-end call (8za; app.ts): 'ask' before the gun, where the card hides which end is
    *  favored and asks which you think; `favCall` the end you've called, if any. 'race' does the same in a race, but
-   *  shows the favored end (gold) as soon as you've called one, and marks your call ✓ or ✗ against it (the owner,
+   *  shows the favored end (gold) as soon as you've called one; the verdict goes to Messages at the gun (the owner,
    *  20 Nov 2026: "don't highlight the favored side until I've identified it myself"). */
   favAsk: 'off' | 'ask' | 'race' = 'off';
   /** Whether the committee's flags are flying in the start card now (signals()). */
   private flagsUp = false;
   favCall: 'pin' | 'committee' | null = null;
+  /** The end favored on the line now, before the gun ('square' under 2° of bias): the race's call is judged on its last value. */
+  favNow: 'pin' | 'committee' | 'square' | null = null;
   private askKey = '';
   private acc = 0;
   mapZoom = false;
@@ -509,7 +511,7 @@ export class Hud {
    * and you as a dot (red when you're over it), your arrow toward the line or away from it.
    */
   private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
-    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
+    const T = (x: number, y: number, t: string, c = '#94abb7', a = 'middle') => `<text x="${x}" y="${y}" text-anchor="${a}" fill="${c}" font-size="13" font-weight="700">${t}</text>`;
     // which end is on the left, looking up the course (N): the pin if it's to the left of N
     const left = { x: -w.N.y, y: w.N.x }, pinLeft = dot(sub(w.pin, w.center), left) > 0;
     const [lName, rName] = pinLeft ? ends : [ends[1], ends[0]], lFav = fav === (pinLeft ? 0 : 1), rFav = fav === (pinLeft ? 1 : 0);
@@ -517,17 +519,17 @@ export class Hud {
     const X = Math.round(75 - along * 61), Y = over ? 4 : 30, col = over ? '#ff5d4c' : '#3fd197', dir = toward === over ? 1 : -1; // (arrow down, away from the line's course side, or up)
     const ly = over ? 18 : 12;
     return `<line x1="14" y1="${ly}" x2="136" y2="${ly}" stroke="#94abb7" stroke-width="2" stroke-dasharray="4 3"/>`
-      + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(14, ly + 18, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7')}`
-      + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(136, ly + 18, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7')}`
+      + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(1, ly + 21, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7', 'start')}`
+      + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(149, ly + 21, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7', 'end')}`
       + `<circle cx="${X}" cy="${Y}" r="4" fill="${col}"/><path d="M${X} ${Y + 3 * dir} v${7 * dir}" stroke="${col}" stroke-width="2"/>`
       + `<path d="M${X - 3.5} ${Y + 7 * dir} l3.5 ${4 * dir} l3.5 ${-4 * dir}" fill="none" stroke="${col}" stroke-width="2"/>`;
   }
   /** The card's "Which end?" row: the two ends in the sketch's own order (left first, looking up the course), the one
    *  called lit. Written only when it changes, so a click lands. */
-  private askRow(w: SimView, on: boolean, verdict: 'ok' | 'bad' | null = null): void {
+  private askRow(w: SimView, on: boolean): void {
     const row = $('ncAsk');
     const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0;
-    const key = on ? `${pinLeft}|${this.favCall}|${verdict}` : '';
+    const key = on ? `${pinLeft}|${this.favCall}` : '';
     if (key === this.askKey) return; this.askKey = key;
     row.hidden = !on; if (!on) return;
     const C = w.C, short = (s: string) => s.replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
@@ -536,9 +538,6 @@ export class Hud {
     const [l, r] = row.querySelectorAll<HTMLButtonElement>('button');
     l.dataset.end = ends[0][0]; l.textContent = `◀ ${ends[0][1]}`; l.setAttribute('aria-pressed', String(this.favCall === ends[0][0]));
     r.dataset.end = ends[1][0]; r.textContent = `${ends[1][1]} ▶`; r.setAttribute('aria-pressed', String(this.favCall === ends[1][0]));
-    // racing, once called: the call stands, marked against the favored end (now shown in gold on the line)
-    for (const b of [l, r]) { const mine = verdict != null && this.favCall === b.dataset.end; b.disabled = verdict != null;
-      b.classList.toggle('ok', mine && verdict === 'ok'); b.classList.toggle('bad', mine && verdict === 'bad'); if (mine) b.textContent += verdict === 'ok' ? ' ✓' : ' ✗'; }
   }
   /** What the nav strip last showed (written only when it changes). */
   private nsKey = '';
@@ -635,11 +634,12 @@ export class Hud {
       // (start practice: the favored end yours to find, shown at the gun; racing, shown once you've called it)
       const asking = w.t < 0 && (this.favAsk === 'ask' || (this.favAsk === 'race' && !this.favCall));
       const favEnd: 0 | 1 | -1 = asking || !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
-      const called = this.favAsk === 'race' && w.t < 0 && !!this.favCall, favKey = deg < 2 ? null : k > 0 ? 'pin' : 'committee';
-      const verdict = called ? (favKey == null || favKey === this.favCall ? 'ok' : 'bad') : null; // (a square line: either's right)
+      // (the end favored now, kept for the call's verdict: the app reads the last one before the gun, so a shift after it
+      // doesn't change the answer; till the gun the gold follows the end favored now. The owner, 20 Nov)
+      if (w.t < 0) this.favNow = deg < 2 ? 'square' : k > 0 ? 'pin' : 'committee';
       // (one short line on the card, the owner: no degrees; the end's name only)
       const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
-      this.askRow(w, (asking || called) && d <= 0, verdict);
+      this.askRow(w, asking && d <= 0); // (racing, gone once she's called: the gold shows the end, the verdict's in Messages)
       // the card's top row: the countdown (before the gun) and the flags flying
       setText($('ncTimer'), w.t < 0 ? fmtClock(w.t) : ''); $('ncTimerBox').hidden = w.t >= 0; $('ncTop').hidden = w.t >= 0 && !this.flagsUp;
       if (d > 0) {
