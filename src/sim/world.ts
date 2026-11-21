@@ -313,7 +313,9 @@ const AI_CREW_SKILL: Record<string, number> = { Red: 0.75, Blue: 0.6, Green: 0.5
 function aiCrew(name: string, who = name): CrewSpec {
   const skill = AI_CREW_SKILL[name] ?? DEFAULT_SKILL;
   // real people, not three of the same: heights across about the adult range (1.60–1.92 m: US adults average about
-  // 1.75 m for men and 1.62 m for women, CDC NHANES) and builds from slight to solid (about BMI 21–28; estimates), from
+  // 1.75 m for men and 1.62 m for women: 175.3 and 161.3 cm, aged 20 and over, NHANES 2015–2018, Fryar et al., NCHS Vital
+  // Health Stat 3(46), 2021, Tables 9 and 11) and builds from slight to solid (about BMI 21–28, a choice for crews who race:
+  // the same report's adults run 21.2–40.3 for women and 22.4–37.1 for men, 10th–90th percentiles, Tables 14–15), from
   // the boat's name so a crew is the same race to race. Their weights are scaled so each boat carries the standard
   // crew's total (230 kg): the same weight aboard; a taller crew reaches slightly further out (about ±1% of the
   // righting moment, inside the speed target's rounding)
