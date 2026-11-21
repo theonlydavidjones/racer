@@ -53,3 +53,15 @@ describe('copy sweep D: the past-race caveats are short, their hovers one line',
     expect(a).toContain('title="${esc(shortTip(r.doubt))}"');
   });
 });
+
+describe('copy sweep F: the drill flag hovers are one line', () => {
+  it('cut through shortTip', () => { expect(read('src/app/setup.ts')).toContain('title="${app.esc(shortTip(PREP_MEANING[f]))}"'); });
+});
+describe('copy sweep G: the tiller-lashed toasts are one short line each', () => {
+  it('no toast over 110 characters for the lashing', () => {
+    const a = read('src/app.ts'), i = a.indexOf("Tiller lashed to leeward with way on"), seg = a.slice(i - 40, i + 900);
+    expect(seg).not.toContain('To heave to, back the jib first and let her slow to a knot or two, then lash.');
+    expect(seg).not.toContain('To lash it elsewhere, take the tiller, move it, and right-click (or double-click).');
+    expect(seg).not.toContain('right-click or double-click lashes it again.');
+  });
+});

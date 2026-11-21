@@ -430,9 +430,9 @@ function lash(at = tillerMeant()): void {
   tillerSent = at; lashPendingFrames = 30; send({ k: 'lash', on: true, at }); showLash();
   const t = at, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
   const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
-  toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
-    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and right-click (or double-click).'
-    : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; right-click or double-click lashes it again.`, fast ? 6000 : 4500);
+  toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack.`
+    : Math.abs(t) < 0.04 ? 'Tiller lashed amidships.'
+    : `Tiller lashed ${lashWhere(t)} (${lee ? 'she turns toward the wind' : 'she bears away'}).`, fast ? 6000 : 4500);
 }
 function unlash(): void { const u = w.user; if (u.lashed == null && !lashPending()) return; lashPendingFrames = 0; send({ k: 'lash', on: false }); showLash(); toast('Lashing off: you have the tiller.', 2000); }
 function showLash(): void {
