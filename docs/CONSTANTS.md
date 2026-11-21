@@ -785,3 +785,73 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | MANOEUVRE_LOSS | table | 89 | measured | the sim's own tack/gybe loss, tests/manoeuvre.test.ts (rests on HANDLING, top 10 #2) |
+
+## Estimates audit, src/environment and src/sim (Deep Physics, 21 Nov 2026)
+
+Every constant in src/environment and src/sim whose comment says estimate, uncited or a guess (57 hits by grep on
+origin/main a237c942), and a search for a source for each: four researchers in parallel (swell and wind sea; harbor
+flow; wind turbulence and wakes; seamanship and crew). No value was changed. Outcomes: **cited** (a cite added, one
+commit per file), **flag** (a source suggests another value: listed below for the Coordinator, not changed),
+**aboard** (only settled aboard Josephine: docs/ABOARD-JOSEPHINE.md), **open** (searched, no source found), **design**
+(a planner's or game's choice: no outside figure exists to find).
+
+Blocked from here: cdip.ucsd.edu, bcdc.ca.gov, journals.ametsoc.org, link.springer.com, sciencedirect.com and
+www.cdc.gov (CDC Stacks served instead). The papers behind most "open" rows are there.
+
+### Cited (values unchanged)
+
+| Constant | File | Cite added |
+|---|---|---|
+| crew heights 1.75 / 1.62 m, BMI 21–28 | sim/world.ts aiCrew | Fryar et al., *Anthropometric Reference Data … 2015–2018*, NCHS Vital Health Stat 3(46), 2021, Tables 9, 11, 14–15: 175.3 and 161.3 cm. BMI 21–28 is a choice for racing crews (the population's 10th–90th is 21.2–40.3 women, 22.4–37.1 men); said so in the comment |
+| the isochrone method | sim/router.ts | James 1957, US Navy Hydrographic Office SP-1 (secondhand); Hagiwara, "Weather routing of (sail-)assisted motor vessels", TU Delft PhD thesis, 1989 (catalog record). Its steps stay design |
+| a shed's wake (x/H)^−1.5 | environment/harborLee.ts | Woo, Peterka & Cermak 1977, NASA CR-2806 §5.4.5 (read): −1.5 for bodies 3–4 times as wide as high; −1.2 at 1, −1.0 at 0.25 |
+| swellShare, autumn only | environment/sea.ts | NDBC's station history for 46237 (read): stdmet and adcp only, no swden; the claim "no spectral history" holds for NDBC |
+| CD10 1.2e-3 | environment/waveField.ts | Large & Pond 1981, J. Phys. Oceanogr. 11, 324–336, as quoted (a 1984 ICCE paper; Yelland 1997 thesis). Was "from memory" |
+| the dying sea's time (still an estimate) | environment/waveField.ts | Young, Hasselmann & Hasselmann 1987, J. Phys. Oceanogr. 17, 1317–1338, abstract: short waves relax fastest; past 60° the old sea decays as swell. No time constant given |
+
+### Flags for the Coordinator (not changed)
+
+| Constant | Now | What was found | Effect if taken |
+|---|---|---|---|
+| shadows.ts bluffDeficit pExp, ships | 1.5 for every ship | Woo et al. 1977 §5.4.5: the decay is slower for narrow bodies (−1.2 at width = height, −1.0 at a quarter): a ship end-on to the wind is narrow | a longer lee astern of a ship head to wind; small (ships rarely lie end-on to a racing boat) |
+| harborLee.ts WALL_H | 2.5 m above the water | BCDC Marina Green exhibits (search snippet, unread): East Harbor riprap crest design +11.0 ft NAVD88; a different wall, and the datum needs 9414290's sheet | unknown until read; asked aboard (1.15) |
+| harborMouth.ts reattach | 4 steps | a CFD study (Re 15,000, ajol.info, unread): 3.78 step heights at 15°, 7.1 at 90°, rising to ~45° and flat beyond; at 27° perhaps 5–6 | the flood's lee across the mouth a little longer; the gap is inside it either way |
+| harborMouth/current BASIN_EDDY | 0.1 | a Delft model-harbor report (search snippet, unidentified): the secondary current about 15% of the main flow | a gyre half as fast again, inside the stated 0.05–0.2 |
+| sea.ts swellShare season | autumn fit | CDIP 142p1 (the same buoy) likely archives the spectra; cdip.ucsd.edu is blocked from here | a summer and winter fit, if the host is opened (the owner's call) |
+
+### Aboard Josephine
+
+| Constant | File | Item |
+|---|---|---|
+| WALL_H 2.5 m | environment/harborLee.ts | 1.15 (new): tape the wall at the berth, with the time |
+| HAND speed 0.15 m/s (and 250 N) | sim/world.ts warping | 1.12 (added to): meters of line hauled in 10 s |
+| HANDOVER_S 20, HANDOVER_MIN 30 | sim/world.ts | 2.12 (added to): carry under power to neutral from 4.5 kt (no published coast-down figure exists) |
+
+### Open (searched, no source found)
+
+| Constant | File | Searched |
+|---|---|---|
+| swellReach 0.55 at the bridge, ~2.8 km decay | environment/sea.ts | Hanes & Erikson 2013, Hanes, Ward & Erikson 2011 (abstracts: no ratio); CoSMoS, BCDC/ESA, ATR (nothing). The 2013 paper's full text (a SWAN transfer?) is the best lead |
+| GUSTS.sigmaFloor 0.35 m/s | environment/gusts.ts | Mahrt 2009, Mahrt, Sun & Stauffer 2015 (abstracts: weak-wind σ not universal; no figure); Springer blocked |
+| the σu, σv, Λ1 factors and Charnock 0.011 | environment/gusts.ts | Smith 1988 confirmed as the source of 0.011 by citing papers; IEC 61400-1 is a paid standard; Kaimal & Finnigan not reached. Already cited in the code; unverified page numbers only |
+| wake spread d/8 | environment/shadows.ts | nothing measured for terrain wakes reached; Woo et al. has lateral profiles but no growth rate extracted |
+| PILE_FLOW 0.6, PILE_MIX 12 | environment/current.ts | pile-group studies are all scour; Nepf 1999 (WRR 35, 479–489) would give a drag-model bracket, not a measurement |
+| BASIN_MOUTH 30 m (layer 0.03–0.1) | environment/current.ts | Uijttewaal & Booij 2000, van Prooijen & Uijttewaal 2002 (abstract; the thesis is a scan); Chu & Babarutsi 1988 not reached |
+| harborMouth free 0.18 | environment/harborMouth.ts | Brown & Roshko 1974 not reached |
+| reattach: Kim, Kline & Johnston 7 ± 1 | environment/harborMouth.ts | the paper's listing (J. Fluids Eng. 102, 302–308, "Investigation of a reattaching turbulent shear layer: flow over a backward-facing step") gives no length in its abstract |
+| HULL_HALF_BEAM 0.85 | sim/world.ts | no Folkboat lines plan, waterplane area or certificate online; the NFIA's drawings would settle it (public data, not aboard) |
+| dying = growing time | environment/waveField.ts | van Vledder & Holthuijsen 1993 and Jackson & Jensen 1999 (blocked) hold the relaxation parameter |
+| wind.ts OPEN_WATER 1.25 | environment/wind.ts | w049 (20 Nov): AMS/NWS hosts blocked |
+| shoreRelief (tideLeg.ts) | environment/current.ts | already checked against PCT0286 / SFB1202 (the comment) |
+| ETA_GUESS 0.92 | sim/roundings.ts | the sim crew's own share: measured from the sim would settle it |
+
+### Design (no outside figure exists)
+
+The router's and the pilot's own thresholds: router.ts SHORE 50, WHARF_CLEAR 20, STEP_MIN/HEADING/SECTOR, STALL,
+GIVE_UP, the 2 min / 3% laid-board tolerance; navigator.ts the direct try's 4× and 20 min, HELM_TOL, HELM_OFF/WIND/KT/
+TIDE/EVERY, HELM_BETTER; helmPlan.ts NAV_MADE, the gap width, LAND_SIDE, OFF_LAG_S, OFF_SLOW, OFF_TACK (fitted),
+OFF_ARC_GIVE/MIN, OFF_HULL, HULL_MIN, the way-off look; routing.ts HULL_CLEAR, MIN_ROOM; world.ts OFF_AHEAD_S,
+OFF_LOOK_HELD, OFF_HELD_S, ASTERN_WIND_FAR/SET_FAR/STEP (SET_PER_KT is the sim's own); outlook.ts LEE_M (a grid, checked
+to 1% against the exact wind); world.ts waveRef's one depth (ENC band middles); shadows.ts LAND_FROM; debrief.ts's
+seconds lost (the sim's own physics). No published seamanship figure for a passing distance off a shore or a pier was
+looked for in depth: if one turns up, SHORE and WHARF_CLEAR are the rows it would move.

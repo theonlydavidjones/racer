@@ -151,7 +151,7 @@ Ordered by accuracy gain.
 - **Do:** confirm the make, model and hp. Measure the bracket position on the after deck and the shaft height out of the water. Note whether it has reverse.
 - **Why:** the sim models 2.5, 3.5 and 6 hp Tohatsu motors (`motor.ts`), and defaults to 3.5. `outboard.ts` uses a transom-top height of 0.54 m from a forum measurement.
 
-**1.12 Dock-handling dimensions (low priority).** Measure the real cleat positions (bow, midships, stern) along the hull and the fender size. Dock-line parameters in `dockLines.ts:24-33` and `202-215` are estimates (line damping, `CLEAT_MU` 0.3, hand pull 250 N, step gap 0.6–0.9 m, 0.5 m/s step speed, bump 0.5 m/s). A tape and your own judgment of safe step speed are the checks.
+**1.12 Dock-handling dimensions (low priority).** Measure the real cleat positions (bow, midships, stern) along the hull and the fender size. Dock-line parameters in `dockLines.ts:24-33` and `202-215` are estimates (line damping, `CLEAT_MU` 0.3, hand pull 250 N, step gap 0.6–0.9 m, 0.5 m/s step speed, bump 0.5 m/s). A tape and your own judgment of safe step speed are the checks. Also time the crew warping her in hand over hand on a dock line: meters of line in 10 s, one hand and two (`world.ts` warping, 0.15 m/s, an estimate; estimates audit, 21 Nov).
 
 **1.13 Drawing dimensions "read off photos, estimates within a few cm" (lowest priority; cosmetic).** These are in `hull.ts` and `boatMesh.ts`: cabin light heights (`hull.ts:443`), cabin-top crown height at the front on the centerline (`hull.ts:484`), the cabin front's rake, thwart underside depth (`COCKPIT_FIT`, "ESTIMATES, uncited", `hull.ts:377`), the footrest hollow, the companionway sill (150 mm over the sole), the mast-foot plate, horseshoe and boot sizes (`boatMesh.ts:1212`), and winch pedestal height. A tape and straight-on photos settle them. The Tacktick unit's tilt (20° is an estimate) and its stand height can be checked in the same way.
 
@@ -163,6 +163,8 @@ Ordered by accuracy gain.
   - The masthead bend: with a halyard tied off at the gooseneck as a straight reference (or a sight up the mast's aft face), measure how far the masthead moves aft with the backstay off, half on and fully on. Do it twice: the jumpers at 0 turns, and at 3 turns. A phone photo up the mast's side with the halyard in frame works.
 - **Why:** how stiff the mast is, and how much curve the main's luff has, decide what the jumpers and backstay do to the main in a breeze. North's guide (loose jumpers in a breeze) and Heikkilä's (tight) are each right for their own main (`docs/rig/jumpers.md`).
 - **Sim now:** no published stiffness exists. Rigging estimates EI about 140 kN·m² fore and aft, ±30%, from the class rule's outside size and its 3.10 kg/m minimum (CR 6.2). The jumpers are a fixed −0.6° twist per turn (`rigTune.ts:218`, estimates). Without the measurements, the model is built on the estimates, labeled as such. The other source is class drawing No. 12 from the NFIA.
+
+**1.15 Gashouse Cove's wall height (estimates audit, 21 Nov; low priority).** At the berth, tape the harbor wall's top above the water and note the time (the tide is read from NOAA 9414290 for it). `harborLee.ts` `WALL_H` is 2.5 m above the water, read off the owner's photos and used for every harbor's walls alike; the one figure found, the East Harbor riprap crest's design elevation of +11.0 ft NAVD88 in BCDC's Marina Green exhibits (a search snippet, not read: bcdc.ca.gov isn't reachable from here), is of a different wall and datum.
 
 ## 2. Underway: observing
 
@@ -226,7 +228,7 @@ Ordered by accuracy gain. Where the existing GPS tracks (2.4) can answer, use th
   - Time a mainsheet full ease and full trim, and the traveler end to end.
 - **Sim now:** `CONTROL_RATE` is mainsheet 0.12 per second, vang 0.25, outhaul 0.3, jib sheet 0.16, traveler 1–2 s end to end (the owner said releasing is very rapid and hauling slightly slower), and `winchFactor`.
 
-**2.12 Motoring (low priority, ROADMAP 212).** On flat water in calm, record speed over ground against throttle (idle, half, full) with the sails down. Then repeat with the sails up on a reach, to see the motor and sails together. `FIGURE_OF_MERIT` 0.56, `REVERSE` 0.5 and `LEG_CDA` 0.010 are estimates.
+**2.12 Motoring (low priority, ROADMAP 212).** On flat water in calm, record speed over ground against throttle (idle, half, full) with the sails down. Then repeat with the sails up on a reach, to see the motor and sails together. `FIGURE_OF_MERIT` 0.56, `REVERSE` 0.5 and `LEG_CDA` 0.010 are estimates. Also: from about 4.5 kt under power, throttle to neutral and read the distance she carries her way off the GPS (`world.ts` `HANDOVER_S` 20 s and `HANDOVER_MIN` 30 m, the pilot's hand-over off a harbor's mouth, assume "a boat length or two"; no published coast-down figure was found: estimates audit, 21 Nov).
 
 **2.13 Bare-poles drift at the dock.** Let her lie at rest in wind with sails off, and note which way the bow falls, her heading to the wind and drift speed. The sim says about 86° off the bow, 0.5 kt, computed, and windage and the hull's height profile are labeled estimates (ROADMAP 161-166; 464-489).
 
