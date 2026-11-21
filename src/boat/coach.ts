@@ -558,29 +558,29 @@ function hoveLessons(b: Boat, s: Situation): Lesson[] {
   const lee = kt(leeDrift(b)), ahead = s.speedKt, twa = s.twa, lashed = b.lashed != null;
   const mid = lashed && Math.abs(b.lashed!) < 0.04, toLee = lashed && !mid && (b.lashed! < 0) === (b.tack === 'S'), mainDrawing = b.trim.main.flow !== 'luffing' || b.trim.main.amount < 0.15;
   if (lashed && toLee && twa >= 35 && twa <= 75 && ahead < 2.2) return [{ id: 'hove:balanced', who: 'you', kind: 'ok', gain: 0,
-    head: `Hove to and balanced: bow ${deg(twa)} off the wind, ${ahead.toFixed(1)} kt ahead, slipping ${lee.toFixed(1)} kt to leeward.`,
-    why: 'The backed jib pushes her bow off; the eased main and the lashed tiller turn her back up. The main is the trim tab.',
+    head: 'Hove to and balanced.',
+    why: `Bow ${deg(twa)} off the wind, ${ahead.toFixed(1)} kt ahead, slipping ${lee.toFixed(1)} kt to leeward. The backed jib pushes her bow off; the eased main and the lashed tiller turn her back up. The main is the trim tab.`,
     look: 'the front of the main lifting while its back still draws. Ease it and she lies lower and slower; trim it and she comes up and fore-reaches.' }];
   if (lashed && toLee && twa > 75) return [{ id: 'hove:beamon', who: 'you', kind: 'fix', gain: 0,
-    head: `She's lying beam-on (${deg(twa)} off the wind${ahead >= 1.5 ? `, reaching off at ${ahead.toFixed(1)} kt` : ''}): trim the main in a little to bring her up.`,
-    why: 'With the main eased right off, nothing turns her back up against the backed jib.', look: 'the bow coming up to about 50° off the wind', done: 'lying hove to' }];
+    head: 'Lying beam-on: trim the main in a little.',
+    why: `${deg(twa)} off the wind${ahead >= 1.5 ? `, reaching off at ${ahead.toFixed(1)} kt` : ''}. With the main eased right off, nothing turns her back up against the backed jib.`, look: 'the bow coming up to about 50° off the wind', done: 'lying hove to' }];
   if (lashed && toLee && twa < 35) return [{ id: 'hove:high', who: 'you', kind: 'fix', gain: 0,
-    head: `She's lying nearly head to wind (${deg(twa)}): ease the main a little more.`, why: 'The main is turning her up past where the backed jib can hold her off.', look: 'the bow falling off to about 50° off the wind', done: 'lying hove to' }];
+    head: 'Nearly head to wind: ease the main a little.', why: `${deg(twa)} off the wind. The main is turning her up past where the backed jib can hold her off.`, look: 'the bow falling off to about 50° off the wind', done: 'lying hove to' }];
   if (lashed && toLee && ahead >= 2.2) return [{ id: 'hove:forereach', who: 'you', kind: 'fix', gain: 0,
-    head: b.ctl.mainsheet > 0.95 ? `She's fore-reaching at ${ahead.toFixed(1)} kt: lash the tiller further to leeward.` : `She's fore-reaching at ${ahead.toFixed(1)} kt: ease the main more, or lash the tiller further to leeward.`,
-    why: 'The main is still driving her faster than the rudder and backed jib can hold.', look: 'the speedo: about a knot when she\'s settled', done: 'settled hove to' }];
+    head: b.ctl.mainsheet > 0.95 ? 'Fore-reaching: lash the tiller further to leeward.' : 'Fore-reaching: ease the main, or lash further to leeward.',
+    why: `${ahead.toFixed(1)} kt ahead. The main is still driving her faster than the rudder and backed jib can hold.`, look: 'the speedo: about a knot when she\'s settled', done: 'settled hove to' }];
   if (mid) return [{ id: 'hove:lashmid', who: 'you', kind: 'fix', gain: 0,
-    head: 'The tiller is lashed amidships: move the lashing to leeward (◀ ▶).', why: 'The rudder only holds her up against the backed jib when it\'s turned toward the wind.',
+    head: 'Tiller lashed amidships: lash it to leeward.', why: 'Move the lashing with ◀ ▶. The rudder only holds her up against the backed jib when it\'s turned toward the wind.',
     look: 'the tiller: on the side away from the wind', done: 'lashed to leeward' }];
   if (lashed && !toLee) return [{ id: 'hove:lashwrong', who: 'you', kind: 'fix', gain: 0,
-    head: 'The tiller is lashed to windward: move the lashing to leeward.', why: 'To windward it turns her away from the wind, the same way the backed jib does, so nothing holds her up.',
+    head: 'Tiller lashed to windward: lash it to leeward.', why: 'To windward it turns her away from the wind, the same way the backed jib does, so nothing holds her up.',
     look: 'the tiller: on the side away from the wind', done: 'lashed to leeward' }];
   if (mainDrawing && byHand(b, 'mainsheet')) return [{ id: 'hove:easemain', who: 'you', kind: 'fix', gain: 0,
-    head: `Jib's aback, but you're not hove to yet (${deg(twa)} off at ${ahead.toFixed(1)} kt): ease the main until its front lifts.`,
-    why: 'Drawing fully, the main drives her on and up; eased, it just balances the backed jib.', look: 'the front of the main starting to lift', done: 'main eased' }];
+    head: 'Jib aback, not hove to yet: ease the main.',
+    why: `${deg(twa)} off the wind at ${ahead.toFixed(1)} kt. Ease it till its front lifts: drawing fully, the main drives her on and up; eased, it just balances the backed jib.`, look: 'the front of the main starting to lift', done: 'main eased' }];
   if (mainDrawing) return [{ id: 'hove:takemain', who: 'you', kind: 'fix', gain: 0,
-    head: `Jib's aback, but you're not hove to yet (${deg(twa)} off at ${ahead.toFixed(1)} kt): ease the main until its front lifts.`,
-    why: 'The crew still has the main trimmed for sailing. Ease it yourself (that takes it from them).', look: 'the front of the main starting to lift', done: 'main eased' }];
+    head: 'Jib aback, not hove to yet: ease the main.',
+    why: `${deg(twa)} off the wind at ${ahead.toFixed(1)} kt. Ease it till its front lifts: the crew still has it trimmed for sailing, and easing it yourself takes it from them.`, look: 'the front of the main starting to lift', done: 'main eased' }];
   return [{ id: 'hove:lash', who: 'you', kind: 'fix', gain: 0,
     head: ahead > 2 ? `Let her slow (${ahead.toFixed(1)} kt), then lash the tiller to leeward.` : 'Now lash the tiller to leeward.',
     why: ahead > 2 ? 'Lashed to leeward with way on, she\'d round up and tack.' : 'The rudder holds her up against the backed jib: with it lashed, she looks after herself.',
@@ -693,20 +693,20 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
   // the dock held head to wind, or a paddle (Crew Controls' 8c, to add here when it lands)
   if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
-    return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way.', why: '', look: 'which way the wind is setting her' };
+    return { ...base, kind: 'info', head: 'No way on, no sail up: hoist the jib (J).', why: 'With no way on, the rudder can\'t turn her.', look: 'which way the wind is setting her' };
   // set toward Fort Mason's piers with little way on (the Gashouse Cove entrance, 8n): the stream or the wind carries her
   // onto the piles in seconds (physics.ts piles); way on, and steer off
   { const u = V(b.h), st = V(b.h + 90), hull = [bow(b), stern(b), ...[1, -1].flatMap(sg => [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + st.x * sg * 1.1, y: b.y + u.y * a + st.y * sg * 1.1 })))];
     const set = !b.docked && !b.handled && !b.pushing ? setOntoPier(hull, b.vx ?? 0, b.vy ?? 0) : null;
-    if (set) return { ...base, kind: 'info', head: `Being set onto ${set.pier.name}: ${Math.max(1, Math.round(set.s))} s to the piles. Get way on and steer off.`, why: '', look: 'the pier\'s piles against the water: is the gap closing?' }; }
-  if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
+    if (set) return { ...base, kind: 'info', head: `${Math.max(1, Math.round(set.s))} s to ${set.pier.name}'s piles: get way on, steer off.`, why: 'The stream or the wind is setting her onto the pier.', look: 'the pier\'s piles against the water: is the gap closing?' }; }
+  if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up or down: the coach waits.', why: 'Until they\'re set, there\'s no trim to read.', look: '' };
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };
   if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the jibe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the jib\'s luff telltales, windward and leeward, streaming once she\'s settled on the new tack' : 'the boom: duck' };
   if (ctx.preStart) return { ...base, kind: 'info', head: `Pre-start: trim's set. ${s.speedKt.toFixed(1)} kt; ease to slow, trim to go.`, why: '', look: 'the line and the clock' };
   // the crew's sheets a moment behind a change of course, or she's still getting going: not "right" yet
   // (not the main eased on purpose in a breeze: that's the crew depowering)
   const lag = ([['main', b.trim.main, 'mainsheet'], ['jib', b.trim.jib, 'jibsheet']] as const).find(([n, t, k]) => t && t.flow !== 'good' && t.amount > 0.1 && !byHand(b, k) && !(b.sheets[n] >= SAILS[n].max - 0.5) && !(n === 'jib' && b.ctl.jibsheet <= 0.01 && t.flow === 'luffing') && !(n === 'main' && s.over && (b.depower ?? 0) > 0.6 && t.flow === 'luffing'));
-  if (lag && s.awa < 110) return { ...base, kind: 'info', head: `The crew is catching up: the ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment.`, why: 'They trim at a human pace, a second or two behind a change of course or a shift.', look: lag[0] === 'jib' ? 'the jib\'s luff telltales: watch them settle' : lag[1]!.flow === 'stalled' ? 'the main\'s leech telltales: watch them stream again' : 'the luff of the main: watch it stop lifting' };
+  if (lag && s.awa < 110) return { ...base, kind: 'info', head: 'The crew is catching up.', why: `The ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment: they trim at a human pace, a second or two behind a change of course or a shift.`, look: lag[0] === 'jib' ? 'the jib\'s luff telltales: watch them settle' : lag[1]!.flow === 'stalled' ? 'the main\'s leech telltales: watch them stream again' : 'the luff of the main: watch it stop lifting' };
   if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt of her target ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
   // (a jib a degree or two off its best: its telltales show it before it's worth a lesson; say which, and the touch that
   // fixes it, so "right" never contradicts a lifting telltale)
