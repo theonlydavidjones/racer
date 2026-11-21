@@ -378,14 +378,16 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
  * Depowering, in the usual order as she gets overpowered upwind (`depower` 0 … 1: the step that's fastest for her crew,
  * physics.ts powerFactor): flatten first (outhaul, then backstay, with the Cunningham and downhaul pulling the draft
  * forward again as the mast bends), the vang on hard (so the leech holds when the main is eased), the jib cars aft
- * (twisting off the jib's top), and last the traveller down to leeward. Each line's least setting at that level, on top
+ * (twisting off the jib's top), and the traveller down from the middle to leeward, from a third of the way: North's
+ * guide eases "the cars ... to leeward to decrease heel" in higher wind with the sheet tight, and dropping the car
+ * takes heel off (balance.ts trimLift), so it comes before the sheet's ease, not last. Each line's least setting at that level, on top
  * of the guide's settings for the wind (guideLimits, with `tws`): where the guide says a line stays off (the vang under
  * 18 kt), it stays off. The jib's luff tension steps up on its halyard alone: the jib Cunningham does the same job
  * (jibShape), and a floor on both would send the forward hand to two lines for the one change.
  */
 export function depowerLimits(depower: number, awa: number, tws?: number, guideAwa = awa): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>>; carAft: number } {
   const d = Math.abs(awa) < 70 ? depower : 0, st = (a: number, b: number) => smooth((d - a) / (b - a));
-  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibHalyard: 0.9 * st(0.3, 0.85), vang: 0.9 * st(0.3, 0.8), traveller: -1 + 1.6 * st(0.6, 1) };
+  const steps: Partial<Record<keyof CrewSettings, number>> = { outhaul: 0.95 * st(0, 0.4), backstay: st(0.1, 0.75), cunningham: st(0.25, 0.8), downhaul: 0.9 * st(0.3, 0.85), jibHalyard: 0.9 * st(0.3, 0.85), vang: 0.9 * st(0.3, 0.8), traveller: 0.6 * st(0.3, 0.8) };
   const g = tws == null ? { min: {}, max: {} } : guideLimits(tws, guideAwa);
   const min: Partial<Record<keyof CrewSettings, number>> = {}, max: Partial<Record<keyof CrewSettings, number>> = { ...g.max };
   for (const k of Object.keys(steps) as (keyof CrewSettings)[]) {
