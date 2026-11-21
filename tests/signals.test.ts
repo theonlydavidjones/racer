@@ -101,3 +101,21 @@ describe('sequences of any length from 1 to 5 minutes (the owner, 21 Nov 2026)',
     expect(startSequence(4, 'I').map(x => [x.name, x.t])).toEqual([['Warning signal', -240], ['Preparatory signal', -180], ['One-minute signal', -60], ['Starting signal', 0]]);
   });
 });
+
+describe('a one-minute sequence in the World (the physics review of r275, 21 Nov 2026)', () => {
+  it('boats are racing from its warning signal, not from the World\'s start', () => {
+    const w = new World(TRAIN, settings({ seq: 1, fleet: 0, opponents: [], traffic: 0 }), 1, { startAt: 120 });
+    expect(w.t).toBe(-120);
+    expect(w.racing(w.user)).toBe(false); // (two minutes out, before the warning signal)
+    while (w.t < -60 + DT) w.step(DT);
+    expect(w.racing(w.user)).toBe(true); // (after the warning signal, the sequence's first)
+  });
+  it('rule 30 only where its flag is flown: a one-minute sequence starts on P; the start drill flies a non-P flag on two minutes', async () => {
+    const { drillSeq } = await import('../src/club/practice');
+    expect(new World(TRAIN, settings({ seq: 1, prepFlag: 'black', fleet: 0, opponents: [] }), 1).prepFlag).toBe('P');
+    expect(new World(TRAIN, settings({ seq: 2, prepFlag: 'black', fleet: 0, opponents: [] }), 1).prepFlag).toBe('black');
+    expect(drillSeq(1, 'I')).toBe(2); expect(drillSeq(1, 'P')).toBe(1); expect(drillSeq(1, undefined)).toBe(1); expect(drillSeq(4, 'U')).toBe(4);
+    const s = startSequence(drillSeq(1, 'Z'), 'Z');
+    expect(s.some(x => x.up.includes('Z'))).toBe(true); // (flown: the drill's rule 30 applies)
+  });
+});

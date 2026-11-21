@@ -60,8 +60,9 @@ export function startSequence(seqMin: number, prep: PrepFlag): Signal[] {
     out.push({ t: 0, name: 'Starting signal', up: [], down: ['class'], sound: 'one', say: 'Starting signal: class flag down, one sound. Go!' });
   } else if (seqMin < 2) {
     // (a one-minute sequence, the owner's Practice choice, 21 Nov 2026: the warning signal is the last minute, so there's
-    // no time for a preparatory signal of its own; the start comes on the class flag alone, as RRS 26 allows sailing
-    // instructions to shorten it. With no preparatory flag, rule 30's flags can't apply: the plain P start)
+    // no time for a preparatory signal of its own; the start comes on the class flag alone. That changes rule 26 itself,
+    // which sailing instructions may do under rule 86.1(b); rule 26's own asterisk covers only the warning signal's time.
+    // With no preparatory flag displayed, rule 30's flags can't apply: the plain P start, World's prepFlag)
     out.push({ t: 0, name: 'Starting signal', up: [], down: ['class'], sound: 'one', say: 'Starting signal: class flag down, one sound. Go!' });
   } else {
     out.push({ t: -60, name: 'Preparatory signal', up: [prep], down: [], sound: 'one', say: `Preparatory signal: ${p} up, one sound. One minute. ${PREP_MEANING[prep]}` });
