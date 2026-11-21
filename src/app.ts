@@ -49,6 +49,7 @@ import { pointTarget } from './sim/lessons';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
+import { Leaderboard } from './ui/leaderboard';
 import { ToolsTray, type Tool } from './ui/toolsTray';
 import { weatherHelmChip } from './ui/weatherHelm';
 import { degAndPoint, turnWords } from './core/compass';
@@ -201,6 +202,8 @@ const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [
 let favCall: 'pin' | 'committee' | null = null;
 /** Racing, the call's verdict, written at the gun (to Messages and the debrief's start: the owner, 20 Nov 2026). */
 let favLine = '';
+/** The race's leaderboard (ui/leaderboard.ts, r288): under the instruments for 12 s after each rounding; Shift+L. */
+const board = new Leaderboard($('lb'));
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -682,10 +685,10 @@ function drillCues(): void {
   hud.favAsk = S.mode === 'drill' ? 'ask' : S.mode === 'race' ? 'race' : 'off'; // (racing: shown once called, the owner, 20 Nov)
   // racing, at the gun: her call against the end favored at the gun (the card's last read before it, so a shift after
   // the gun doesn't change the answer), one line in Messages and in the debrief's start
-  if (S.mode === 'race' && favCall && !favLine && w.t >= 0 && hud.favNow) {
+  if (S.mode === 'race' && !favLine && w.t >= 0 && hud.favNow) {
     // (one sentence, so the Messages card shows it whole: "the pin", "the X", "Dorado YC")
     const the = (e: 'pin' | 'committee') => { const l = e === 'pin' ? w.C.pinLabel : w.C.committeeLabel; return /\s/.test(l) ? l : `the ${l.length > 2 ? l.toLowerCase() : l}`; };
-    favLine = `Favored end: ${hud.favNow === 'square' ? 'neither, a square line' : the(hud.favNow)}, and you called ${the(favCall)}`;
+    favLine = `Favored end: ${hud.favNow === 'square' ? 'neither, a square line' : the(hud.favNow)}${favCall ? `, and you called ${the(favCall)}` : ''}`;
     logMessage(favLine);
   }
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
@@ -1081,11 +1084,15 @@ $('bCourse').onclick = () => (w.cruising ? navToggle() : courseView.toggle(w));
 // the same as Shift+R, until the results open
 $('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode === 'drill') results.restartDrill(); });
 $('ncRestart').addEventListener('keydown', e => e.stopPropagation());
-// the favored-end call, in the start line's card (8za): which end you've read as favored, before the gun
-$('ncAsk').addEventListener('click', e => {
-  e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0 || (hud.favAsk === 'race' && favCall)) return; // (racing, the call stands once made: the end's shown)
+// the favored-end call (8za): an end of the start line's picture clicked, before the gun (the owner, 20 Nov 2026)
+function callEnd(e: Event): void {
+  e.stopPropagation(); const b = e.currentTarget as HTMLElement; if (b.hidden || w.t >= 0 || (hud.favAsk === 'race' && favCall)) return; // (racing, the call stands once made: the end's shown)
   favCall = b.dataset.end === 'pin' ? 'pin' : 'committee'; hud.favCall = favCall;
-});
+}
+for (const id of ['ncEndL', 'ncEndR']) {
+  $(id).addEventListener('click', callEnd);
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); callEnd(e); } else e.stopPropagation(); });
+}
 // the flags in the start card: the flag index (the old Flags tile's click)
 $('ncFlags').addEventListener('click', e => { e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); });
 $('ncFlags').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); } });
@@ -1330,6 +1337,7 @@ function runAction(a: Action): void {
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
     case 'speed': cycleSpeed(); break;
+    case 'leaderboard': board.toggle(); break; // (r288: Shift+L, on or off till pressed again)
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
@@ -1529,6 +1537,7 @@ function frame(now: number): void {
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
   drillCues();
+  board.update(w, S.mode === 'race' && w.running && !w.cruising && !w.freeSail && w.t >= 0 && !w.user.retired, w);
   hud.update(w, dt);
   if (w.running) flowPanel.update(w.user, now, { preStart: !w.freeSail && w.t < 0 }); // (as the coach has it)
   if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);

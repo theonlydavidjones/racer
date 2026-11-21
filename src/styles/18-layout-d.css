@@ -53,5 +53,31 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #nextCard .nc-row svg{width:100%;height:auto}
 #nextCard .nc-top{flex-direction:column;align-items:flex-start}
 #nextCard .nc-flags{margin-left:0}
-.nc-ask{flex-wrap:wrap;gap:4px}
-.nc-ask button{flex:1 1 100%;text-align:left}
+/* the favored-end call: click an end of the line's picture (hud.ts callEnds; the owner, 20 Nov 2026) */
+#nextCard .nc-sk{position:relative}
+#nextCard .nc-sk svg{display:block;width:100%;height:auto}
+#nextCard .nc-end{position:absolute;top:0;bottom:0;width:34%;border-radius:4px;cursor:pointer}
+#nextCard .nc-end.l{left:-3px} #nextCard .nc-end.r{right:-3px}
+#nextCard .nc-end[hidden]{display:none}
+#nextCard .nc-end:hover,#nextCard .nc-end:focus-visible{background:rgba(255,182,39,.16);outline:1px solid rgba(255,182,39,.55)}
+/* the leaderboard (r288, the owner, 20 Nov 2026): the card's spot under the instruments, as narrow; sail numbers whole,
+   a name cut short, her "You" dropped where it won't fit (ui/leaderboard.ts) */
+#lb{width:var(--nc-w);box-sizing:border-box;background:var(--pod);border:1px solid var(--rule);border-radius:8px;padding:6px;color:var(--text);font-family:var(--f-inst);pointer-events:auto;cursor:pointer}
+#lb[hidden]{display:none}
+#lb .lb-h{display:flex;justify-content:space-between;font:600 9.5px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+#lb .lb-pos{color:var(--accent)}
+#lb .lb-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px;align-items:baseline;font:600 11px/1.6 var(--f-inst);font-variant-numeric:tabular-nums}
+#lb .lb-p{color:var(--muted);min-width:8px}
+#lb .lb-n{display:flex;gap:3px;min-width:0;white-space:nowrap}
+#lb .lb-n b{flex:none;color:#e9f2f5;font-weight:700}
+#lb .lb-n i{font-style:normal;color:#a9bcc6;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#lb .lb-n.you{flex-wrap:wrap;height:1.6em;overflow:hidden}
+#lb .lb-n.you i{flex:none}
+#lb .lb-g{color:#a9bcc6;font-size:10px}
+#lb .me{background:rgba(255,182,39,.14);border-radius:4px;margin:0 -3px;padding:0 3px}
+#lb .me .lb-p,#lb .me .lb-n i{color:var(--accent)}
+#lb .lb-gap{color:var(--muted);text-align:center;line-height:.9}
+#lb .lb-all{display:flex;flex-direction:column;gap:2px}
+#lb .lb-chip{border:1px solid var(--rule);border-radius:4px;padding:0 4px}
+#lb .lb-chip.me{margin:0;padding:0 4px}
+#lb .lb-ch{font-size:10px;color:var(--muted)} #lb .lb-ch.up{color:var(--row)} #lb .lb-ch.dn{color:var(--giveway)}

@@ -510,34 +510,30 @@ export class Hud {
    * A line in the card's sketch, seen from below it looking up the course: its two ends (the favoured one starred),
    * and you as a dot (red when you're over it), your arrow toward the line or away from it.
    */
-  private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
+  private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean, called: 0 | 1 | -1 = -1): string {
     const T = (x: number, y: number, t: string, c = '#94abb7', a = 'middle') => `<text x="${x}" y="${y}" text-anchor="${a}" fill="${c}" font-size="13" font-weight="700">${t}</text>`;
     // which end is on the left, looking up the course (N): the pin if it's to the left of N
     const left = { x: -w.N.y, y: w.N.x }, pinLeft = dot(sub(w.pin, w.center), left) > 0;
     const [lName, rName] = pinLeft ? ends : [ends[1], ends[0]], lFav = fav === (pinLeft ? 0 : 1), rFav = fav === (pinLeft ? 1 : 0);
+    // (the end called, start practice: ringed till the gun shows which was favored)
+    const lCall = called === (pinLeft ? 0 : 1), rCall = called === (pinLeft ? 1 : 0), ring = '#ffb627';
     const along = clamp(dot(sub(u, w.center), left) / (w.lineLen / 2), -1.3, 1.3); // + toward the left end
     const X = Math.round(75 - along * 61), Y = over ? 4 : 30, col = over ? '#ff5d4c' : '#3fd197', dir = toward === over ? 1 : -1; // (arrow down, away from the line's course side, or up)
     const ly = over ? 18 : 12;
     return `<line x1="14" y1="${ly}" x2="136" y2="${ly}" stroke="#94abb7" stroke-width="2" stroke-dasharray="4 3"/>`
+      + (lCall ? `<rect x="5" y="${ly - 9}" width="18" height="18" rx="3" fill="none" stroke="${ring}" stroke-width="1.5"/>` : '') + (rCall ? `<circle cx="136" cy="${ly}" r="8.5" fill="none" stroke="${ring}" stroke-width="1.5"/>` : '')
       + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(1, ly + 21, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7', 'start')}`
       + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(149, ly + 21, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7', 'end')}`
       + `<circle cx="${X}" cy="${Y}" r="4" fill="${col}"/><path d="M${X} ${Y + 3 * dir} v${7 * dir}" stroke="${col}" stroke-width="2"/>`
       + `<path d="M${X - 3.5} ${Y + 7 * dir} l3.5 ${4 * dir} l3.5 ${-4 * dir}" fill="none" stroke="${col}" stroke-width="2"/>`;
   }
-  /** The card's "Which end?" row: the two ends in the sketch's own order (left first, looking up the course), the one
-   *  called lit. Written only when it changes, so a click lands. */
-  private askRow(w: SimView, on: boolean): void {
-    const row = $('ncAsk');
-    const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0;
-    const key = on ? `${pinLeft}|${this.favCall}` : '';
+  /** The sketch's two ends as places to click (the owner, 20 Nov 2026: the call's made on the picture, no buttons):
+   *  each end's area gets its end, looking up the course; off when there's no call to make. Written only on change. */
+  private callEnds(w: SimView, on: boolean): void {
+    const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0, key = on ? String(pinLeft) : '';
     if (key === this.askKey) return; this.askKey = key;
-    row.hidden = !on; if (!on) return;
-    const C = w.C, short = (s: string) => s.replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
-    const ends: ['pin' | 'committee', string][] = [['pin', short(C.pinLabel)], ['committee', short(C.committeeLabel)]];
-    if (!pinLeft) ends.reverse();
-    const [l, r] = row.querySelectorAll<HTMLButtonElement>('button');
-    l.dataset.end = ends[0][0]; l.textContent = `◀ ${ends[0][1]}`; l.setAttribute('aria-pressed', String(this.favCall === ends[0][0]));
-    r.dataset.end = ends[1][0]; r.textContent = `${ends[1][1]} ▶`; r.setAttribute('aria-pressed', String(this.favCall === ends[1][0]));
+    const l = $('ncEndL'), r = $('ncEndR'); l.hidden = r.hidden = !on; if (!on) return;
+    l.dataset.end = pinLeft ? 'pin' : 'committee'; r.dataset.end = pinLeft ? 'committee' : 'pin';
   }
   /** What the nav strip last showed (written only when it changes). */
   private nsKey = '';
@@ -597,7 +593,7 @@ export class Hud {
    */
   private lineBox(w: SimView, u: Boat): void {
     const el = $('linebox'), C = w.C;
-    if (w.t >= 0 || u.finished) this.askRow(w, false);
+    if (w.t >= 0 || u.finished) this.callEnds(w, false);
     if (u.finished) { $('nextCard').hidden = true; return; }
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
@@ -639,11 +635,13 @@ export class Hud {
       if (w.t < 0) this.favNow = deg < 2 ? 'square' : k > 0 ? 'pin' : 'committee';
       // (one short line on the card, the owner: no degrees; the end's name only)
       const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
-      this.askRow(w, asking && d <= 0); // (racing, gone once she's called: the gold shows the end, the verdict's in Messages)
+      const callIx: 0 | 1 | -1 = this.favAsk === 'ask' && w.t < 0 && this.favCall ? (this.favCall === 'pin' ? 0 : 1) : -1;
+      // (start practice: the call can change till the gun; racing, it stands once made, the gold showing the end)
+      this.callEnds(w, w.t < 0 && (this.favAsk === 'ask' || (this.favAsk === 'race' && !this.favCall)));
       // the card's top row: the countdown (before the gun) and the flags flying
       setText($('ncTimer'), w.t < 0 ? fmtClock(w.t) : ''); $('ncTimerBox').hidden = w.t >= 0; $('ncTop').hidden = w.t >= 0 && !this.flagsUp;
       if (d > 0) {
-        this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
+        this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0, callIx));
         el.innerHTML = w.t < 0 ? `Over by ${d.toFixed(0)} m · get back below the line` : u.roundEnd ? 'I flag: back round an end of the line' : 'OCS · dip back below the line and start';
         return;
       }
@@ -652,7 +650,7 @@ export class Hud {
       const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, driveCurveFor(u.ww.kt, u.twa, vtL)) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
-      this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));
+      this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0, callIx));
       // in the last minute, the time to burn matters more than which end is favoured
       // (no "sailing away" or favored-end words: the gold marks the end, the strip the way; the owner, 20 Nov)
       el.innerHTML = u.ocs ? 'You were over: now start properly' : isFinite(tl) ? tStr + (w.t > -60 ? burn : '') : '';
