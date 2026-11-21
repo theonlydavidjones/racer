@@ -31,3 +31,14 @@ describe('copy sweep H: no dangling separator before the season picker', () => {
     expect(read('src/ui/season.ts')).not.toMatch(/<b>\$\{esc\(series\.host\)\} · \$\{all\.length > 1 \? `<select/);
   });
 });
+
+describe('copy sweep E: the Keys labels are short, the detail a hover', () => {
+  it('four labels that ran to 91–164 characters', async () => {
+    const { ACTIONS } = await import('../src/ui/keys');
+    for (const id of ['autopilot', 'pushOff', 'windLadder', 'weatherHelm']) {
+      const a = ACTIONS.find(x => x.id === id)!;
+      expect(a.label.length, id).toBeLessThanOrEqual(60); expect(a.tip, id).toBeTruthy();
+    }
+    expect(ACTIONS.filter(a => a.label.length > 90).map(a => a.id)).toEqual([]);
+  });
+});
