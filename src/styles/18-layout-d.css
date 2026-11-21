@@ -83,3 +83,8 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #lb .lb-chip{border:1px solid var(--rule);border-radius:4px;padding:0 4px}
 #lb .lb-chip.me{margin:0;padding:0 4px}
 #lb .lb-ch{font-size:10px;color:var(--muted)} #lb .lb-ch.up{color:var(--row)} #lb .lb-ch.dn{color:var(--giveway)}
+/* her own row (option (c), the owner, 21 Nov 2026): the gap and "You" share the name's cell, laid right to left so
+   that "You" wraps out of sight first, then the gap; her number never gives way and nothing touches it */
+#lb .lb-n.lb-yg{flex-direction:row-reverse;margin-right:0}
+#lb .lb-n.lb-yg .lb-g{flex:none;margin-left:4px}
+#lb .lb-n.lb-yg span:last-child{margin-right:auto}

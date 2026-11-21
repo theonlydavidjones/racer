@@ -51,4 +51,21 @@ describe('the leaderboard (r288)', () => {
   it('the gap to the leader: whole meters, a comma from 1,000', () => {
     expect([gapText(37.4), gapText(412), gapText(1240.2), gapText(12405)]).toEqual(['+37', '+412', '+1,240', '+12,405']);
   });
+  // option (c), the owner (21 Nov 2026): her own row's gap may drop out of sight rather than touch her number. The case
+  // that broke at 104 px: USA 12345, 9th of 12, +1,240 behind the leader. (The fit itself is measured in the browser, on
+  // the stress sheet: jsdom has no layout. Here, that her gap's in the cell that can drop it, not the fixed column.)
+  it('her row: the gap goes with "You", in the cell that can drop it whole', () => {
+    const el = { hidden: true, innerHTML: '', addEventListener() {} } as unknown as HTMLElement, lb = new Leaderboard(el);
+    const gaps = [0, 11, 23, 36, 57, 140, 412, 690, 1240, 1385, 2210, 3480];
+    const spec = { sails: { country: 'USA', number: '12345' } } as unknown as LbBoat['spec'];
+    const fleet = (leg: number) => gaps.map((g, i) => boat(i, 0, leg ? g : 4000 - i * 10, leg, i === 8 ? { isUser: true, spec } : {}));
+    const w = (t: number, leg: number) => { const boats = fleet(leg); return { boats, user: boats[8], C: { marks: [{ key: 'A', p: { x: 0, y: 5000 } }] }, center: fin, t }; };
+    const race = {}; lb.update(w(0, 0), true, race); lb.update(w(1, 1), true, race);
+    expect(el.innerHTML).toContain('9th/12');
+    const mine = el.innerHTML.split('<div class="lb-r').find(r => r.startsWith(' me'))!;
+    expect(mine).toContain('<b>USA 12345</b>');
+    expect(mine).toMatch(/class="lb-n you lb-yg">.*<span class="lb-g">\+1,240<\/span><span>You<\/span><\/i><span><\/span>/);
+    // (the others keep the gap in its own column)
+    expect(el.innerHTML).toContain('<span class="lb-g">+1,385</span></div>');
+  });
 });

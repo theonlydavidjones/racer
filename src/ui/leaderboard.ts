@@ -107,7 +107,11 @@ export class Leaderboard {
       for (const i of shortRows(n, me)) {
         if (i == null) { html += '<div class="lb-gap">⋯</div>'; continue; }
         const x = f[i], gap = x.b.finished ? 'fin' : x.b.retired ? 'ret' : i === 0 ? '' : gapText(x.g - lead);
-        html += `<div class="lb-r${x.b.isUser ? ' me' : ''}"><span class="lb-p">${i + 1}</span>${label(x.b)}<span class="lb-g">${gap}</span></div>`;
+        // her own row: the gap goes in with her "You", where it can drop out of sight whole rather than touch her number
+        // (option (c), the owner, 21 Nov 2026: her place is at the card's top); "You" goes first, then the gap
+        html += x.b.isUser
+          ? `<div class="lb-r me"><span class="lb-p">${i + 1}</span><b>${esc(sailOf(x.b))}</b><i class="lb-n you lb-yg"><s>&#8203;</s>${gap ? `<span class="lb-g">${gap}</span>` : ''}<span>You</span></i><span></span></div>`
+          : `<div class="lb-r"><span class="lb-p">${i + 1}</span>${label(x.b)}<span class="lb-g">${gap}</span></div>`;
       }
     } else {
       html += '<div class="lb-all">' + f.map((x, i) => { const c = gained.get(x.b.id) ?? 0;
