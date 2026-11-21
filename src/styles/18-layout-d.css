@@ -80,3 +80,6 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #lb .lb-chip.me{margin:0;padding:0 4px}
 #lb .lb-ch{font-size:10px;color:var(--muted)} #lb .lb-ch.up{color:var(--row)} #lb .lb-ch.dn{color:var(--giveway)}
 #lb .lb-flag{height:8px;width:auto;margin-right:3px;border-radius:1px;box-shadow:0 0 0 .5px rgba(255,255,255,.35)} /* (her ensign for the sail letters: the owner) */
+
+/* the start drill's debrief clear of the heading tape over it (the first-hour audit #15) */
+#drill{padding-top:calc(env(safe-area-inset-top,0px) + 72px)}
