@@ -23,8 +23,9 @@ export const ROSE_DEFAULTS: RoseOpts = { r0: 9, r1: 26, rm: 19, labels: 'all' };
 export const ROSE_POINTS = ['irons', 'close', 'closeReach', 'beam', 'broad', 'run'] as const;
 export type RosePoint = typeof ROSE_POINTS[number];
 const WORDS: Record<RosePoint, string> = { irons: 'No-go', close: 'Close-hauled', closeReach: 'Close reach', beam: 'Beam reach', broad: 'Broad reach', run: 'Run' };
-/** The edges between the bands (TWA, °), the lesson's own: close-hauled from her beat angle. */
-export const roseEdges = (beat: number): number[] => [beat - 3, beat + 8, 75, 105, 160];
+/** The edges between the bands (TWA, °), the lesson's own (sim/lessons.ts POINTS): close-hauled from her beat angle,
+ *  held below the beam reach as the lesson holds it (min 72° and 75°), so the two never cross. */
+export const roseEdges = (beat: number): number[] => [Math.min(beat - 3, 72), Math.min(beat + 8, 75), 75, 105, 160];
 /** What the water draws (scene.ts rose()). */
 export interface RoseDecal { rose(r: { x: number; y: number; from: number; edges: number[]; r0: number; r1: number; rm: number; lit: number; side: number; target: number } | null): void }
 
