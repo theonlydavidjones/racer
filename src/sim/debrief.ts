@@ -312,8 +312,11 @@ export class RaceLog {
         detail: `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt, where ${tuneName(u.tune) === want ? 'it was right only part of the time' : `${tuneWords(TUNE_PRESETS[want])} would have fitted`}.`,
         tip: 'Tune the rig at the dock for the forecast: the forestay and shrouds can\'t be touched once racing (CR 7.40), nor the mast foot (CR 6.1.5). (The time is what her sails gave up; heel and the rest add to it.) If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
     }
+    // (counted as the results count them, one a breach whose turns were done (World.breaches, RRS 44.1): turns for two
+    // fouls run together are one spell on the water but two penalties)
+    const taken = w.breaches?.filter(r => r.taken).length ?? 0, nPen = Math.max(taken, this.pen.n);
     if (this.pen.n) out.push({ key: 'penalty', title: 'Penalties', lost: this.pen.t,
-      detail: `${this.pen.n} penalt${this.pen.n === 1 ? 'y' : 'ies'}: ${mmss(this.pen.t)} doing turns.`,
+      detail: `${nPen} penalt${nPen === 1 ? 'y' : 'ies'}: ${mmss(this.pen.t)} doing turns.`,
       tip: 'Know who has right of way before you get close: port gives way to starboard, windward to leeward, and give room at marks. The replay of each foul shows the rule.' });
     const wide = this.marks.filter(L => L.wide != null && L.wide > 22);
     if (wide.length) {
