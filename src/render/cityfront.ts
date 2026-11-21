@@ -74,7 +74,8 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
   type Acc = { pos: number[]; nrm: number[]; col: number[] };
   type Tile = { full: Acc; far: Acc; cx: number; cz: number };
   const tiles = new Map<string, Tile>();
-  const acc = (tx: number, tz: number, office: boolean) => { const k = `${tx},${tz},${office ? 1 : 0}`; let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, cx: (tx + 0.5) * 1000, cz: -(tz + 0.5) * 1000 }); return a; };
+  const acc = (tx: number, tz: number, office: boolean) => { // (offices over 24 m are few, so all of them share one mesh drawn whole: one call, not one for each tile)
+    const k = office ? 'offices' : `${tx},${tz},0`; if (office) { tx = -1; tz = -1; } let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, cx: office ? 0 : (tx + 0.5) * 1000, cz: office ? 0 : -(tz + 0.5) * 1000 }); return a; };
   const wc = new THREE.Color(), rc = new THREE.Color();
   for (const b of list) {
     const pts: THREE.Vector2[] = [];
@@ -97,7 +98,8 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
     const m = new THREE.Mesh(g, mat); m.matrixAutoUpdate = false; return m;
   };
   for (const [k, t] of tiles) {
-    const mat = k.endsWith(',1') ? offices : homes, lod = new THREE.LOD();
+    if (k === 'offices') { grp.add(mesh(t.full, offices)); continue; }
+    const mat = homes, lod = new THREE.LOD();
     lod.position.set(t.cx, 0, t.cz); lod.updateMatrix(); lod.matrixAutoUpdate = false; // (the distance is to the tile's middle; the vertices are relative to it)
     lod.addLevel(mesh(t.full, mat), 0); lod.addLevel(mesh(t.far, mat), FAR_M);
     grp.add(lod);
