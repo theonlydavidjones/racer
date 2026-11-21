@@ -6,8 +6,10 @@ import { beatAngle, polar, runAngle } from '../boat/polar';
 import { heelFactor } from '../boat/balance';
 import { trimDrive } from '../boat/trim';
 import { driveSpeed, tuneLoss } from '../boat/coach';
-import { presetFor, tuneName, tuneWords, TUNE_PRESETS } from '../boat/rigTune';
+import { presetFor, tuneName, tuneWords } from '../boat/rigTune';
 import type { World } from './world';
+
+const RANK: Partial<Record<string, number>> = { light: 0, medium: 1, strong: 2 };
 import type { SimView } from './host';
 
 /**
@@ -68,7 +70,8 @@ export class RaceLog {
   heel = { t: 0, lost: 0 };
   trim = { lost: 0 };
   /** The rig's tune against the guide's for the wind she met, upwind (sampled every 2 s: speedFactor twice is not free). */
-  tune = { lost: 0, t: 0, every: 0, kt: 0, n: 0 };
+  /** `more`/`less`: of the time it cost, seconds in more (or less) wind than her setting is for (the debrief says which). */
+  tune = { lost: 0, t: 0, every: 0, kt: 0, n: 0, more: 0, less: 0 };
   pen = { n: 0, t: 0 };
   private inPen = false;
   marks: MarkLog[] = [];
@@ -215,7 +218,12 @@ export class RaceLog {
     this.trim.lost += dt * trimK;
     this.spell(w, 'trim', trimK > 0.001, dt * trimK);
     if (u.tune && u.twa < 70 && !u.tacking && !u.luff && (this.tune.every -= dt) <= 0) {
-      this.tune.every = 2; const k = tuneLoss(u); this.tune.lost += 2 * k; this.tune.kt += ww.kt; this.tune.n++; if (k > 0.005) this.tune.t += 2;
+      this.tune.every = 2; const k = tuneLoss(u); this.tune.lost += 2 * k; this.tune.kt += ww.kt; this.tune.n++;
+      if (k > 0.005) {
+        // (which way it was off: the wind then against the setting's own range; a tune of her own has no range to say)
+        this.tune.t += 2; const R = RANK[tuneName(u.tune)], W = RANK[presetFor(ww.kt)]!;
+        if (R != null && W > R) this.tune.more += 2; else if (R != null && W < R) this.tune.less += 2;
+      }
     }
     // shifts, on a beat: on a header (against the mean wind), the other tack would be lifted
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), headed = u.tack === 'S' ? -dev : dev; // + headed
@@ -271,7 +279,7 @@ export class RaceLog {
       const late = Math.max(0, (this.startDelay ?? 60) - 2), g = this.gun;
       const atFav = (g.favored === w.C.pinLabel ? g.frac < 0.33 : g.frac > 0.67);
       out.push({ key: 'start', title: 'The start', lost: late,
-        detail: this.startDelay == null ? 'No clean start.' : `You crossed ${this.startDelay.toFixed(1)} s after the gun${g.d < -1 ? `, ${Math.round(-g.d)} m back from the line at the gun` : ''}, going ${g.kt.toFixed(1)} kt at the gun.${g.favDeg >= 3 ? ` The ${g.favored} end was favored by ${Math.round(g.favDeg)}°${atFav ? ', and you started there.' : '; you started away from it.'}` : ' The line was about square.'}`,
+                detail: this.startDelay == null ? 'No clean start.' : `You crossed ${this.startDelay.toFixed(1)} s after the gun${g.d < -1 ? `, ${Math.round(-g.d)} m back from the line at the gun` : ''}, going ${g.kt.toFixed(1)} kt at the gun.${g.favDeg >= 3 ? ` The ${g.favored} end was favored by ${Math.round(g.favDeg)}°${atFav ? ', and you started there.' : '; you started away from it.'}` : ' The line was about square.'}`,
         tip: late > 6 ? 'Time your run in: know how long it takes to reach the line from your spot, and leave with a few seconds to spare, building speed. Be on the line at full speed at the gun.' : g.favDeg >= 3 && !atFav ? `Start nearer the favored end: ${Math.round(g.favDeg)}° of bias is worth a boat length or more in a short line.` : 'A good start.' });
     }
     if (this.header.lost > 0.5 || this.header.liftTacks > 0) out.push({ key: 'shifts', title: 'Wind shifts', lost: this.header.lost + this.header.liftTacks * 3,
@@ -309,7 +317,10 @@ export class RaceLog {
     if (u.tune && this.tune.lost > 1 && this.tune.n) {
       const kt = this.tune.kt / this.tune.n, want = presetFor(kt);
       out.push({ key: 'tune', title: 'Rig tune', lost: this.tune.lost,
-        detail: `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt, where ${tuneName(u.tune) === want ? 'it was right only part of the time' : `${tuneWords(TUNE_PRESETS[want])} would have fitted`}.`,
+        // (one short line, and which way it was off: the debrief audit, 21 Nov 2026)
+        detail: tuneName(u.tune) !== want ? `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)} in about ${Math.round(kt)} kt: the ${want} setting fits.`
+          : this.tune.more + this.tune.less ? `${mmss(this.tune.t)} upwind with the rig set for ${this.tune.more >= this.tune.less ? 'less' : 'more'} wind than you had.`
+          : `${mmss(this.tune.t)} upwind on ${tuneWords(u.tune)}, off for part of it.`,
         tip: 'Tune the rig at the dock for the forecast: the forestay and shrouds can\'t be touched once racing (CR 7.40), nor the mast foot (CR 6.1.5). (The time is what her sails gave up; heel and the rest add to it.) If the wind is forecast to cross a setting, tune for the part of the race that matters most, and use the backstay for the rest.' });
     }
     if (this.pen.n) out.push({ key: 'penalty', title: 'Penalties', lost: this.pen.t,
