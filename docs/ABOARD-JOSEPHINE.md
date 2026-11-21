@@ -14,6 +14,7 @@ Source: origin/main, plus git history where main points to it. Items marked (his
 - 1.8 Sails: read the tags (luff, foot, LP, maker, age); count reef points.
 - 1.10 Heel at the dock: crew weight on the rail, phone inclinometer; and the yard's scale weight if you have it.
 - 3.1 Tune: forestay mark, mast rake with a plumb weight, mast foot position, shroud turnbuckle pitch.
+- 1.14 Mast bend: the mast's section (outside size, wall thickness); the main's luff curve laid out flat; the masthead's bend with the backstay on, jumpers at 0 and at 3 turns.
 
 ## If you're out sailing today
 
@@ -153,6 +154,15 @@ Ordered by accuracy gain.
 **1.12 Dock-handling dimensions (low priority).** Measure the real cleat positions (bow, midships, stern) along the hull and the fender size. Dock-line parameters in `dockLines.ts:24-33` and `202-215` are estimates (line damping, `CLEAT_MU` 0.3, hand pull 250 N, step gap 0.6–0.9 m, 0.5 m/s step speed, bump 0.5 m/s). A tape and your own judgment of safe step speed are the checks.
 
 **1.13 Drawing dimensions "read off photos, estimates within a few cm" (lowest priority; cosmetic).** These are in `hull.ts` and `boatMesh.ts`: cabin light heights (`hull.ts:443`), cabin-top crown height at the front on the centerline (`hull.ts:484`), the cabin front's rake, thwart underside depth (`COCKPIT_FIT`, "ESTIMATES, uncited", `hull.ts:377`), the footrest hollow, the companionway sill (150 mm over the sole), the mast-foot plate, horseshoe and boot sizes (`boatMesh.ts:1212`), and winch pedestal height. A tape and straight-on photos settle them. The Tacktick unit's tilt (20° is an estimate) and its stand height can be checked in the same way.
+
+**1.14 Mast section, the main's luff round and the masthead bend (r299, the mast-bend model; Rigging; added 21 Nov, the owner's ask).**
+- **Do (tape and phone, at the dock, mast up):**
+  - The mast's outside size at the boom band, fore and aft and side to side, in mm. If an end of the section can be seen (the masthead cap off, or the foot), the wall thickness, and a photo of the section's shape with a ruler.
+  - The mast's maker or section name, if it's marked.
+  - The main's luff round: lay the main flat on a floor, stretch a string from head to tack, and measure the luff's distance from the string every 1 m, the deepest point especially. Note the main's maker and model (e.g. North's "LM-5" or "LM-5A").
+  - The masthead bend: with a halyard tied off at the gooseneck as a straight reference (or a sight up the mast's aft face), measure how far the masthead moves aft with the backstay off, half on and fully on. Do it twice: the jumpers at 0 turns, and at 3 turns. A phone photo up the mast's side with the halyard in frame works.
+- **Why:** how stiff the mast is, and how much curve the main's luff has, decide what the jumpers and backstay do to the main in a breeze. North's guide (loose jumpers in a breeze) and Heikkilä's (tight) are each right for their own main (`docs/rig/jumpers.md`).
+- **Sim now:** no published stiffness exists. Rigging estimates EI about 140 kN·m² fore and aft, ±30%, from the class rule's outside size and its 3.10 kg/m minimum (CR 6.2). The jumpers are a fixed −0.6° twist per turn (`rigTune.ts:218`, estimates). Without the measurements, the model is built on the estimates, labeled as such. The other source is class drawing No. 12 from the NFIA.
 
 ## 2. Underway: observing
 
