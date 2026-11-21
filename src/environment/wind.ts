@@ -157,7 +157,15 @@ export function windTerrain(p: Vec, from = 255, lattice = false): number {
 /** A patch of stronger (puff) or lighter (lull) wind, carried downwind with the breeze. */
 export interface Puff { x: number; y: number; r: number; amp: number; age: number; life: number; /** the way it travels (unit vector, downwind): the wind where it is */ dx?: number; dy?: number; /** and how fast (m/s) */ v?: number }
 
-/** Puffs are streaks, longer downwind than across: half-length r × PUFF_LONG, half-width r × PUFF_WIDE. */
+/** Puffs are streaks, longer downwind than across: half-length r × PUFF_LONG, half-width r × PUFF_WIDE (r 70-230 m,
+ * below: 105-345 m across, 210-690 m along the wind). No one has published a measured length-to-width ratio for a
+ * puff on the water, so the 2 to 1 here is an estimate. What there is points the same way:
+ * - Bethwaite (Higher Performance Sailing; read only in summaries) puts a fully developed gust at 10-12 kt at about
+ *   100-200 m across the wind and longer along it, with no figure for the length.
+ * - Streaks in the surface layer run far longer than they are wide: about 5-20 to 1 in a large-eddy simulation over
+ *   water, and more again in wind-tunnel boundary layers (Hutchins & Marusic 2007, J. Fluid Mech. 579:1). Those are
+ *   streaks in the mean flow, though, not the patch of stronger wind a boat sails through, so 2 to 1 sits at their
+ *   low end. */
 const PUFF_LONG = 1.5, PUFF_WIDE = 0.75;
 
 /**
