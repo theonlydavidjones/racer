@@ -45,7 +45,7 @@ import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
 import { WindRose } from './render/windRose';
 import { beatFor } from './boat/seaway';
-import { pointTarget, puffAhead } from './sim/lessons';
+import { baseFactor, pointTarget, puffAhead } from './sim/lessons';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
@@ -712,7 +712,7 @@ function drillCues(): void {
 let puffT = 0, puffNow: ReturnType<typeof puffAhead> = null;
 function puffCue(): void {
   const now = performance.now(), u = w.user;
-  if (now - puffT > 250) { puffT = now; puffNow = puffAhead(w, { x: u.x, y: u.y, vx: u.vx ?? 0, vy: u.vy ?? 0, kt: u.ww.kt }); }
+  if (now - puffT > 250) { puffT = now; puffNow = puffAhead({ gusts: w.gusts, puffs: w.puffs, wind: w.wind, fieldAt: baseFactor(w) }, { x: u.x, y: u.y, vx: u.vx ?? 0, vy: u.vy ?? 0 }); }
   const p = puffNow, at = p ? { x: Math.round(p.at.x / 10) * 10, y: Math.round(p.at.y / 10) * 10 } : null;
   guides.set(at ? { zone: at } : null, at ? `puff:${at.x},${at.y}` : '');
   guides.cue(p ? { word: 'Puff', sub: `${p.inS} s` } : null); guides.place(u);

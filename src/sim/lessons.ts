@@ -95,32 +95,51 @@ export const LESSON_MARKS = {
 };
 /**
  * Lesson 11's look-ahead (w028; the owner, 15 Nov 2026: "more in-game guidance about when the puffs are coming"): her
- * wind's rise in the next seconds, from the sim's own wind as it moves. The gusts (environment/gusts.ts) are a field
- * frozen in the air and carried with it (Taylor's hypothesis: "a gust you see coming down the course arrives"), so the
- * gust she'll have in τ s is the one now at her place then, less the air's travel, U·τ upwind of it; the puffs
- * (environment/wind.ts Puffs) are carried on at their own speed and aging. Each at the same size the sim gives it
- * (sigmaU, the puffs' weights). The first second her wind's up by the lesson's puff (PUFF_KT) on the mean, when it isn't
- * already, is when it reaches her; where that air is now (upwind of her) is the patch to mark. Nothing invented.
+ * wind's rise in the next seconds, from the sim's own wind as it moves (world.ts windHere). The gusts
+ * (environment/gusts.ts) are a field frozen in the air and carried with it at the course's mean wind (world.ts steps it
+ * at wind.kt: Taylor's hypothesis, "a gust you see coming down the course arrives"), so the gust she'll have in τ s is
+ * the one now U·τ upwind of where she'll be; the puffs (environment/wind.ts Puffs) are carried on at their own speed and
+ * aging, their sum clamped as Puffs.at clamps it. The rise is sized from the base wind where she'll be (baseFactor: the
+ * sim's wind there without the puffs and gusts being predicted), the gust by sigmaU of the wind there, as
+ * windHere sizes them. The first second it's up by the lesson's puff (PUFF_KT), when it isn't already, is when it
+ * reaches her; where that air is now (upwind of her) is the patch to mark. Not carried along her 15 s: the shore's,
+ * the slot's and the shifts' own change over her track (fieldAt is read where she'll be, now), the shadows of other
+ * boats, and the puffs' re-look at the wind each second (they keep the way they're going): fine for a lesson's cue.
  */
-export interface PuffWind { gusts: { at(p: Vec): { u: number; v: number } }; puffs: { cells: readonly Puff[]; gustiness: number; dir: Vec }; wind: { from: number; kt: number } }
-export function puffAhead(w: PuffWind, her: { x: number; y: number; vx: number; vy: number; kt: number }, horizon = 15): { inS: number; at: Vec } | null {
-  const U = Math.max(0.3, her.kt * KT), d = V(w.wind.from + 180), sg = sigmaU(U), field = w.puffs;
-  // her wind's rise over the mean (kt) τ s on, and where that air is now
+export interface PuffWind {
+  gusts: { at(p: Vec): { u: number; v: number } };
+  puffs: { cells: readonly Puff[]; gustiness: number; dir: Vec };
+  wind: { from: number; kt: number };
+  fieldAt(p: Vec): { k: number };
+}
+export function puffAhead(w: PuffWind, her: { x: number; y: number; vx: number; vy: number }, horizon = 10): { inS: number; at: Vec } | null {
+  const U = Math.max(0.3, w.wind.kt * KT), d = V(w.wind.from + 180), field = w.puffs;
+  // her wind's rise over the base (kt) τ s on, and where that air is now
   const rise = (tau: number): { kt: number; air: Vec } => {
-    const x = her.x + her.vx * tau, y = her.y + her.vy * tau, air = { x: x - d.x * U * tau, y: y - d.y * U * tau };
-    let k = 0;
+    const p = { x: her.x + her.vx * tau, y: her.y + her.vy * tau }, air = { x: p.x - d.x * U * tau, y: p.y - d.y * U * tau };
+    let k = 1;
     for (const c of field.cells) {
       if (c.age + tau > c.life) continue;
       const v = c.v ?? 0, moved = { ...c, x: c.x + (c.dx ?? field.dir.x) * v * tau, y: c.y + (c.dy ?? field.dir.y) * v * tau, age: c.age + tau };
-      k += c.amp * field.gustiness * Puffs.weight(moved, x, y, field.dir);
+      k += c.amp * field.gustiness * Puffs.weight(moved, p.x, p.y, field.dir);
     }
-    return { kt: k * her.kt + w.gusts.at(air).u * sg / KT, air };
+    const base = w.wind.kt * w.fieldAt(p).k, kt = base * clampN(k, 0.45, 1.7), Ums = kt * KT;
+    const gu = Math.max(-0.9 * Ums, w.gusts.at(air).u * sigmaU(Ums));
+    return { kt: (Ums + gu) / KT - base, air };
   };
   const need = LESSON_MARKS.puffKt;
   if (rise(0).kt >= need) return null; // (in one already: not one coming)
   for (let tau = 1; tau <= horizon; tau++) { const r = rise(tau); if (r.kt >= need) return { inS: tau, at: r.air }; }
   return null;
 }
+const clampN = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+/**
+ * The base wind's factor at a point, as puffAhead reads it: the sim's own wind there without the gusts (windHere's flag)
+ * and without the puffs' factor (Puffs.at), against the course's mean: the shore's and the slot's field, the shifts'
+ * speed and the lee of the land, all of what the puffs and gusts sit on.
+ */
+export const baseFactor = (w: { windHere(p: Vec, self?: undefined, gusts?: boolean): { kt: number }; puffs: { at(p: Vec): { k: number } }; wind: { kt: number } }) =>
+  (p: Vec): { k: number } => ({ k: w.windHere(p, undefined, false).kt / Math.max(1e-6, w.puffs.at(p).k) / Math.max(1e-6, w.wind.kt) });
 
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
