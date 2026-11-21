@@ -104,15 +104,19 @@ const REAIM_OFF = 12;
  * waves and Komen et al. (1984) put it on the friction velocity, the form the wave models use (read in van Agthoven
  * 1994, TU Delft, eq. 3.4): energy grows at 0.25·(rho_air/rho_water)·(28·ustar/c − 1)·omega, the height at half that;
  * nothing for a wave the wind can't keep up with. ustar from the 10 m wind by a drag coefficient of 1.2e-3 (Large &
- * Pond 1981's value under 11 m/s, FROM MEMORY: a search on 17 Nov 2026 could not open it or another drag law to read;
- * the one figure read, an often-used constant of 1.5e-3, would make these times about a fifth shorter). In 10 kt: a 1 s wave in about 8 minutes, a 2 s
+ * Pond 1981, J. Phys. Oceanogr. 11, 324–336: 10³·C_D = 1.2 for 4–11 m/s, 0.49 + 0.065·U10 above; read as quoted, not in
+ * the paper: in a 1984 ICCE paper, and Yelland's 1997 thesis finds 0.53 + 0.064·U10 above 11 m/s and agrees with it; the
+ * often-used constant 1.5e-3 would make these times about a fifth shorter). In 10 kt: a 1 s wave in about 8 minutes, a 2 s
  * wave in an hour; in 20 kt, 3.4 and 16.5 minutes. And never longer than the waves take to cross the fetch at their group
  * speed (update): past that every wave at a place was raised by the new wind. CARRIED from open-water measurements to
  * a bay, where the sea's height is the sea model's (sea.ts, by fetch and duration): this only times the change.
  * That the height holds through a shift, the pair's energy kept, is a MODELING CHOICE, not a measurement: it keeps the
  * drawn sea and the sea the boat's drag meets one and the same. The
  * dying is given the growing's time, an ESTIMATE: no measurement of short chop's decay after a shift was found (the
- * measured turning of a whole sea's mean direction, Hasselmann et al. 1980, is of the same order: an hour or more).
+ * measured turning of a whole sea's mean direction, Hasselmann et al. 1980, is of the same order: an hour or more). The
+ * modeled response agrees in kind: the short waves relax fastest, at a rate that rises with the wind, and past a 60° shift
+ * a new sea grows on the new wind while the old dies away as swell (Young, Hasselmann & Hasselmann 1987, J. Phys. Oceanogr.
+ * 17, 1317–1338, as its abstract has it); it gives no one time to set the dying by.
  */
 const RHO_RATIO = 1.2 / 1025, CD10 = 1.2e-3, KT_MS = 0.5144;
 function lifeTime(k: number, w: number, kt: number): number {
