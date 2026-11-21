@@ -574,7 +574,8 @@ export class World {
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
     this.t = -this.startAt;
-    this.prepFlag = settings.prepFlag ?? 'P';
+    // (rule 30 applies only "if flag X has been displayed": a one-minute sequence flies no preparatory flag, so its start is the plain one, r275)
+    this.prepFlag = settings.seq < 2 ? 'P' : settings.prepFlag ?? 'P';
     this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
     this.flags = flagsAt(this.sequence, this.t);
     this.seaBreeze = settings.windKt === 0;
@@ -1197,8 +1198,9 @@ export class World {
    */
   racing(b: Boat): boolean {
     if ((this.freeSail && !this.caseRun) || this.cancelled || notRacing(b)) return false; // (a Case is sailed as a race: its boats are racing)
-    const prep = this.sequence.find(s => s.name === 'Preparatory signal');
-    return !prep || this.t >= prep.t;
+    // (a one-minute sequence has no preparatory signal: racing from its warning signal, the sequence's first, r275)
+    const from = (this.sequence.find(s => s.name === 'Preparatory signal') ?? this.sequence.find(s => s.name === 'Warning signal'))?.t;
+    return from == null || this.t >= from;
   }
 
   /** Rule 21.1: how long (s) each returning boat has been sailing clearly away from the line (to release the latch). */

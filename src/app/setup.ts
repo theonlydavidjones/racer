@@ -12,7 +12,7 @@ import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
-import { asTheClubRunsIt, coursePicker, hostOf, practiceSeq } from '../club/practice';
+import { asTheClubRunsIt, coursePicker, drillSeq, hostOf, practiceSeq } from '../club/practice';
 import { place } from '../sim/places';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -68,7 +68,7 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
-  const WSf = app.S.mode === 'drill' ? { ...drillFleet(WSd, app.S.drillSolo ?? true), prepFlag: app.S.drillFlag ?? 'P' } : asTheClubRunsIt(WSd); // (the start drill: its own flag, rule 30's to practice) // (a race at a default club: its committee's settings, r275)
+  const WSf = app.S.mode === 'drill' ? { ...drillFleet(WSd, app.S.drillSolo ?? true), prepFlag: app.S.drillFlag ?? 'P', seq: drillSeq(app.S.seq, app.S.drillFlag) } : asTheClubRunsIt(WSd); // (the start drill: its own flag, rule 30's to practice) // (a race at a default club: its committee's settings, r275)
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };

@@ -58,6 +58,10 @@ export const PRACTICE_COMMITTEE: Pick<Settings, 'prepFlag' | 'penaltyTurns' | 'b
 export const SEQ_RANGE = [1, 5] as const;
 export const practiceSeq = (seq: number): number => Math.max(SEQ_RANGE[0], Math.min(SEQ_RANGE[1], Math.round(seq) || 5));
 
+/** The start drill's sequence: Practice's length, but at least two minutes when its flag isn't P, so the flag is flown
+ * (a one-minute sequence has no preparatory signal: the physics review, 21 Nov 2026, r275). */
+export const drillSeq = (seq: number, flag: Settings['prepFlag'] | undefined): number => { const s = practiceSeq(seq); return flag && flag !== 'P' ? Math.max(2, s) : s; };
+
 /** The settings a race is sailed with: at a default club, its committee's in place of yours; in the practice area, its
  * own committee's with your sequence's length. */
 export function asTheClubRunsIt<T extends Settings>(S: T): T {
