@@ -8,6 +8,7 @@ import { HARBOR } from '../geo/marina';
 import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildAlcatraz } from './alcatraz';
 import { buildCityFront, inCityFront } from './cityfront';
+import { addFortPoint } from './fortPoint';
 import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
@@ -453,17 +454,9 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     grp.add(piles);
   }
 
-  // Fort Point: the brick fort (1853–61) at the foot of the bridge, on the rock blasted down to 15 ft (4.6 m) above
-  // the sea (Wikipedia, "Fort Point National Historic Site"): three tiers of casemates round a courtyard, with the
-  // lighthouse on its roof. Position and footprint from the DataSF building footprints; the bridge's arch crosses its
-  // west end.
-  {
-    const BRICK = lam(0x9a5a44), g = new THREE.Group(), H = 14;
-    for (const [w, d, x, z] of [[56, 10, 0, -43.5], [56, 10, 0, 43.5], [10, 77, -23, 0], [10, 77, 23, 0]] as const) g.add(block(w, d, H, BRICK).translateX(x).translateZ(z));
-    g.add(block(36, 77, 0.5, lam(0x8d8170))); // the courtyard
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 8, 8), WHITE).translateY(H + 4).translateZ(-38)); // Fort Point light, on the barbette
-    place(g, 37.81055, -122.47710, 56, 4.6);
-  }
+  // Fort Point: the brick fort (1853–61) on its lidar-measured outline and heights (render/fortPoint.ts); the bridge's arch
+  // crosses its west end.
+  addFortPoint(grp);
   // Alcatraz: the lidar's ground and its buildings (render/alcatraz.ts, render/alcatrazBuildings.ts)
   addAlcatrazBuildings(grp, alcatraz);
   /* ---------- Angel Island ---------- */
