@@ -582,6 +582,7 @@ function crewPopOpen(open = !!$('crewPop').hidden, from: 'button' | 'coach' = 'c
 }
 $('bCrew').onclick = () => crewPopOpen(undefined, 'button');
 // the crew line in the Coach card is redrawn every frame: catch its clicks on the card
+$('trimNotes').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tn-strat')) { closeTrimNotes(); courseView.openStrategist(w); } });
 $('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-crew')) crewPopOpen(); });
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
 /* The sail controls band (ui/sailBand.ts): every line, laid out as you face forward from the helm. */
@@ -672,6 +673,7 @@ const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 /* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
  * above her masthead, in the tack and gybe drill, the mark-rounding drill and the start practice. */
 const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
+hud.legCall = () => courseView.legCall(w); // (the Strategist card's leg call: the C view's own brief, r298)
 let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
@@ -724,7 +726,10 @@ function openTrimNotes(): void {
   if (!w.running || !$('trimNotes').hidden) return;
   notesPaused = !w.paused; if (notesPaused) send({ k: 'pause', on: true });
   const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band }); // (the band the live note last said)
-  $('trimNotesBody').innerHTML = trimNotesHtml(w.user, s, notes);
+  // (in a race, the Strategist card's racing lines first, whole, and the one way into the strategist's view: r298)
+  const situ = $('situ'), race = $('tpRace'), lines = [!situ.hidden ? situ.title : '', !race.hidden ? $('tpRaceMsg').textContent ?? '' : ''].filter(Boolean);
+  const racing = w.freeSail ? '' : `<div class="tn-race"><div class="tn-race-h"><span>Racing</span><button type="button" class="tn-strat">Strategist ›</button></div>${lines.map(l => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('') || '<p class="tn-quiet">Nothing pressing: sail your plan.</p>'}</div>`;
+  $('trimNotesBody').innerHTML = racing + trimNotesHtml(w.user, s, notes);
   $('trimNotes').hidden = false; $<HTMLButtonElement>('bTrimNotesX').focus();
 }
 function closeTrimNotes(): void {
@@ -734,7 +739,9 @@ function closeTrimNotes(): void {
 }
 $('trimNotes').addEventListener('click', e => { const el = e.target as HTMLElement; if (el.id === 'bTrimNotesX' || el.id === 'trimNotes') closeTrimNotes(); });
 $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-all')) openTrimNotes(); });
-$('bCoach').onclick = () => openTrimNotes();
+// the Strategist card (r298): a click anywhere on it (not on a control in it) opens the whole of it: the racing lines and
+// the strategist, then every line's note (Trim Notes)
+$('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('button, a, input, .sb-ctl')) return; openTrimNotes(); });
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
@@ -763,7 +770,9 @@ function coachTick(): void {
   const r = coachShown, top = r.view.top, fix = !r.done && top.kind === 'fix';
   // the live note: one at a time, numbered, held (the bar runs out over its hold); what the line's doing and why under
   // it, with All notes; the line ringed in the band, its target on its track
-  $('tpHint').innerHTML = r.done ? ce(r.done) : fix ? `<span class="tp-n">1</span>${ce(top.head.replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(top.head);
+  // (in a race the Strategist card's racing line says it's the start: the trim line drops its "Pre-start:", r298)
+  const head = (t: string) => w.freeSail ? t : t.replace(/^Pre-start:\s*/i, '').replace(/^./, c => c.toUpperCase());
+  $('tpHint').innerHTML = r.done ? ce(head(r.done)) : fix ? `<span class="tp-n">1</span>${ce(head(top.head).replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(head(top.head));
   $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : top.kind);
   $('tpSub').innerHTML = fix ? `${top.now ? ce(top.now) + '. ' : ''}${ce(top.short ?? '')}<button type="button" class="tp-all">All notes ›</button>` : '';
   $('tpHold').hidden = !fix; ($('tpHold').firstElementChild as HTMLElement).style.width = `${Math.round((1 - r.held) * 100)}%`;
