@@ -40,12 +40,14 @@ export class KeysView {
     for (const b of $('setTabs').querySelectorAll<HTMLElement>('[data-st]')) b.setAttribute('aria-pressed', String(b.dataset.st === t));
   }
   close(): void { $('keysView').hidden = true; this.listening = null; }
+  /** Drawn again: the keys that work now have changed (the sheet and traveler keys following the tack). */
+  refresh(): void { this.render(); }
   private note(t: string): void { $('keysNote').textContent = t; }
   private render(): void {
     const groups = [...new Set(ACTIONS.map(a => a.group))];
     $('keysIndex').innerHTML = groups.map(g => `<button type="button" class="chip" data-kg="${g}">${g}</button>`).join('');
     $('keysList').innerHTML = groups.map(g => `<div class="kgroup" data-g="${g}"><div class="eyebrow">${g}</div>` + ACTIONS.filter(a => a.group === g).map(a =>
       `<div class="krow${this.listening === a.id ? ' listening' : ''}"><span class="klab">${a.label}</span>` +
-      `<button class="kkeys" type="button" data-a="${a.id}" title="Click, then press the new key">${this.listening === a.id ? '<span class="knone">Press a key…</span>' : this.map.keys[a.id].map(k => `<kbd>${keyLabel(k)}</kbd>`).join('') || '<span class="knone">none</span>'}</button></div>`).join('') + '</div>').join('');
+      `<button class="kkeys" type="button" data-a="${a.id}" title="Click, then press the new key">${this.listening === a.id ? '<span class="knone">Press a key…</span>' : this.map.effective(a.id).map(k => `<kbd>${keyLabel(k)}</kbd>`).join('') || '<span class="knone">none</span>'}</button></div>`).join('') + '</div>').join('');
   }
 }

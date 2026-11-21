@@ -65,6 +65,7 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  keysTack?: 0 | 1; // the main's and the traveler's keys follow the tack, as they move on the screen (r026; Keys; off by default)
   /** Your own colors, saved from the boat editor's color picker (the owner, 8i: "like in Google Docs"), shared by every picker. */
   myColors?: string[];
   /** The wind indicator (render/windLadder.ts) showing: off unless you turn it on, and remembered. */

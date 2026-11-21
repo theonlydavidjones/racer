@@ -325,11 +325,11 @@ function paintSeg(): void {
     const k = seg.dataset.k as keyof Settings;
     const cur = String(app.S[k] ?? (k === 'fog' || k === 'rain' ? 'real' : undefined)); // (fog and rain unset: the real record's)
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (app.S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
+  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (app.S[c.dataset.t as 'aids' | 'windDial' | 'camRide' | 'keysTack'] ?? 0) === 1; });
 }
 // the on-screen training aids: a switch each (on = shown)
 document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
-  const k = c.dataset.t as 'aids' | 'windDial' | 'camRide'; app.S[k] = c.checked ? 1 : 0; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg();
+  const k = c.dataset.t as 'aids' | 'windDial' | 'camRide' | 'keysTack'; app.S[k] = c.checked ? 1 : 0; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg();
 }));
 document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest('button'); if (!b) return;

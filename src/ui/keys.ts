@@ -133,5 +133,37 @@ export class KeyMap {
     return stolen;
   }
   reset(): void { this.keys = structuredClone(DEFAULT_KEYS); this.save(); }
-  label(action: Action): string { return this.keys[action].map(keyLabel).join(' / ') || 'none'; }
+  label(action: Action): string { return this.effective(action).map(keyLabel).join(' / ') || 'none'; }
+  /** The sheet and traveler keys follow the tack (r026; Keys, off by default): set while she's on starboard tack. */
+  swap = false;
+  /** The keys that do `action` now: with `swap`, the main's and the traveler's pairs trade keys (TACK_PAIRS). */
+  effective(action: Action): string[] { const o = this.swap ? TACK_PAIRS[action] : undefined; return this.keys[o ?? action]; }
+}
+
+/**
+ * The owner (15 and 20 Nov 2026, r026): "I want the keyboard controls for main sheet and traveler to match their actual
+ * direction on the screen, meaning the controls need to switch with the tacks." Seen from astern, the left-hand key of
+ * each pair (Z, ⇧Z) moves the boom or the car to the left of the screen on port tack, as the keys are laid out: there the
+ * boom is out to starboard, so the right-hand key eases it, and windward is to port, so the left-hand key takes the car
+ * up. On starboard tack both are the other way round, so each pair trades its keys.
+ */
+const TACK_PAIRS: Partial<Record<Action, Action>> = { mainIn: 'mainOut', mainOut: 'mainIn', travUp: 'travDown', travDown: 'travUp' };
+export const TACK_KEYS: readonly Action[] = Object.keys(TACK_PAIRS) as Action[];
+
+/**
+ * Which way the sheet and traveler keys work: they follow her tack once she's through it, never mid-turn (r026), so a
+ * key held through a tack doesn't reverse under the player's finger. The new tack is taken once she's held it for
+ * SETTLE_S, with none of those keys held.
+ */
+export class TackKeys {
+  static readonly SETTLE_S = 2;
+  tack: 'P' | 'S' = 'P';
+  private seen: 'P' | 'S' | null = null;
+  private since = 0;
+  /** `tack` her tack now, `t` the race clock (s), `holding` whether a sheet or traveler key is held: true while swapped. */
+  update(tack: 'P' | 'S', t: number, holding: boolean): boolean {
+    if (tack !== this.seen) { this.seen = tack; this.since = t; }
+    if (tack !== this.tack && !holding && t - this.since >= TackKeys.SETTLE_S) this.tack = tack;
+    return this.tack === 'S';
+  }
 }

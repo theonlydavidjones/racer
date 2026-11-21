@@ -18,7 +18,7 @@ import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
-import { HELD, KeyMap, keyOf, type Action } from './ui/keys';
+import { HELD, KeyMap, TACK_KEYS, TackKeys, keyOf, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, scoreOrder, type Incident } from './rules';
@@ -1296,15 +1296,20 @@ function keysHint(): void {
 keysHint();
 hud.hailKey = () => keymap.label('hail');
 $('bKeys2').onclick = () => keysView.open();
+/** The sheet and traveler keys' tack (r026, the Keys option): it follows hers once she's through a tack. */
+const tackKeys = new TackKeys();
 /** Helm and sheets follow whatever is held. */
 function applyHeld(): void {
+  const swap = S.keysTack === 1 && tackKeys.update(w.user.tack, w.t, TACK_KEYS.some(a => held.has(a)));
+  if (keymap.swap !== swap) { keymap.swap = swap; if (keysView.isOpen) keysView.refresh(); }
+  const flip = swap ? -1 : 1; // (on starboard tack the pairs trade keys: ui/keys.ts TACK_PAIRS)
   const steer = w.pilot.mode !== 'off' ? 0 : (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); // (on the pilot, the steering keys turn its course: pilotTick)
   // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
   const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
   const add = (k: CtlKey, d: number) => { if (d) cmd[k] = Math.max(-1, Math.min(1, (cmd[k] ?? 0) + d)); };
-  add('mainsheet', (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0));
+  add('mainsheet', flip * ((held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0)));
   add('jibsheet', (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0));
-  add('traveller', (held.has('travDown') ? 1 : 0) - (held.has('travUp') ? 1 : 0)); // (−1 windward … +1 leeward, at the car's own rate)
+  add('traveller', flip * ((held.has('travDown') ? 1 : 0) - (held.has('travUp') ? 1 : 0))); // (−1 windward … +1 leeward, at the car's own rate)
   const sel = CTL_UI[ctlSel];
   if (sel.key !== 'carFore' && sel.key !== 'carIn') add(sel.key, (held.has('ctlUp') ? 1 : 0) - (held.has('ctlDown') ? 1 : 0));
   if (steer) unlash(); // a hand on the tiller: the lashing comes off (one still on its way too: unlash knows)
