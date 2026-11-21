@@ -11,6 +11,7 @@ import { buildCityFront, inCityFront } from './cityfront';
 import { addFortPoint } from './fortPoint';
 import { addGgSouth } from './ggSouth';
 import { addPalace } from './palace';
+import { addAlcatrazExtras } from './alcatrazExtras';
 import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
@@ -449,6 +450,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   addFortPoint(grp);
   // Alcatraz: the lidar's ground and its buildings (render/alcatraz.ts, render/alcatrazBuildings.ts)
   addAlcatrazBuildings(grp, alcatraz);
+  addAlcatrazExtras(grp);
   /* ---------- Angel Island ---------- */
   // The state park: no town, just its woods and the old army and immigration buildings where they stand. Positions
   // are approximate (to about 50 m, from the park's map and Wikipedia; OpenStreetMap wasn't reachable to check them).

@@ -16,6 +16,9 @@ const at = LL(C[0], C[1], 22);
 const VIEWS = {
   sw_300: [off(230, 380, 4), at], sw_1km: [off(230, 1080, 4), at], // from the Golden Gate side, the island's broadside
   ne_300: [off(50, 380, 4), at], ne_1km: [off(50, 1080, 4), at], // from the Angel Island side
+  dock_200: [LL(37.8262, -122.4175, 4), LL(37.82668, -122.42095, 6)], // the ferry dock and the east side, from the water east of the island
+  dock_close: [LL(37.8262, -122.4196, 3), LL(37.82668, -122.42092, 5)], // the ferry dock and the guard tower, from the water about 120 m off
+  walls_300: [LL(37.8245, -122.4220, 4), LL(37.8268, -122.4228, 18)], // the island's south terraces and walls, from the water south of the island
   light_150: [LL(37.82625 - 0.0016, -122.42230 - 0.0006, 4), LL(37.82645, -122.42265, 40)], // the lighthouse and the cellhouse, from the water about 200 m south-south-west of the tower
   over: [LL(C[0] - 0.0016, C[1] - 0.0008, 620), LL(C[0], C[1], 0)], // from above, a little to the south-west, looking down on the island
 };
@@ -24,7 +27,7 @@ const VIEWS = {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
+  await p.goto(`http://localhost:${process.env.PORT || 5173}/?inproc`); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1200);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
   await p.addStyleTag({ content: 'body *:not(#gl) { visibility: hidden !important; } #gl { visibility: visible !important; }' });
