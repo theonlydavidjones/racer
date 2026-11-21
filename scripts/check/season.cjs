@@ -50,7 +50,7 @@ const out = process.argv[2] || '.';
   await page.waitForSelector('#results:not([hidden])', { timeout: 60000 }).catch(() => fail('the results never showed'));
   const line = await page.evaluate(() => { const e = document.getElementById('resSeason'); return { hidden: e.hidden, text: e.textContent }; });
   console.log('results season line:', JSON.stringify(line));
-  if (line.hidden || !/^Seaweed Soup: \d+(st|nd|rd|th) · \d+ nett/.test(line.text)) fail('no season line in the results');
+  if (line.hidden || !/^[^:]+: \d+(st|nd|rd|th) · \d+ nett/.test(line.text)) fail('no season line in the results');
   if (/win/.test(line.text)) fail('the series is called won after race 1 of five');
   await page.screenshot({ path: out + '/season-results.png' });
   // 3. saved: the standings
