@@ -12,7 +12,7 @@ export type LineUiKey = CtlKey | 'carFore' | 'carIn';
 
 /** The lines' names in running text ("the main halyard"). */
 export const LINE_NAME: Record<LineKey, string> = {
-  mainsheet: 'mainsheet', traveller: 'traveller', backstay: 'backstay', vang: 'vang', outhaul: 'outhaul',
+  mainsheet: 'mainsheet', traveller: 'traveler', backstay: 'backstay', vang: 'vang', outhaul: 'outhaul',
   cunningham: 'Cunningham', downhaul: 'main halyard', jibCunningham: 'jib Cunningham', jibHalyard: 'jib halyard', jibsheet: 'jib sheet', jibsheetW: 'windward jib sheet', car: 'jib cars'
 };
 /** Their names as labels ("Main halyard"). */
