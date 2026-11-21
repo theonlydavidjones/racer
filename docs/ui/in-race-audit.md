@@ -10,8 +10,8 @@ index.html (not src/sim, src/boat, src/ai, src/rules, src/environment).
 
 ## Checked and clean
 
-- **UK spellings:** none in the visible text at any of the 13 stops (the DOM scan for colour, centre, metre, harbour,
-  favour, manoeuvre, grey, programme, -ise, traveller, gybe), and `spelling.cjs` passes.
+- **UK spellings:** none in the visible text at any of the 13 stops (the DOM scan for every UK form
+  `spelling.cjs` lists), and `spelling.cjs` passes.
 - **Controls that don't answer:** none. Pause, Resume (the pause screen), Speed ×3 and its key (Shift+Y), Sound ×2, Tools
   ×2, the view button ×3, Crew ×2, the band's ▾ and key 4, T (the tiller) and P (pause) each changed the state they
   should (`answers.cjs`). The band's ▾ answers by class (`sailband shut`), not by height.

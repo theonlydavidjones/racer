@@ -27,7 +27,7 @@ body:has(.overlay:not([hidden])) #compassBar{visibility:hidden}
 /* the inset map at the top right, under the nav strip when there is one */
 #map{top:calc(env(safe-area-inset-top,0px) + 16px)!important}
 body.nav-on #map{top:calc(env(safe-area-inset-top,0px) + 74px)!important}
-body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.still #navStrip{visibility:hidden}
+body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.still #navStrip,body:has(#fleet:not([hidden])) #compassBar,body:has(#fleet:not([hidden])) #navStrip{visibility:hidden}
 /* the four cards one width, the clock's (the owner, 20 Nov): a little less padding and spacing so each sub-line fits whole */
 #hud .pod{padding-left:5px;padding-right:5px}
 #hud .sub{letter-spacing:.05em}
