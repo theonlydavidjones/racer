@@ -212,6 +212,13 @@ const CLEAR_HOLD_S = 0.5;
 /** How long she foots for the way to tack before asking it anyway, s: an ESTIMATE, a sailor's patience; footing she
  * gains what she will in about her speed's time constant, and in chop she can settle short of it (the v214 review). */
 const FOOT_FOR_S = 30;
+/** One think's footing for the way to tack: whether she foots, and her time at it. It counts only while she still wants
+ * the tack and is short of the way for it: when the reason goes (a tack for clear air or the rhumb line that lapses, a
+ * header's one think) it starts again from nothing, so a later slow tack gets its own FOOT_FOR_S, not what's left of an
+ * earlier one's (the v215 review). */
+export function footStep(footT: number, slow: boolean, reaches: boolean, dt: number): { foot: boolean; footT: number } {
+  return slow && reaches && footT < FOOT_FOR_S ? { foot: true, footT: footT + dt } : { foot: false, footT: 0 };
+}
 function clearestHeading(w: World, b: Boat, want: number): number {
   const from = b.ww.from, tackOf = (h: number) => { const r = wrap(from - h); return Math.abs(r) > 176 ? b.tack : r >= 0 ? 'S' : 'P'; }; // (starboard: the wind on her right, rel >= 0, as physics.ts tackStep)
   const ai = b.ai, held = ai && ai.clearT != null && ai.clearH != null && ai.clearT < w.t && w.t - ai.clearT <= CLEAR_HOLD_S && Math.abs(wrap(ai.clearH - want)) <= 90 ? ai.clearH : null;
@@ -878,8 +885,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         // she's footed FOOT_FOR_S and still hasn't (she settles under the table's target in chop: v214 review): then she
         // asks the tack anyway, slow, and her helm takes her through the wind, sculled round)
         const slow = doTack && b.v < slowTack(b) * 1.15;
-        if (slow && footReaches(b) && (ai.footT ?? 0) < FOOT_FOR_S) { desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10); ai.footT = (ai.footT ?? 0) + dt; }
-        else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg, slow }; ai.footT = 0; desired = other === 'S' ? csS : csP; planned = desired; decideTurn(b, w.t); } // (called or not, by her skipper: boat/calls.ts)
+        const f = footStep(ai.footT ?? 0, slow, slow && footReaches(b), dt);
+        ai.footT = f.footT;
+        if (f.foot) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
+        else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg, slow }; desired = other === 'S' ? csS : csP; planned = desired; decideTurn(b, w.t); } // (called or not, by her skipper: boat/calls.ts)
       }
     } else if (mode === 'run') {
       // running for a mark deeper than her best downwind angle (polar.ts runAngle: wing-on-wing, VMG best at 160–174°):

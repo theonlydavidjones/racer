@@ -3,6 +3,7 @@ import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { wrap } from '../src/core/math';
 import { footReaches, slowTack } from '../src/boat/physics';
+import { footStep } from '../src/ai/ai';
 import type { Boat } from '../src/boat/boat';
 import { FLAT_SEA } from '../src/environment/sea';
 
@@ -97,5 +98,29 @@ describe('A tack in light air (physics.ts slowTack)', () => {
     let far = false;
     sail(b, 60, () => { if (Math.abs(wrap(b.h - 180)) < 60) far = true; });
     expect(far, 'gybed round').toBe(true);
+  });
+});
+
+describe('Footing for the way to tack (ai.ts footStep)', () => {
+  // (the v215 review: footT was zeroed only off the beat or when a tack was set, so 25 s footed for a tack that then
+  // lapsed was banked, and the next slow tack was asked after 5 s; a header's single think banked its step too)
+  const run = (footT: number, thinks: [slow: boolean, s: number][], dt = 0.05) => {
+    let asked = -1, t = 0;
+    for (const [slow, s] of thinks) for (let i = 0; i < Math.round(s / dt); i++, t += dt) {
+      const f = footStep(footT, slow, slow, dt); footT = f.footT;
+      if (slow && !f.foot && asked < 0) asked = t;
+    }
+    return { footT, asked };
+  };
+  it('a tack she footed 25 s for and then dropped leaves nothing banked: the next one gets its full 30 s', () => {
+    const r = run(0, [[true, 25], [false, 1], [true, 40]]);
+    expect(r.asked - 26, 'footed before asking the next').toBeGreaterThanOrEqual(29.9);
+  });
+  it('a header\'s one think banks nothing', () => {
+    expect(run(0, [[true, 0.05], [false, 0.05]]).footT).toBe(0);
+  });
+  it('footing she asks the tack after 30 s', () => {
+    const r = run(0, [[true, 40]]);
+    expect(r.asked).toBeGreaterThanOrEqual(29.9); expect(r.asked).toBeLessThan(30.2);
   });
 });
