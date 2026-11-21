@@ -55,7 +55,7 @@ describe('copy sweep D: the past-race caveats are short, their hovers one line',
 });
 
 describe('copy sweep F: the drill flag hovers are one line', () => {
-  it('cut through shortTip', () => { expect(read('src/app/setup.ts')).toContain('title="${app.esc(shortTip(PREP_MEANING[f]))}"'); });
+  it('by hand where a plain cut dropped the penalty (PREP_TIP), else through shortTip', () => { expect(read('src/app/setup.ts')).toContain('title="${app.esc(PREP_TIP[f] ?? shortTip(PREP_MEANING[f]))}"'); });
 });
 describe('copy sweep G: the tiller-lashed toasts are one short line each', () => {
   it('no toast over 110 characters for the lashing', () => {
