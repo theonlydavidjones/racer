@@ -197,7 +197,9 @@ export function swellFor(date: string, day: SwellDay): Swell {
  * half-hourly records in the afternoon window the days are averaged over (11:00–17:00 local), 2 October – 11 November
  * 2026 (scripts/fetch-swell-split.mjs): a median 0.75 below 1.5 m, 0.82 at 1.5–2.5 m, 0.85 above (big seas are mostly
  * swell); a tenth of the time under 0.62. Fitted 0.71 + 0.048·Hs. Only the autumn's: the station keeps no spectral
- * history, so for summer's wind-driven afternoons (more wind sea, a smaller share) and winter's storms it's an estimate.
+ * history (NDBC's station history for 46237 lists only stdmet, 2007–, and adcp, 2017–2018; no swden file in
+ * data/historical/swden; checked 21 Nov 2026: its spectra are only the realtime window; CDIP's own archive of the same buoy,
+ * 142p1, may hold them, but cdip.ucsd.edu isn't reachable from here), so for summer's wind-driven afternoons (more wind sea, a smaller share) and winter's storms it's an estimate.
  */
 export const swellShare = (hs: number) => clamp(0.71 + 0.048 * hs, 0.55, 0.92);
 
