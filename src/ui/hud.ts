@@ -96,6 +96,8 @@ export class Hud {
   /** The end favored on the line now, before the gun ('square' under 2° of bias): the race's call is judged on its last value. */
   favNow: 'pin' | 'committee' | 'square' | null = null;
   private askKey = '';
+  /** Where the chart's north arrow and wind go, across (px): drawChart works it out before the chart's print. */
+  private northX = 0;
   private acc = 0;
   mapZoom = false;
   /** What the inset shows, cruising: the water round her (the map), or the navigator's passage (her course to the
@@ -773,6 +775,12 @@ export class Hud {
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
     const avoid = PLACES.filter(pl => pl.buoy && scale > 0.12).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
     const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
+    // north and the wind: on the full chart at its top right, under the field picker; on the setup's small chart just left
+    // of the expand icon, or, with her boat or the destination under them there, at its top left: the wind's label never
+    // on her (chart audit #11); the chart's print keeps clear of them
+    { const busy = (x: number) => [me, ...(wd.dest ? [tf(wd.dest.p.x, wd.dest.p.y)] : [])].some(([bx, by]) => Math.abs(bx - x) < 48 && by < 130);
+      this.northX = opts.cornerFree ? (busy(w - 72) && !busy(48) ? 48 : w - 72) : w - 28;
+      if (opts.cornerFree) avoid.push([this.northX - 34, 6, 68, 116]); }
     // the chart's own panels over it, the Layers panel, the field picker and Day | Dusk, the passage line, the info box: the
     // names keep clear of them, the sim's and the chart's own print alike (chart audit #1)
     const panels: [number, number, number, number][] = [];
@@ -821,7 +829,7 @@ export class Hud {
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     // (`cornerFree`: the top-right corner left for the setup chart's expand icon, north and the wind just left of it)
     // (the full chart's top-right corner is the field picker's and Day | Dusk: north and the wind go just under them)
-    const nx = opts.cornerFree ? w - 72 : w - 28, dy = opts.cornerFree ? 0 : 56;
+    const nx = this.northX, dy = opts.cornerFree ? 0 : 56;
     ctx.fillText('N', nx, 22 + dy); ctx.beginPath(); ctx.moveTo(nx, 28 + dy); ctx.lineTo(nx + 5, 42 + dy); ctx.lineTo(nx - 5, 42 + dy); ctx.closePath(); ctx.fill();
     const wf = wd.wind.from * D2R, ox = nx, oy = 80 + dy;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
@@ -833,9 +841,12 @@ export class Hud {
     { const t = `WIND ${Math.round(wd.wind.kt)} KT`, tx = opts.cornerFree ? ox - 6 : w - 8; ctx.save(); ctx.textAlign = opts.cornerFree ? 'center' : 'right'; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, tx, oy + 34); ctx.fillText(t, tx, oy + 34); ctx.restore(); }
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
     // (on a halo, so a ship or the chart's print under it doesn't swallow it: chart audit #10)
-    ctx.save(); ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillStyle = I.halo; ctx.fillRect(10, h - 28, bar + ctx.measureText(lab).width + 18, 20); ctx.restore();
+    // (and above NOAA's credit line where that reaches across under it, on the setup's narrow chart: chart audit #11)
+    ctx.save(); ctx.font = '9px "Saira Semi Condensed", sans-serif'; const crW = ctx.measureText(chartCredit()).width; ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
+    const sbW = bar + ctx.measureText(lab).width + 18, lift = w - crW - 16 < 10 + sbW + 4 ? 18 : 0; ctx.fillStyle = I.halo; ctx.fillRect(10, h - 28 - lift, sbW, 20); ctx.restore();
+    ctx.save(); ctx.translate(0, -lift);
     ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
-    ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
+    ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14); ctx.restore();
     ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
     const cw = ctx.measureText(chartCredit()).width; ctx.fillStyle = I.deep; ctx.globalAlpha = 0.85; ctx.fillRect(w - cw - 16, h - 19, cw + 12, 15);
     ctx.fillStyle = I.text; ctx.globalAlpha = 1; ctx.fillText(chartCredit(), w - 10, h - 8);
