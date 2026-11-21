@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Leaderboard, gapText, placesGained, raceOrder, sailOf, shortRows, toGo, type LbBoat } from '../src/ui/leaderboard';
+import { Leaderboard, gapText, placesGained, raceOrder, sailOf, sailParts, shortRows, toGo, type LbBoat } from '../src/ui/leaderboard';
 
 const boat = (id: number, x: number, y: number, leg: number, o: Partial<LbBoat> = {}): LbBoat =>
   ({ id, isUser: false, name: `B${id}`, leg, x, y, finished: false, finishT: null, ...o });
@@ -46,7 +46,10 @@ describe('the leaderboard (r288)', () => {
   it('long sail numbers come out whole', () => {
     const spec = (country: string, number: string) => ({ sails: { country, number } }) as unknown as LbBoat['spec'];
     for (const [c, n] of [['USA', '12345'], ['GBR', '1234'], ['DEN', '1234'], ['SWE', '12345'], ['NZL', '9999'], ['USA', '111']])
-      expect(sailOf(boat(1, 0, 0, 0, { spec: spec(c, n), name: 'Kestrel of the Golden Gate' }))).toBe(`${c} ${n}`);
+      { const b = boat(1, 0, 0, 0, { spec: spec(c, n), name: 'Kestrel of the Golden Gate' });
+        expect(sailOf(b)).toBe(`${c} ${n}`); expect(sailParts(b)).toEqual({ country: c, number: n }); } // (the country drawn as the ensign)
+    expect(sailParts(boat(0, 0, 0, 0, { isUser: true, no: 'USA 122' }))).toEqual({ country: 'USA', number: '122' });
+    expect(sailParts(boat(1, 0, 0, 0, { no: 'US 87' }))).toBeNull(); // (a stock boat: her name)
   });
   it('the gap to the leader: whole meters, a comma from 1,000', () => {
     expect([gapText(37.4), gapText(412), gapText(1240.2), gapText(12405)]).toEqual(['+37', '+412', '+1,240', '+12,405']);

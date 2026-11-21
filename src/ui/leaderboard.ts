@@ -1,4 +1,5 @@
-import { sailNo, type BoatSpec } from '../boat/spec';
+import { countryName, ensignFor, sailNo, type BoatSpec } from '../boat/spec';
+import { flagArtCanvas } from '../render/flagArt';
 
 /**
  * The race's leaderboard (r288, the owner, 20 Nov 2026): the fleet's order now, shown under the instruments for 12 s
@@ -49,6 +50,19 @@ export function shortRows(n: number, me: number): (number | null)[] {
 
 /** A boat's sail number, where she has one (a club member's boat, and yours); the stock boats go by name (the owner). */
 export const sailOf = (b: LbBoat): string => b.spec ? sailNo(b.spec) : b.isUser ? b.no ?? '' : '';
+/** The same, as its country (sail letters) and its number: the board shows the country as her ensign, to save room. */
+export function sailParts(b: LbBoat): { country: string; number: string } | null {
+  const no = sailOf(b).trim(); if (!no) return null;
+  const m = /^([A-Z]{2,3})\s+(\S.*)$/.exec(no);
+  return m ? { country: m[1], number: m[2] } : { country: '', number: no };
+}
+/** Each country's ensign as a small picture (render/flagArt.ts, as the fleet's tiles have it), made once. */
+const ensignUrls = new Map<string, string>();
+function ensignUrl(country: string): string {
+  let u = ensignUrls.get(country);
+  if (u == null) { const id = ensignFor(country); try { u = id ? flagArtCanvas(id)?.toDataURL() ?? '' : ''; } catch { u = ''; } ensignUrls.set(country, u); }
+  return u;
+}
 
 const ord = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -99,8 +113,10 @@ export class Leaderboard {
     const gained = placesGained(f.map(x => x.b.id), (t < this.until ? this.ref : null) ?? this.atMark);
     const head = `<div class="lb-h"><span>${esc(this.mark || 'Race')}</span><span class="lb-pos">${ord(me + 1)}/${n}</span></div>`;
     // (the number its own column, whole, always; the name gives way, cut with an ellipsis; her "You" dropped whole)
-    const label = (b: LbBoat) => { const no = sailOf(b);
-      return `<b>${esc(no)}</b>${b.isUser ? '<i class="lb-n you"><s>&#8203;</s><span>You</span></i>' : `<i class="lb-n">${esc(b.name)}</i>`}`; };
+    // (the country as her ensign, not its letters: the owner, 21 Nov 2026; the letters where there's no ensign to draw)
+    const label = (b: LbBoat) => { const sp = sailParts(b), url = sp?.country ? ensignUrl(sp.country) : '';
+      const no = !sp ? '' : url ? `<img class="lb-flag" src="${url}" alt="${sp.country}" title="${esc(countryName(sp.country))}">${esc(sp.number)}` : esc(sp.country ? `${sp.country} ${sp.number}` : sp.number);
+      return `<b>${no}</b>${b.isUser ? '<i class="lb-n you"><s>&#8203;</s><span>You</span></i>' : `<i class="lb-n">${esc(b.name)}</i>`}`; };
     let html = head;
     if (!this.expanded) {
       for (const i of shortRows(n, me)) {
