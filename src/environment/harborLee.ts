@@ -22,7 +22,9 @@ import { WindSum, bluffDeficit } from './shadows';
  *   isn't thrown up, so the sheltered layer stays about 1.2 h deep, and with no form drag there's no long far wake: 70%
  *   slower below 1.2 h to 7 h, fading out by 15 h (the review's reading; not measured for these walls).
  * - A shed on a pier: a bluff body (shadows.ts bluffDeficit, as the ships' and the bridge piers' are: Hosker's cavity,
- *   then the deficit fading as (x/H)^−1.5, after Woo, Peterka & Cermak 1977), from its lee face, across its width. The
+ *   then the deficit fading as (x/H)^−1.5, after Woo, Peterka & Cermak 1977, "Wind-tunnel measurements in the wakes of
+ *   structures", NASA CR-2806, §5.4.5: −1.5 for bodies 3–4 times as wide as high, as these long sheds are; nearer −1.2 at
+ *   width 1, −1.0 at 0.25), from its lee face, across its width. The
  *   sheds stand 13–17 m: the whole rig is in their wake.
  *
  * Heights: the sheds' from OpenStreetMap (geo/data/pile-piers.json). The walls' aren't published where we could reach:
