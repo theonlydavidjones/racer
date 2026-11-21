@@ -812,7 +812,10 @@ export class Hud {
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
-    ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34);
+    ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
+    // (on a halo, like the chart's other overlays, and, on the full chart, kept inside its right edge: centered on the arrow
+    // 28 px in, it ran off it and into the chart's own names; chart audit #2)
+    { const t = `WIND ${Math.round(wd.wind.kt)} KT`, tx = opts.cornerFree ? ox - 6 : w - 8; ctx.save(); ctx.textAlign = opts.cornerFree ? 'center' : 'right'; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, tx, oy + 34); ctx.fillText(t, tx, oy + 34); ctx.restore(); }
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
     ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
     ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
