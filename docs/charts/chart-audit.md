@@ -35,17 +35,30 @@ The stills are in `audit/`. Line numbers are on 5de4d67c.
 | 15 | **UK spelling.** None in what the player reads on the charts. `spelling.cjs` finds 3, all in docs/marinas drafts. A few code comments in encChart.ts and hud.ts use the British spellings of color and gray; they're not shown. | — | — | — |
 | 16 | **Chart features against NOAA's ENC.** Not compared feature by feature: that needs the ENC's own data beside the drawing, a research task of its own. Nothing looked wrong or missing in the area sailed. | — | — | — |
 
-The S items fixed on `claude/leaderboard-b`, one commit each, citing "chart audit #n":
+## Fixed on `claude/leaderboard-b`
 
-| # | Commit |
-|---|--------|
-| 1 | f9a20998 |
-| 2 | 6fd71d32 |
-| 3 | 1242adba |
-| 7 | 56771428 |
-| 8 | 5435d94b |
-| 10 | 525f75c8 |
-| 12 | 657352fa |
-| 14 | 40e2722f |
+Each fix is its own commit, citing "chart audit #n". The before/after stills are in `stills/chart-audit/` on the
+`stills/leaderboard-b` branch. The Coordinator ruled on the four M items (4, 6, 9 and 11).
 
-#1 doesn't cover the ENC's own names running off the left edge ("Golden Gate Bridge"); that's still open.
+| # | Commit(s) | Before/after |
+|---|-----------|--------------|
+| 1 | f9a20998 | 01-names-panels.png |
+| 2 | 6fd71d32, 995a5fdd | 02-wind-label.png |
+| 3 | 1242adba | 03-dusk-clock.png |
+| 4 | d52a2438 | 04-names.png |
+| 6 | 19e48695 | 06-zoomout.png |
+| 7 | 56771428 | 07-waves-feet.png |
+| 8 | 5435d94b | 08-key-course.png |
+| 9 | f32f3405 | 09-inset.png |
+| 10 | 525f75c8 | 10-scale-bar.png |
+| 11 | bbd66b5f | 11-setup.png |
+| 12 | 657352fa | — |
+| 14 | 40e2722f | — (nav-layer.cjs and plan-chart.cjs pass on this branch and on v215) |
+| in-race #3, #4 | ebd904ad | tags-before-after.png |
+
+### Corrections and what's still open
+
+- **#10:** the dark shape over the scale bar is the chart's own print, not a ship. The halo makes the bar and its label read over it.
+- **#1:** the ENC's own names can still run off the chart's left edge ("…te Bridge").
+- **#4:** the sim's own "ETA" label at the destination is still crossed by a layline. Only NOAA's names were redrawn.
+- **#9:** the label still touches a yellow buoy on the racing inset. Only course marks, the line's ends and boats count as under it.
