@@ -2,6 +2,11 @@
 
 Player-visible changes per release, from git (the Coordinator's record; newest first).
 
+## v213 (20 Nov, code f8377d60)
+
+- In a choppy light breeze the AI no longer counts a tack as cheaper than it would be in flat water: its slow-tack speed is never below the flat-water value. (Skipper Model; 900f7570)
+- The AI's best upwind angle in chop is steadier: the chop's lean fades in over 0.3 m, the search reaches 90°, and a boat with no headway at any angle takes 65°. (Bay East; 07e07a0e)
+
 ## v212 (20 Nov, code 99fc7ce2)
 
 - **AI in a dying breeze.** In 1–4 kt her close-hauled speed (0.4–1.2 m/s) is under the fixed 1.3 m/s tack threshold. On the layline she used to bear away to build speed the wind could not give, and every tack became a full 250–380° jibe taking about 100 s. She now tacks from 0.6 of her close-hauled speed in the wind she has. It is unchanged from about 9 kt. She judges that wind by the lighter of the wind now and her 20 s mean, so a fresh puff no longer makes her jibe round. (f6320b17, 2184d27f, 18053ef7)

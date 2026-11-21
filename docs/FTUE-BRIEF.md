@@ -101,3 +101,12 @@ Questions for the coordinator/engineering agent to answer:
 - Non-racing clubs. The 16 Tier 2 clubs (mostly cruising and social) aren't joinable in the MVP.
 - Crewing mode. Crewing on someone else's boat. Rejected as an opening experience, but possible later.
 - Trailering. Out of scope.
+
+## The owner's decisions since the brief
+
+- 20 Nov 2026: "Create a race" at the default clubs becomes **Practice**; in practice the committee's settings are locked to the club's.
+- 20 Nov 2026: plan approvals 1 (no sign-in screen where the platform signs you in), 2 (the Drill card's line to Learn to sail), 3 (every marina pinned, the built ones choosable), 5 (the Yacht Club page leads with your club).
+- 20 Nov 2026, **membership (overrides §3's entry rule):** "very few races that I know of require people to be members of the sponsor club. you just have to be a member of a yacht club of any kind." Season races at a default club need membership in any club; gated events stay a later rule; Practice is open to all.
+- 20 Nov 2026, **burgee designer:** "we should only send someone to the burgee creator as part of a new-club creation flow."
+- 20 Nov 2026, marina names: public owners keep real names (Alameda Marina, Marina Bay Yacht Harbor, Napa Valley real); private ones as approved in docs/marinas/PARODY-NAMES-DRAFT.md (Fisherman's Wharf, Heron Harbor, Loch Tay Marina, Fortitude Marina, the rest option 1).
+- 20 Nov 2026, toggles: words in a toggle only for brief, obvious two-state choices (CLAUDE.md).

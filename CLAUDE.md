@@ -56,6 +56,8 @@ come later, once the physics and racing are dialed in.
 - No blocks of explanatory copy on the player's screens (owner, 13 Nov 2026: "these blocks of tiny copy are useless.
   nobody will ever read this."). At most one short line where the player needs it to act; methods and caveats go
   behind one hover or link, or are cut. Prefer visuals (tiles, charts, icons) to words.
+- Toggles (the owner, 20 Nov 2026): words inside a segmented toggle only for brief, obvious two-state choices
+  ([Light|Dark], [Day|Dusk]); anything less obvious is a short label beside a plain on/off switch.
 - Be extremely conservative about new buttons and distractions on the game surface (owner, 13 Nov 2026): put new controls inside existing elements (the inset map, the sail band, menus, Keys), not as new on-screen buttons.
 
 ## Workflow
@@ -141,7 +143,7 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
     ROADMAP's prose. Before handing out or starting a request, check main's code and `git log --grep` for it first.
   - At each publish the Coordinator sends Roadmap the release's request numbers (`git log <prev>..<this> | grep -oE
     'r[0-9]{3}'`), its player-visible changes, and what moved between releases; Roadmap writes the Roadmap rows
-    (requests, and the Releases view's `work`) from that alone. The Coordinator adds the release's section to
+    from that alone. The Coordinator adds the release's section to
     docs/RELEASE-NOTES.md and strikes its ROADMAP items in the same commit as the version row.
   - Anything only the owner can settle aboard Josephine (a measurement, a photo, an observation underway) goes in
     docs/ABOARD-JOSEPHINE.md, not only in a message; it's struck there with their answer when it's used.

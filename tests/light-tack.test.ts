@@ -4,6 +4,7 @@ import { beatAngle } from '../src/boat/polar';
 import { wrap } from '../src/core/math';
 import { slowTack } from '../src/boat/physics';
 import type { Boat } from '../src/boat/boat';
+import { FLAT_SEA } from '../src/environment/sea';
 
 /**
  * AI steering in a dying breeze (ROADMAP; the Coordinator, 19 Nov 2026): in 1-4 kt her close-hauled speed is 0.5-1.2 m/s,
@@ -24,6 +25,15 @@ function askTack(b: Boat, s = 60): { gybed: boolean; round: number } {
 }
 
 describe('A tack in light air (physics.ts slowTack)', () => {
+  it('in chop, she wants at least the way she would in flat water (a seaway stops her head to wind sooner, not later)', () => {
+    // (the physics review, 20 Nov 2026: with the share of her speed in chop, the threshold fell as the chop rose, 0.28 to
+    // 0.12 m/s at 1.5 kt in 0.4 m, and to nothing at 1 kt; from there a tack took 72 s in 0.5 m and 201 s in 0.3 m)
+    for (const kt of [1, 1.5, 3, 6]) for (const hsW of [0.3, 0.4, 0.5]) {
+      const flat = slowTack({ ww: { kt }, sea: FLAT_SEA }), chop = slowTack({ ww: { kt }, sea: { ...FLAT_SEA, hsW, tpW: 2 } });
+      expect(chop, `${kt} kt, ${hsW} m: ${chop.toFixed(2)} m/s in chop, ${flat.toFixed(2)} in flat water`).toBeGreaterThanOrEqual(flat);
+      expect(flat, `${kt} kt`).toBeGreaterThan(0.1);
+    }
+  });
   it('in 3 kt, the edge: from just under TACK_WAY of her speed she gybes round, from just over it she tacks', () => {
     for (const [f, gybes] of [[0.9, true], [1.1, false]] as const) {
       const a = beatAngle(3), b = testBoat({ heading: 360 - a, kt: 1, windKt: 3 });

@@ -99,8 +99,10 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
     // (the fouls only, and only both ways: 48 more seeds, 51–98, the courses in turn, so the paired test runs over 96.
     // Why: on 20 Nov 2026 the light-air tack with the crew's outhaul failed it on the 48 alone, 72 against 101, mean +0.60
     // against a bound of 0.53 (t 2.77); on 96 seeds outside the test (51–146) the same pair gave 171 against 177, +0.06
-    // against 0.29, the same as main's +0.06: a tail draw on the fixed 48, not a rise in fouls. Coordinator's ruling: more
-    // seeds at the same 99% rate, not a looser bound.)
+    // against 0.29, the same as main's +0.06. Pooled over all 144 it's +0.24 a race, about two standard errors: neither a
+    // rise in fouls nor its absence is shown. Coordinator's ruling: more seeds at the same 99% rate, not a looser bound.
+    // These 96 (3–50 and 51–98, as written here) are fixed from now on, as the 48 above: a failure is read against this
+    // same set, never one chosen again.)
     const MORE_FOULS = Array.from({ length: 48 }, (_, k) => [k % 2, 51 + k] as const);
     jobs.push(...MORE_FOULS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }]]));
     const R = await sail('approxRace', jobs);

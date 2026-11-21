@@ -213,8 +213,8 @@ function clearestHeading(w: World, b: Boat, want: number): number {
   const from = b.ww.from, tackOf = (h: number) => { const r = wrap(from - h); return Math.abs(r) > 176 ? b.tack : r >= 0 ? 'S' : 'P'; }; // (starboard: the wind on her right, rel >= 0, as physics.ts tackStep)
   const ai = b.ai, held = ai && ai.clearT != null && ai.clearH != null && ai.clearT < w.t && w.t - ai.clearT <= CLEAR_HOLD_S && Math.abs(wrap(ai.clearH - want)) <= 90 ? ai.clearH : null;
   // (a tack away, though, with way on for it: from slowTack × 1.15, and once chosen, whatever her speed, until she's
-  // through the wind; a hard threshold would offer it at 1.31 m/s and take it back at 1.29 as she luffed into the tack:
-  // the physics review)
+  // through the wind; a hard threshold would offer it just over slowTack and take it back just under as she luffed into
+  // the tack: the physics review)
   const tackAway = (h: number) => Math.abs(wrap(from - h)) < 90, heldAway = held != null && tackOf(held) !== b.tack && tackAway(held);
   const mayTack = heldAway || b.v >= slowTack(b) * 1.15;
   let best = want, bestS = -Infinity, bestC = 0;

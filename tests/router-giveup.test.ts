@@ -10,7 +10,7 @@
 //   minutes against the flood and got through at 168.2 (given up on the stall and a dead way alone, it couldn't either).
 // - And the give-up is the passage's direct try's alone (it then goes stretch by stretch): asked of the router in general,
 //   it cut a long wait on the foul tide in Raccoon Strait (Belvedere Point to Ayala Cove against the ebb in 5 kt, 25 Nov
-//   15:00), given up at 218 min where it arrives at 327.5 (Deep Physics' second review; 326.5 since beat-chop read the drive table between its rows). Not asked, the router gets there.
+//   15:00), given up at 218 min where it arrives at 327.5 (Deep Physics' second review; 326.5 since beat-chop read the drive table between its rows; 326.6 since the beat in a light chop lost its lean toward the wind, beat-smooth). Not asked, the router gets there.
 import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -60,6 +60,6 @@ describe('a front that has lost the way is given up; one that is waiting is kept
     const w = new World(COURSES[0], sail({ tideDate: '2026-11-25', tideTime: '12:00', windKt: 5 }), 1, { freeSail: true });
     w.step(DT);
     const r = routeLeg(outlookFor(w as never), LL(37.8655, -122.456), LL(37.871, -122.435), w.clockUtc + 180, 30, 360); // (leaving 15:00)
-    expect(r.ok).toBe(true); expect(r.minutes).toBeCloseTo(326.525, 2);
+    expect(r.ok).toBe(true); expect(r.minutes).toBeCloseTo(326.606, 2);
   }, 300_000);
 });

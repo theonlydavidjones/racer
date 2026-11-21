@@ -87,36 +87,64 @@ let chopNext = 0;
  * each other 5 degrees apart: taken at its highest point, the answer swung 5 to 7 degrees on a quarter-knot puff, and the
  * AI's target angle and the laylines with it. So the curve is taken as its mean over BEAT_SMOOTH_KT of wind either side
  * and BEAT_SMOOTH_DEG of angle either side (no helmsman holds her closer than that, nor reads the wind finer), and the
- * top of that, between the half degrees by the parabola through the three highest points. Within 0.9% of the most
- * she could make, in any wind and chop (tests/beat-chop.test.ts). ESTIMATES, both widths.
+ * top of that, between the half degrees by the parabola through the three highest points. The mean leans the top
+ * 0.5–0.9° toward the wind in flat water, against the polar's own best angle there (beatAngle): that lean is taken off
+ * (beatInChop), whole at the first of a chop and fading out by LEAN_FADE, so as the chop gets up from nothing she
+ * doesn't step closer than she sailed in flat water (the physics review of beat-chop, 20 Nov 2026: it stepped 0.8° toward pinching at 2 cm).
+ * Searched from B0 to B1, wide enough that in light air in a chop, where her best is footing off at 60–90°, the window
+ * isn't cut short: cut at 65°, it gave 56° at 1 kt in a 0.3 m chop, where she made no headway at all, and gave up 15%
+ * at 2 kt in 0.8 m. With no headway at any angle, BEAT_NO_WAY. Within 0.9% of the most she could make good in any wind
+ * from 4 kt and any chop, 1% from 3 kt, 3.1% from 2 kt (tests/beat-chop.test.ts); under 2 kt in a chop she barely makes
+ * way at any angle, and the angle found may give up a few percent of almost nothing. In light air in a big chop (2–3 kt,
+ * 0.5 m and more) the best angle itself moves fast, 2–6° a quarter knot, as the sea's drag overtakes the drive.
+ * ESTIMATES, the widths.
  */
-const BEAT_SMOOTH_KT = 0.75, BEAT_SMOOTH_DEG = 4, B0 = 30, B1 = 65, BN = Math.round((B1 - B0) / 0.5) + 1;
+const BEAT_SMOOTH_KT = 0.75, BEAT_SMOOTH_LIGHT = 0.25, BEAT_SMOOTH_DEG = 4, B0 = 30, B1 = 90, BN = Math.round((B1 - B0) / 0.5) + 1;
+/** The angle when she makes no headway at any (deg): footing off, wide, her only hope (a judgement). */
+const BEAT_NO_WAY = 65;
 const beatRaw = new Float64Array(BN), beatSm = new Float64Array(BN);
 function beatSearch(kt: number, hs: number, tp: number): number {
-  // the speed made good at each half degree: the wind as it is and BEAT_SMOOTH_KT either side (¼ ½ ¼)
+  // the speed made good at each half degree: the wind as it is and BEAT_SMOOTH_KT either side (¼ ½ ¼); in light air a
+  // quarter of the wind at most (BEAT_SMOOTH_LIGHT), as a helmsman reads a zephyr's puffs by how much they are of it: at
+  // ±0.75 kt about a 1–2 kt wind, the mean was the curve of a different breeze, and she pinched where she should foot
+  const dk = Math.min(BEAT_SMOOTH_KT, BEAT_SMOOTH_LIGHT * kt);
   for (let i = 0; i < BN; i++) { const t = B0 + i * 0.5, c = Math.cos(t * D2R);
-    beatRaw[i] = (0.5 * speedInChop(kt, t, hs, tp) + 0.25 * (speedInChop(Math.max(0, kt - BEAT_SMOOTH_KT), t, hs, tp) + speedInChop(kt + BEAT_SMOOTH_KT, t, hs, tp))) * c; }
+    beatRaw[i] = (0.5 * speedInChop(kt, t, hs, tp) + 0.25 * (speedInChop(Math.max(0, kt - dk), t, hs, tp) + speedInChop(kt + dk, t, hs, tp))) * c; }
   // ... and over the angles either side, weighted to nothing at BEAT_SMOOTH_DEG (at the ends, over what there is)
   const W = Math.round(BEAT_SMOOTH_DEG / 0.5); let best = -1, bestV = -Infinity;
   for (let i = 0; i < BN; i++) { let sum = 0, wt = 0; for (let k = -W + 1; k < W; k++) { const j = i + k; if (j < 0 || j >= BN) continue; const w = W - Math.abs(k); sum += w * beatRaw[j]; wt += w; } beatSm[i] = sum / wt; if (beatSm[i] > bestV) { bestV = beatSm[i]; best = i; } }
   // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
   // widest, footing off for speed being her only hope)
-  if (!(bestV > 0)) return B1;
+  if (!(bestV > 0)) return NaN;
   if (best <= 0 || best >= BN - 1) return B0 + best * 0.5;
   const l = beatSm[best - 1], m = beatSm[best], r = beatSm[best + 1], d = l - 2 * m + r;
   return B0 + (best + (d < 0 ? clamp(0.5 * (l - r) / d, -0.5, 0.5) : 0)) * 0.5;
 }
 const beatCache = new Map<number, number>();
+/** The smoothed top's lean toward the wind in flat water, by the wind (beatSearch): what's taken off it. */
+const leanCache = new Map<number, number>();
+function lean(kt: number): number {
+  const k = Math.round(kt * 4); let v = leanCache.get(k);
+  if (v === undefined) { const s = beatSearch(k / 4, 0, 0); v = s === s ? beatAngleCalm(k / 4) - s : 0; leanCache.set(k, v); }
+  return v;
+}
+/** The chop over which the flat-water lean is faded out (m): by then the sea's own shape of the curve governs the top,
+ * and taken off whole in a big one it overshot a sharp top (1.2% given up at 6.5 kt in 0.8 m). An estimate
+ * (docs/CONSTANTS.md). */
+const LEAN_FADE = 0.3;
+/** The angle from beatSearch's top: its flat-water lean taken off, fading out by LEAN_FADE of chop; or BEAT_NO_WAY with
+ * no headway. */
+const fromSearch = (kt: number, hs: number, tp: number) => { const s = beatSearch(kt, hs, tp); return s === s ? s + lean(kt) * Math.max(0, 1 - hs / LEAN_FADE) : BEAT_NO_WAY; };
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
   // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
-  if (!Number.isFinite(kt + hs + tp)) return beatSearch(kt, hs, tp); // (no key for a NaN: worked out, not cached)
+  if (!Number.isFinite(kt + hs + tp)) return fromSearch(kt, hs, tp); // (no key for a NaN: worked out, not cached)
   const k4 = Math.round(kt * 4), h50 = Math.round(hs * 50), t10 = Math.round(tp * 10), key = (k4 * 1048576 + h50) * 1048576 + t10;
   let a = beatCache.get(key);
   if (a === undefined) {
     // (worked out from the rounded values the key holds, not the first caller's exact ones: otherwise the angle cached
     // for everyone after depends on which boat, in which World, asked first, and the same seed sails a different race)
-    a = beatSearch(k4 / 4, h50 / 50, t10 / 10);
+    a = fromSearch(k4 / 4, h50 / 50, t10 / 10);
     if (beatCache.size > 20000) beatCache.clear();
     beatCache.set(key, a);
   }

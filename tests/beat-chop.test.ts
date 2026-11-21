@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { beatInChop, speedInChop } from '../src/boat/seaway';
 import { driveCurveFor, driveRatio } from '../src/boat/driveCurve';
-import { polar } from '../src/boat/polar';
+import { beatAngle, polar } from '../src/boat/polar';
 import { D2R } from '../src/core/math';
 
 /**
@@ -24,12 +24,19 @@ describe('the beat angle in chop holds steady through a puff', () => {
       expect(Math.abs(beatInChop(kt + 0.25, hs, tp) - beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeLessThan(1.5);
     }
   });
-  it('the steady angle gives up under 1% of the most she could make good to windward', () => {
-    for (const [hs, tp] of [[0.1, 1.8], [0.3, 2.5], [0.5, 3], [0.8, 3.5], [1.2, 4.5]]) for (let kt = 4; kt <= 30; kt += 0.5) {
+  // (searched to 90°: cut at 65°, light air in a chop gave 56° at 1 kt in 0.3 m where she made no headway, and gave up
+  // 15% at 2 kt in 0.8 m; the physics review, 20 Nov 2026)
+  it('the steady angle gives up under 0.9% of the most she could make good to windward from 4 kt, 1% from 3 kt, 3.1% from 2 kt (footing off past 65° in light air; it was 15%)', () => {
+    for (const [hs, tp] of [[0.1, 1.8], [0.2, 2.2], [0.3, 2.5], [0.5, 3], [0.8, 3.5], [1.2, 4.5]]) for (let kt = 2; kt <= 30; kt += kt < 4 ? 0.25 : 0.5) {
       const a = beatInChop(kt, hs, tp), got = speedInChop(kt, a, hs, tp) * Math.cos(a * D2R);
-      let top = 0; for (let t = 30; t <= 65; t += 0.25) top = Math.max(top, speedInChop(kt, t, hs, tp) * Math.cos(t * D2R));
-      if (top > 0) expect(1 - got / top, `${kt} kt, ${hs} m at ${a.toFixed(1)}`).toBeLessThan(0.01);
+      let top = 0; for (let t = 25; t <= 90; t += 0.25) top = Math.max(top, speedInChop(kt, t, hs, tp) * Math.cos(t * D2R));
+      if (top > 0) expect(1 - got / top, `${kt} kt, ${hs} m at ${a.toFixed(1)}`).toBeLessThan(kt >= 4 ? 0.009 : kt >= 3 ? 0.01 : 0.031);
     }
+  });
+  // (the physics review of beat-chop, 20 Nov 2026: the smoothed top leaned 0.6–0.9° toward the wind of the polar's
+  // flat-water angle, so as the chop passed 2 cm, where beatFor turns from one to the other, she stepped toward pinching)
+  it('as the chop gets up from nothing she doesn\'t step closer to the wind: at 2 cm, the flat-water angle within 0.15°', () => {
+    for (let kt = 2; kt <= 30; kt += 0.5) expect(Math.abs(beatInChop(kt, 0.02, 1.5) - beatAngle(kt)), `${kt} kt`).toBeLessThan(0.15);
   });
   it('more chop moves it smoothly too: a step of the sea\'s height (0.02 m) or period (0.1 s) under a degree', () => {
     for (const [k0, k1, hs, tp] of SEAS) for (let kt = k0; kt <= k1; kt += 1) {
