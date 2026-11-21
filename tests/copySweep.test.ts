@@ -19,3 +19,15 @@ describe('copy sweep B: "Retire and head home?" is one line, the rules behind a 
     expect(dlg).toMatch(/<details[^>]*><summary><u>Why\?[\s\S]*RRS A5\.1[\s\S]*23\.1/);
   });
 });
+
+describe('copy sweep C: the Season footer is short', () => {
+  it('the rules line is under 70 characters', () => {
+    const t = /<div class="sfoot"><span[^>]*>([^<]*)<\/span>/.exec(read('src/ui/season.ts'))?.[1] ?? '';
+    expect(t.length).toBeGreaterThan(10); expect(t.length).toBeLessThanOrEqual(70);
+  });
+});
+describe('copy sweep H: no dangling separator before the season picker', () => {
+  it('the head puts the host and the picker without a stray dot', () => {
+    expect(read('src/ui/season.ts')).not.toMatch(/<b>\$\{esc\(series\.host\)\} · \$\{all\.length > 1 \? `<select/);
+  });
+});
