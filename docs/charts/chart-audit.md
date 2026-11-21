@@ -56,9 +56,14 @@ Each fix is its own commit, citing "chart audit #n". The before/after stills are
 | 14 | 40e2722f | — (nav-layer.cjs and plan-chart.cjs pass on this branch and on v215) |
 | in-race #3, #4 | ebd904ad | tags-before-after.png |
 
-### Corrections and what's still open
+### Corrections
 
 - **#10:** the dark shape over the scale bar is the chart's own print, not a ship. The halo makes the bar and its label read over it.
-- **#1:** the ENC's own names can still run off the chart's left edge ("…te Bridge").
-- **#4:** the sim's own "ETA" label at the destination is still crossed by a layline. Only NOAA's names were redrawn.
-- **#9:** the label still touches a yellow buoy on the racing inset. Only course marks, the line's ends and boats count as under it.
+
+### Finished after the first pass
+
+| # | Commit | Before/after |
+|---|--------|--------------|
+| 1 | 2d78d92b: NOAA's names whole inside the frame or left out ("…te Bridge", "…9M HORN") | 01b-names-left-edge.png |
+| 4 | 1d4a6edb: the destination's ETA drawn over the laylines | 04b-eta.png |
+| 9 | the commit after 1d4a6edb: the inset's label keeps off NOAA's buoys too | 09b-inset-buoy.png |
