@@ -252,7 +252,7 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
     hazard(ctx, s[0], s[1], H.h, I, detail === 'chart' && scale > 0.35);
   }
   // the print: names first, then the aids' labels, each kept clear of what's already placed; soundings fill the gaps
-  const P = new Placer(ctx);
+  const P = new Placer(ctx, w, h);
   for (const b of avoid) P.block(...b); // the sim's own labels, drawn later over the chart
   ctx.textAlign = 'left';
   if (detail === 'chart') {
@@ -341,7 +341,8 @@ export function drawEncNamesAgain(ctx: CanvasRenderingContext2D, pal: ChartPalet
 class Placer {
   private boxes: [number, number, number, number][] = [];
   private queue: { t: string; x: number; y: number; font: string; col: string; align: CanvasTextAlign }[] = [];
-  constructor(private ctx: CanvasRenderingContext2D) {}
+  /** `w`, `h`: the canvas (px). A label that wouldn't fit whole inside it is left out, not cut by its edge (chart audit #1). */
+  constructor(private ctx: CanvasRenderingContext2D, private w = Infinity, private h = Infinity) {}
   hits(x: number, y: number, w: number, h: number): boolean { return this.boxes.some(b => x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1]); }
   block(x: number, y: number, w: number, h: number): void { this.boxes.push([x, y, w, h]); }
   /** Queue a label (drawn on flush, over the soundings) if it fits; true if placed. */
@@ -349,6 +350,7 @@ class Placer {
     if (!t) return false;
     this.ctx.font = font; const w = this.ctx.measureText(t).width, h = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? '10');
     const x0 = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x, y0 = y - h;
+    if (x0 < 2 || y0 < 1 || x0 + w > this.w - 2 || y + 3 > this.h) return false; // (whole inside the frame, or left out)
     if (this.hits(x0 - 2, y0 - 1, w + 4, h + 3)) return false;
     this.block(x0 - 2, y0 - 1, w + 4, h + 3); this.queue.push({ t, x, y, font, col, align });
     return true;
