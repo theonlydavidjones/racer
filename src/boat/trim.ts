@@ -11,6 +11,7 @@
  * The polar is the boat's speed with perfect trim, so trim efficiency scales the target speed.
  */
 import { BOOM_STOP, carLead } from './controls';
+import { STALL_SPAN, STALL_START, easedDrive } from './balance';
 
 export type SailName = 'main' | 'jib';
 export type Flow = 'good' | 'luffing' | 'stalled';
@@ -34,14 +35,12 @@ export interface SailSpec {
  * at 18° the inner hole was too wide for the beat itself in 8 kt, the jib luffing a little at its own best course.
  */
 export const SAILS: Record<SailName, SailSpec> = {
-  main: { aoa: 22, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
+  main: { aoa: 25, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
   jib: { aoa: 16.5, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
 };
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
 const LUFF_START = 2, LUFF_SPAN = 10;
-/** Stalling starts this far above the best angle of attack. */
-const STALL_START = 4;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smooth = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
@@ -70,7 +69,10 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   // flow along the sail (upwind/reaching)
   let effUp = 1, flow: Flow = 'good', amount = 0;
   if (err < -LUFF_START) { amount = clamp((-err - LUFF_START) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
-  else if (err > STALL_START) { amount = clamp((err - STALL_START) / 25, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
+  // eased below the best angle the sail makes less lift at the wing's slope (balance.ts), and less drive with it: the
+  // drive the force model gives at that lift, against its best (to first order nothing for a degree or two; then more)
+  if (err < 0) effUp = Math.min(effUp, easedDrive(sail, a, err));
+  else if (err > STALL_START) { amount = clamp((err - STALL_START) / STALL_SPAN, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
   if (dw > 0.5) { flow = 'good'; amount = 0; } // stalled is normal downwind; the telltales just hang

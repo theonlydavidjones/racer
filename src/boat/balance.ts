@@ -234,13 +234,47 @@ const kheff = (awa: number) => 1.451 + (0.80 - 1.451) * clamp((awa - 20) / 60, 0
 
 // (sailForces' helpers, out here rather than as closures in it: it runs several times a step for every boat, and each
 // closure, with the context holding what it captured, was an allocation every call. The same arithmetic)
-const trimK = (t: SailTrim) => (t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1);
+const smoothStep = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
+/** Stalling starts this far (deg) past the best angle of attack (trim.ts sailTrim reads it from here). */
+export const STALL_START = 4, STALL_SPAN = 25;
+/**
+ * The rig's lift slope as a finite wing, per degree of angle of attack: Helmbold's lifting-line form for a low aspect
+ * ratio, dCL/dα = 2π·AR / (2 + √(AR² + 4)) (J. D. Anderson, Fundamentals of Aerodynamics, §5.3), its aspect ratio ORC's
+ * own, heff² / Aref: the same effective span the rig's induced drag is worked from (eqs. 5.45–5.46), so the lift a
+ * trim gives and the drag it costs come from one wing. About 0.087 per degree on her beat.
+ */
+export const liftSlope = (heff: number, aref: number) => { const ar = heff * heff / aref; return 2 * Math.PI * ar / (2 + Math.sqrt(ar * ar + 4)) * D2R; };
+/**
+ * How one sail's lift goes with its trim (its lift at the best trim × this). ORC's coefficients are the best-trimmed
+ * sail's, the angle of attack that gives the most drive (§5.1). Off it the angle of attack changes the lift at the
+ * wing's slope, both ways: eased (the traveller dropped, the sheet let out) it makes less, over-sheeted more. Luffing,
+ * the front of the sail backs and the lift goes faster still (as before).
+ * The owner, 21 Nov 2026: "easing the traveler (dropping it to leeward) absolutely reduces heel".
+ */
+function trimLift(t: SailTrim, cl0: number, slope: number): number {
+  const att = (e: number) => Math.max(0, 1 + slope * e / Math.max(0.05, cl0));
+  if (t.flow === 'luffing') return Math.min(1 - t.amount * 0.92, att(t.err));
+  // past the stall's start the leech's flow breaks away: the lift goes no higher (the sail at its peak; the separated
+  // flow's extra drag, oneSail, carries on growing with the angle, so easing out of a stall takes heel off too)
+  if (t.flow === 'stalled') return att(STALL_START);
+  return att(t.err);
+}
 const flatOf = (s: Shape, full: number) => clamp(s.depth / full, 0.42, 1);
 /** One sail's force: its lift from its depth against its fullest (flat), its trim and a worn sail's lost lift (sailForces) */
-function oneSail(q: number, a: number, ce: number, luffing: boolean, area: number, clmax: number, cd0: number, flat: number, jibSail: boolean, t: SailTrim, s: Shape): SailForce {
+function oneSail(q: number, a: number, ce: number, luffing: boolean, area: number, clmax: number, cd0: number, flat: number, jibSail: boolean, t: SailTrim, s: Shape, slope: number): SailForce {
   if (luffing) return { heel: q * area * 0.06 * Math.cos(a), drive: 0 };
-  const cl = clmax * flat * trimK(t) * (s.clMul ?? 1), m = tab(FCD.f, FCD.m, flat);
-  const cd = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07) + ce * cl * cl * m; // (a worn sail's hooked leech adds its own profile drag)
+  // (its trim counts while the wind flows along it: off it, running, the sail's pushed and its lift is beside the point)
+  const cl0 = clmax * flat * (s.clMul ?? 1), up = 1 - smoothStep((a / D2R - 90) / 30), k = 1 + (trimLift(t, cl0, slope) - 1) * up;
+  const cl = cl0 * k, m = tab(FCD.f, FCD.m, flat);
+  // over-sheeted, the extra lift comes with at least as much more drag as cancels its drive: the best trim is where the
+  // drive is greatest, so dD/dα = tan β · dL/dα there (β the apparent wind angle). Past the best angle she heels harder
+  // for no more drive (the speed path counts the stall's own loss, trim.ts)
+  // (and past the stall's start, with the lift at its peak, the separated flow's drag grows on at the same rate per
+  // degree, tan β times the wing's slope: the drive falls away and the heel creeps up the harder she's sheeted; where
+  // the stall starts and that its drag grows at that rate are estimates, no sail's measured curve was found, 21 Nov 2026)
+  const tb = Math.tan(Math.min(a, 80 * D2R)), past = t.flow === 'stalled' ? Math.max(0, t.err - STALL_START) * slope * up : 0;
+  const over = (k > 1 ? Math.max(0, (k - 1) * cl0 * tb - ce * cl0 * cl0 * (k * k - 1) * m) : 0) + past * tb;
+  const cd = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07) + ce * cl * cl * m + over; // (a worn sail's hooked leech adds its own profile drag)
   const L = q * area * cl, D = q * area * cd;
   return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
 }
@@ -268,8 +302,9 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const ce = kpp + Aref / (Math.PI * heff * heff);
   // how much lift each sail makes: its depth against its fullest (flat), its trim, a worn sail's lost lift
   const fM = flatOf(main.shape, RIG.fullDepth.main), fJ = jib ? flatOf(jib.shape, RIG.fullDepth.jib) : 1;
-  const mainF = oneSail(q, a, ce, luffing, AREA.main, clM, cdM, fM, false, main.trim, main.shape);
-  const jibF = jib ? oneSail(q, a, ce, luffing, AREA.jib, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
+  const slope = liftSlope(heff, Aref);
+  const mainF = oneSail(q, a, ce, luffing, AREA.main, clM, cdM, fM, false, main.trim, main.shape, slope);
+  const jibF = jib ? oneSail(q, a, ce, luffing, AREA.jib, clJ, cdJ, fJ, true, jib.trim, jib.shape, slope) : { heel: 0, drive: 0 };
   // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure
   const wM = hypot(clM, cdM) * Am, wJ = hypot(clJ, cdJ) * Aj;
   const flat = (fM * Am + fJ * Aj) / Aref;
@@ -277,6 +312,28 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const low = (0.5 * (1 - flat) + 0.902 * (1 - flat) * (1 - RIG.frac)) * (1 - (RIG.overlap - 0.9) / 0.6);
   const ceh = RIG.hbi + zce * (1 - low) + RIG.rm4;
   return { main: mainF, jib: jibF, twist: main.shape.twist, ceh, flat };
+}
+
+/**
+ * How much of a sail's drive is left eased `err` degrees (negative) below its best angle of attack, at apparent wind
+ * angle `awa` (deg): its lift down at the wing's slope (trimLift) and its induced drag with it, drive L·sinβ − D·cosβ,
+ * against the same at its best (both sails up, new and full: the speed path's share, trim.ts sailTrim).
+ */
+export function easedDrive(sail: 'main' | 'jib', awa: number, err: number): number {
+  if (err >= 0) return 1;
+  const b = clamp(Math.abs(awa), 0, 180);
+  if (b >= 120) return 1;
+  const a = b * D2R, Am = AREA.main, Aj = AREA.jib, Aref = Am + Aj;
+  const clM = (tab(MAIN_C.b, MAIN_C.clLo, b) + tab(MAIN_C.b, MAIN_C.clHi, b)) / 2 - tab(MAIN_C.b, MAIN_C.dcl, b);
+  const clJ = tab(JIB_C.b, JIB_C.cl, b) - tab(JIB_C.b, JIB_C.dcl, b) / 3;
+  const clMax = (clM * Am + clJ * Aj) / Aref;
+  const kpp = clMax > 0.05 ? (MAIN_C.kpp * clM * clM * Am + JIB_C.kpp * clJ * clJ * Aj) / (Aref * clMax * clMax) : MAIN_C.kpp;
+  const heff = EFF_SPAN * kheff(b) * (RIG.P + RIG.BAS + RIG.hbi), ce = kpp + Aref / (Math.PI * heff * heff), m = tab(FCD.f, FCD.m, 1);
+  const cl0 = sail === 'main' ? clM : clJ, cd0 = sail === 'main' ? (tab(MAIN_C.b, MAIN_C.cdLo, b) + tab(MAIN_C.b, MAIN_C.cdHi, b)) / 2 + tab(MAIN_C.b, MAIN_C.dcd, b) : tab(JIB_C.b, JIB_C.cd, b) * m;
+  const k = Math.max(0, 1 + liftSlope(heff, Aref) * err / Math.max(0.05, cl0));
+  const drive = (kk: number) => cl0 * kk * Math.sin(a) - (cd0 + ce * cl0 * cl0 * kk * kk * m) * Math.cos(a);
+  const d1 = drive(1);
+  return d1 > 1e-3 ? clamp(drive(k) / d1, 0, 1) : 1;
 }
 
 /** Righting moment (N·m) at a heel angle (deg), with the crew hiking as hard as needed (`hike` 0..1). */
