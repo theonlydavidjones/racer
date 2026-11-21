@@ -2,7 +2,7 @@ import { HelmFeed, passageLive } from './sim/navigator';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
-import { trimNotesHtml } from './ui/trimNotes';
+import { NAME as TRIM_NAME, trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
@@ -675,6 +675,7 @@ const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 /* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
  * above her masthead, in the tack and gybe drill, the mark-rounding drill and the start practice. */
 const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
+hud.legCall = () => courseView.legCall(w); // (the Strategist card's leg call: the C view's own brief, r298)
 let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
@@ -737,7 +738,43 @@ function closeTrimNotes(): void {
 }
 $('trimNotes').addEventListener('click', e => { const el = e.target as HTMLElement; if (el.id === 'bTrimNotesX' || el.id === 'trimNotes') closeTrimNotes(); });
 $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-all')) openTrimNotes(); });
-$('bCoach').onclick = () => openTrimNotes();
+// the Strategist card (r298): a click anywhere on it (not on a control in it) opens the whole of it: the racing lines and
+// the strategist, then every line's note (Trim Notes)
+let cardOpen = false, cardTimer = 0;
+$('trimPanel').addEventListener('click', e => {
+  const t = e.target as HTMLElement;
+  if (t.closest('.tpx-all')) { openTrimNotes(); return; }
+  if (t.closest('.tpx-strat')) { courseView.openStrategist(w); return; }
+  if (t.closest('button, a, input, .sb-ctl')) return;
+  cardShow(!cardOpen);
+});
+/** The card grown in place (r298; the owner's option A, design stills/r298-coach-card X-expanded): under its two lines,
+ *  the sails as pills (main, jib, heel, helm, crew), each line's note (the coach's own, lineNotes: what Trim Notes says,
+ *  fixes first), then the ways on: All notes (Trim Notes, also its key) and, racing, the Strategist (the C view). Kept
+ *  fresh twice a second while open. */
+function cardShow(on: boolean): void {
+  cardOpen = on; $('trimPanel').classList.toggle('open', on); $('tpX').hidden = !on;
+  clearInterval(cardTimer); if (on) { cardFill(); cardTimer = window.setInterval(cardFill, 500); }
+}
+function cardFill(): void {
+  if (!w.running && !w.paused) { cardShow(false); return; } // (the race over, or a new one: closed; paused, it stays)
+  const u = w.user, esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const pill = (k: string, v: string, cls = '') => `<span class="tpx-pill">${k} <b class="${cls}">${esc(v)}</b></span>`;
+  const st = (id: string) => { const e = $(id); return [e.textContent ?? '', /luffing/.test(e.className) ? 'warn' : /stalled|backed/.test(e.className) ? 'bad' : ''] as const; };
+  const [mw, mc] = st('tpMain'), [jw, jc] = st('tpJib'), hn = u.helmNeed ?? 0, crew = document.querySelector('#tpBalance .tp-crew')?.textContent?.replace(/^crew /, '') ?? '';
+  const helm = hn > 5 ? ['weather', 'warn'] : hn < -1.5 ? ['lee', 'warn'] : ['neutral', ''];
+  const { notes } = lineNotes(u, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band });
+  const lines = [...notes].sort((a, b) => (b.fix ? 1 : 0) - (a.fix ? 1 : 0)).slice(0, 6)
+    .map(n => `<div class="tpx-line${n.fix ? ' fix' : ''}"><span>${esc(TRIM_NAME[n.line] ?? n.line)}</span><span>${esc(n.fix ? (n.fix.short ?? n.fix.head) : n.ok)}</span></div>`).join('');
+  // (built once, then only the parts that changed rewritten: a click on a way on never lands on a node being replaced)
+  const x = $('tpX');
+  if (!x.querySelector('.tpx-ways')) x.innerHTML = '<div class="tpx-sec">Sails</div><div class="tpx-pills"></div><div class="tpx-sec">Lines</div><div class="tpx-lines"></div>'
+    + '<div class="tpx-ways"><button type="button" class="tpx-all">All notes ›</button><button type="button" class="tpx-strat">Strategist ›</button></div>';
+  const set = (q: string, html: string) => { const e = x.querySelector<HTMLElement>(q)!; if (e.innerHTML !== html) e.innerHTML = html; };
+  set('.tpx-pills', `${pill('Main', mw.toLowerCase(), mc)}${pill('Jib', jw.toLowerCase(), jc)}${pill('Heel', `${Math.abs(Math.round(u.heelMag ?? 0))}°`)}${pill('Helm', helm[0], helm[1])}${crew ? pill('Crew', crew) : ''}`);
+  set('.tpx-lines', lines);
+  x.querySelector<HTMLElement>('.tpx-strat')!.hidden = w.freeSail;
+}
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
@@ -766,7 +803,9 @@ function coachTick(): void {
   const r = coachShown, top = r.view.top, fix = !r.done && top.kind === 'fix';
   // the live note: one at a time, numbered, held (the bar runs out over its hold); what the line's doing and why under
   // it, with All notes; the line ringed in the band, its target on its track
-  $('tpHint').innerHTML = r.done ? ce(r.done) : fix ? `<span class="tp-n">1</span>${ce(top.head.replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(top.head);
+  // (in a race the Strategist card's racing line says it's the start: the trim line drops its "Pre-start:", r298)
+  const head = (t: string) => w.freeSail ? t : t.replace(/^Pre-start:\s*/i, '').replace(/^./, c => c.toUpperCase());
+  $('tpHint').innerHTML = r.done ? ce(head(r.done)) : fix ? `<span class="tp-n">1</span>${ce(head(top.head).replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(head(top.head));
   $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : top.kind);
   $('tpSub').innerHTML = fix ? `${top.now ? ce(top.now) + '. ' : ''}${ce(top.short ?? '')}<button type="button" class="tp-all">All notes ›</button>` : '';
   $('tpHold').hidden = !fix; ($('tpHold').firstElementChild as HTMLElement).style.width = `${Math.round((1 - r.held) * 100)}%`;

@@ -11,7 +11,7 @@ import type { Boat, LineKey } from '../boat/boat';
 import type { LineNote, Situation } from '../boat/coach';
 
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-const NAME: Partial<Record<LineKey, string>> = { jibsheet: 'Jib sheet', car: 'Jib car', downhaul: 'Main halyard', cunningham: 'Main Cunningham', outhaul: 'Outhaul', vang: 'Vang', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', backstay: 'Backstay', mainsheet: 'Mainsheet', traveller: 'Traveler' };
+export const NAME: Partial<Record<LineKey, string>> = { jibsheet: 'Jib sheet', car: 'Jib car', downhaul: 'Main halyard', cunningham: 'Main Cunningham', outhaul: 'Outhaul', vang: 'Vang', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', backstay: 'Backstay', mainsheet: 'Mainsheet', traveller: 'Traveler' };
 /** The groups, as on the band and the boat. */
 const GROUPS: { name: string; lines: LineKey[]; wide?: boolean }[][] = [
   [{ name: 'Jib', lines: ['jibsheet', 'car'] }, { name: "The main's shape", lines: ['downhaul', 'cunningham', 'outhaul', 'vang'] }, { name: "The jib's luff", lines: ['jibCunningham', 'jibHalyard'] }],

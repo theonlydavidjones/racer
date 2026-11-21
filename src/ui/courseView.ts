@@ -86,6 +86,14 @@ export class CourseView {
   }
 
   get isOpen(): boolean { return !$('courseView').hidden; }
+  /** The strategist's call on her leg, for the Strategist card (r298): from the brief this view has worked out (none
+   *  till it has: the card never works out a second one). */
+  legCall(w: SimView): { name: string; best: 'left' | 'right' | 'middle'; certainty: 'clear' | 'likely' | 'open' } | null {
+    if (this.brief?.w !== w) return null;
+    const L = this.brief.b.legs.find(l => l.i === w.user.leg); return L && L.kind !== 'reach' ? { name: L.name, best: L.best, certainty: L.certainty } : null;
+  }
+  /** Open on the strategist's tab (the Strategist card's link). */
+  openStrategist(w: SimView): void { this.open(w); if (!w.freeSail) this.setTab('brief'); }
 
   open(w: SimView): void {
     this.world = w;

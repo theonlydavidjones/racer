@@ -73,12 +73,16 @@
 <div id="msgLog" aria-label="Recent messages"><div class="ml-head"><span>Messages</span><button class="ml-all" id="bLogAll" type="button">All</button></div><ol id="msgRecent"></ol></div>
 <div id="coachPanel" hidden aria-label="Trim coach"><div class="coach-head"><b>Trim coach</b><span id="coachSum"></span><button type="button" id="bCoachX" aria-label="Close the trim coach">✕</button></div><div id="coachBody"></div></div>
 <div id="trimPanel" aria-label="Sail trim">
-  <!-- the situation (who keeps clear, under which rule): a strip on top of the Coach card, only when there is one -->
+  <div class="tp-head" title="The racing line and the trim line; click for all of it"><span class="tp-lab" id="tpTitle">Strategist</span><span id="tpWho">Crew trims every line</span><span class="tp-chev" aria-hidden="true">▸</span></div>
+  <!-- the racing line: the situation (who keeps clear, under which rule: its chip and headline), only when there is one -->
   <div id="situ" hidden><div class="msg" id="situMsg"></div><div class="rule" id="situRule"></div></div>
-  <div class="tp-head"><span class="tp-lab">Coach</span><span id="tpWho">Crew trims every line</span></div>
+  <!-- with no situation on, the next most pertinent racing line (hud.ts strategist, ui/racingLine.ts) -->
+  <div class="tp-race" id="tpRace" hidden><span class="tp-tag" id="tpRaceTag"></span><span class="msg" id="tpRaceMsg"></span></div>
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
   <div class="tp-hint" id="tpHint"></div>
+  <!-- the card grown in place (r298; a click, and a click again): the sails, each line's note, and the ways on -->
+  <div class="tp-x" id="tpX" hidden></div>
   <!-- the live note: what the line is doing and why, and "All notes" (Trim Notes); the bar runs out over its hold -->
   <div class="tp-sub" id="tpSub"></div><div class="tp-hold" id="tpHold" hidden><i></i></div>
   <!-- the tack and gybe drill: your last manoeuvre, scored, and what to change -->
@@ -87,7 +91,7 @@
   <div class="tp-help" id="tpHelp" hidden></div>
   <div class="tp-shape" id="tpShape"></div>
   <div class="tp-balance" id="tpBalance"></div>
-  <div class="tp-btnrow"><button class="tp-more" id="tpMore" type="button" aria-expanded="true">Sail controls ▾</button><button class="tp-more" id="bCoach" type="button">Trim coach</button></div>
+  <div class="tp-btnrow"><button class="tp-more" id="tpMore" type="button" aria-expanded="true">Sail controls ▾</button></div>
 </div>
 
 <div id="controls">

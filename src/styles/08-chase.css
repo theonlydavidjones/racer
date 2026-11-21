@@ -161,3 +161,24 @@ body.showroom #flowPanel{display:none}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
 
+/* the Strategist card (r298, ROADMAP 8s19; the owner, 21 Nov 2026: one card, two lines; "treat both as the strategist"):
+   its title as the Messages card's, ▸ for more (the whole card opens it); the racing line (the situation, its rule's
+   chip, or the next most pertinent: hud.ts strategist) over the trim line; the strategist's amber, the C view's own */
+#trimPanel{cursor:pointer}
+#trimPanel .tp-head{align-items:center;margin-bottom:2px}
+#trimPanel .tp-head .tp-lab{font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#trimPanel .tp-chev{font-size:11px;color:var(--muted);margin-left:auto}
+#trimPanel:hover .tp-chev{color:var(--accent)}
+#trimPanel #situ,#trimPanel .tp-race{position:static;transform:none;width:auto;margin:0;padding:3px 0;border:0;border-radius:0;background:none;box-shadow:none;
+  display:flex;flex-direction:row-reverse;justify-content:flex-end;flex-wrap:nowrap;align-items:center;gap:8px;pointer-events:auto}
+#trimPanel #situ[hidden],#trimPanel .tp-race[hidden]{display:none}
+#trimPanel #situ .msg,#trimPanel .tp-race .msg{flex:1;min-width:0;font:600 13px/1.3 var(--f-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+#trimPanel #situ .rule,#trimPanel .tp-tag{flex:0 0 auto;min-width:30px;padding:3px 5px;border-radius:5px;text-align:center;font:700 10px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase}
+#trimPanel #situ .rule{background:var(--row);color:#14202c}
+#trimPanel #situ.kc .rule{background:var(--giveway);color:#14202c}
+#trimPanel #situ.alarm{animation:msgflash 1.2s ease-out infinite}
+#trimPanel .tp-race{flex-direction:row}
+#trimPanel .tp-race .tp-tag{background:rgba(255,182,39,.16);color:var(--accent);border:1px solid rgba(255,182,39,.5)}
+#trimPanel .tp-race.alarm .tp-tag{background:var(--giveway);color:#14202c;border-color:var(--giveway)}
+#trimPanel #tpSub,#trimPanel #tpHold,#trimPanel #tpBalance,#trimPanel .tp-btnrow{display:none!important}
+#trimPanel .tp-hint{border-left:0;padding-left:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
