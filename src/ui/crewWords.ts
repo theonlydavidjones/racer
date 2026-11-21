@@ -90,8 +90,8 @@ export function showCrewRow(u: Boat): void {
     bt.setAttribute('aria-pressed', String(pl?.across === p));
     bt.title = PLACE_TIP[p];
   });
-  const side: Record<string, string> = { lee: `${lwS} side · heels her`, up: `${wwS} side deck`, hike: `${wwS} rail · holds her up` };
-  document.querySelectorAll<HTMLElement>('#tpCrewRow [data-side]').forEach(el => { el.textContent = side[el.dataset.side!]; });
+  const side = crewSideHints(lwS, wwS);
+  document.querySelectorAll<HTMLElement>('#tpCrewRow [data-side]').forEach(el => { el.textContent = side[el.dataset.side as 'lee' | 'up' | 'hike']; });
   document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt => {
     bt.classList.toggle('on', pl?.fore === bt.dataset.cf);
     bt.classList.toggle('at', !pl?.fore && autoFore === bt.dataset.cf);
@@ -114,3 +114,7 @@ export function setWho(id: string | HTMLElement, yours: boolean, title?: string)
   el.querySelectorAll<HTMLButtonElement>('[data-who]').forEach(b => { const on = (b.dataset.who === 'you') === yours; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
   if (title != null) el.title = title;
 }
+
+/** The hint under each crew place, in one style: the side, then what it does (w032). */
+export const crewSideHints = (leeward: string, windward: string): Record<'lee' | 'up' | 'hike', string> =>
+  ({ lee: `${leeward} · heels her`, up: `${windward} · sits up`, hike: `${windward} · holds her up` });
