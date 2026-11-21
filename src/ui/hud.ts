@@ -1050,6 +1050,8 @@ function toMouth(dest: CourseMark): CourseMark {
  * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
  */
+/** How far off her the route starts when her course is drawn, px: clear of the ring round her (r267). */
+const ROUTE_GAP_PX = 34;
 function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink, plan: PassageNow | null = null): void {
   // the racing marks and buoys the sim knows (the chart draws the real ones under them): small orange rings
   for (const pl of PLACES) if (pl.buoy) {
@@ -1063,9 +1065,11 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   // (bound for her slip with the way in drawn: the route to its harbor's mouth, where the way in takes over: drawNavLayer)
   const legs = navRoute(u, toMouth(dest)).map(q => tf(q.x, q.y)); legs[0] = a;
   const path = () => { ctx.beginPath(); legs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
-  ctx.save(); ctx.lineJoin = 'round';
+  // (with her course drawn, the route starts a little off her, so the one line leaving the boat is her course: r267)
+  if (plan && plan.track.length > 1 && legs.length > 1) { const [x0, y0] = legs[0], [x1, y1] = legs[1], L = Math.hypot(x1 - x0, y1 - y0), k = Math.min(0.5, ROUTE_GAP_PX / Math.max(1, L)); legs[0] = [x0 + (x1 - x0) * k, y0 + (y1 - y0) * k]; }
+  ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = PEN.dest.cap; ctx.setLineDash(PEN.dest.dash);
   ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
-  ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
   // the turns on the way: small dots
   for (const q of legs.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
   ctx.restore();
@@ -1103,9 +1107,9 @@ function drawNavLayer(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark, n
   if (way) {
     const pts = [way.mouth, way.entry, ...way.path.slice(1), way.approach].map(q => tf(q.x, q.y));
     const path = () => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
-    ctx.lineCap = 'round';
+    ctx.lineCap = PEN.dest.cap; ctx.setLineDash(PEN.dest.dash);
     ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
-    ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
     for (const q of pts.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
   }
   const tr = now.track;

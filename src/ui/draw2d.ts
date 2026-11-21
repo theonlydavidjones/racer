@@ -53,7 +53,9 @@ export function drawLand(ctx: CanvasRenderingContext2D, tf: Tf): void {
 export const PEN = {
   start: { w: 2, halo: 4.5, dash: [5, 5] },        // the start line
   layline: { w: 1.8, halo: 4.2, dash: [4, 4] },    // laylines (the maps' width 1.2, + 0.6 over the halo)
-  dest: { w: 1.8, halo: 4, dash: [5, 4] },         // the line to where you're heading
+  // the navigator's route to where you're heading: round orange dots (r267, the owner found its dashes read as the red
+  // port layline's): a pattern no layline or chart line uses; its halo dotted too, so it stays a string of beads
+  dest: { w: 3.2, halo: 6, dash: [0.01, 7], cap: 'round' as CanvasLineCap },
   track: { w: 2.2, halo: 5, dash: [] as number[] }, // the course she'd sail leaving now (hud.ts drawTrack)
   ahead: { w: 1.2, dash: [3, 3], alpha: 0.6 }      // where a ship will be in a minute
 };

@@ -11,10 +11,10 @@ import { CURRENT_RAMP, WIND_RAMP, rampColor } from './flow';
 export type SimKey = 'you' | 'boats' | 'start' | 'marks' | 'next' | 'dest' | 'destline' | 'track' | 'laylines' | 'ships' | 'current' | 'wind' | 'puffs' | 'sea' | 'fog' | 'shadows';
 type Draw = (g: CanvasRenderingContext2D, I: Ink, w: number, h: number) => void;
 
-const line = (g: CanvasRenderingContext2D, w: number, h: number, pen: { w: number; dash: number[]; halo?: number }, color: string, halo?: string) => {
-  const y = h / 2;
-  if (pen.halo && halo) { g.strokeStyle = halo; g.lineWidth = pen.halo; g.setLineDash([]); g.beginPath(); g.moveTo(3, y); g.lineTo(w - 3, y); g.stroke(); }
-  g.strokeStyle = color; g.lineWidth = pen.w; g.setLineDash(pen.dash); g.beginPath(); g.moveTo(3, y); g.lineTo(w - 3, y); g.stroke(); g.setLineDash([]);
+const line = (g: CanvasRenderingContext2D, w: number, h: number, pen: { w: number; dash: number[]; halo?: number; cap?: CanvasLineCap }, color: string, halo?: string) => {
+  const y = h / 2; g.lineCap = pen.cap ?? 'butt';
+  if (pen.halo && halo) { g.strokeStyle = halo; g.lineWidth = pen.halo; g.setLineDash(pen.cap === 'round' ? pen.dash : []); g.beginPath(); g.moveTo(3, y); g.lineTo(w - 3, y); g.stroke(); }
+  g.strokeStyle = color; g.lineWidth = pen.w; g.setLineDash(pen.dash); g.beginPath(); g.moveTo(3, y); g.lineTo(w - 3, y); g.stroke(); g.setLineDash([]); g.lineCap = 'butt';
 };
 const dot = (g: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, I: Ink, edge = true) => {
   g.fillStyle = I.halo; g.beginPath(); g.arc(x, y, r + 2.2, 0, 6.29); g.fill();
