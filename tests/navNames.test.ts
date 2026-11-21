@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLACES } from '../src/sim/places';
+import { PLACES, spotLabel } from '../src/sim/places';
 import { canLay, destName, shortName } from '../src/ui/navNames';
 
 // The nav strip's names (the owner, 20 Nov 2026, r272): brief, never truncated, never coordinates or qualifiers.
@@ -9,7 +9,7 @@ describe('the nav strip’s names', () => {
     expect(shortName('Clipper Cove, Treasure Island')).toBe('Clipper Cove');
     expect(shortName('Corte Madera Channel light R "2"')).toBe('Corte Madera Channel');
     expect(shortName('Raccoon Strait mid-channel')).toBe('Raccoon Strait');
-    expect(destName({ name: 'Her slip, West Harbor 101', key: 'slip', p: { x: 0, y: 0 } })).toBe('Home');
+    expect(destName({ name: 'Her slip, West Harbor 101', key: 'slip' })).toBe('Home');
     expect(shortName('A · St. Felix outer buoy', { race: true })).toBe('A');
   });
   it('every place in the sim comes to a short bare name, none truncated or qualified', () => {
@@ -20,9 +20,10 @@ describe('the nav strip’s names', () => {
       expect(n, pl.name).not.toMatch(/^(off|under|the)\b|\(|\)|,|"|°|′/i);
     }
   });
-  it('a spot on open water takes the nearest named place, never coordinates', () => {
+  it('a spot on open water, as the sim names it (spotLabel), comes to the feature\'s bare name, never coordinates', () => {
     const al = PLACES.find(p => /alcatraz/i.test(p.name))!;
-    expect(destName({ name: '37°49.60′N 122°25.30′W', p: { x: al.p.x + 50, y: al.p.y } })).toBe('Alcatraz');
+    expect(destName({ name: spotLabel({ x: al.p.x + 50, y: al.p.y }) })).toBe('Alcatraz');
+    expect(destName({ name: spotLabel({ x: al.p.x + 2200, y: al.p.y }) })).not.toMatch(/^Near\b/); // (the strip's reminder: bare)
   });
   // (the owner, 20 Nov 2026: VMC when she can lay the mark, VMG when she must tack or jibe to reach it, by the laylines)
   it('lays the mark on her tack on or past its layline; short of it, or on the other tack, she has to tack or jibe', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { World } from '../src/sim/world';
-import { destMark, latLon, place, spotId, spotLabel } from '../src/sim/places';
+import { destMark, latLon, place, spotId, spotLabel, nearFeature, SPOT_AT, SPOT_NEAR } from '../src/sim/places';
 
 /**
  * r270, the owner's rule for places: never coordinates. A spot picked on open water reaches the sim by its position
@@ -38,3 +38,25 @@ describe('a spot on open water is never named by its coordinates in the sim (r27
     expect(w.dest!.name).toBe(m.name); expect(w.dest!.spot).toBeUndefined();
   });
 });
+
+describe('one rule names a spot: a feature close by, Near it a little further, else open water (v216, from the v215 review)', () => {
+  it('by its distance from the nearest feature', () => {
+    const al = place('alcatraz')!.p;
+    expect(spotLabel(al)).toBe('Alcatraz');
+    expect(spotLabel({ x: al.x + 80, y: al.y })).toBe('Alcatraz');
+    // (out from every feature, step by step: Near on the way, then no name that would mislead)
+    let q = { ...al }, seen = new Set<string>(); for (let k = 0; k < 60 && spotLabel(q) !== 'open water'; k++) { seen.add(spotLabel(q).split(' ')[0]); q = { x: q.x, y: q.y + 400 }; }
+    expect(spotLabel(q)).toBe('open water'); expect(seen.has('Near')).toBe(true);
+  });
+  it('never names a spot after a feature further than SPOT_NEAR, and by its bare name only within SPOT_AT', () => {
+    for (const pl of [place('alcatraz')!, place('gate')!, place('clipper')!, place('m-17')!])
+      for (let r = 0; r <= 6000; r += 500) for (const a of [0, 90, 180, 270]) {
+        const q = { x: pl.p.x + Math.sin(a * Math.PI / 180) * r, y: pl.p.y + Math.cos(a * Math.PI / 180) * r }, n = spotLabel(q);
+        if (n === 'open water') { expect(nearFeature(q, SPOT_NEAR)).toBeNull(); continue; }
+        const near = /^Near (.+)$/.exec(n);
+        if (!near) expect(nearFeature(q, SPOT_AT)).toBe(n);
+        else { expect(nearFeature(q, SPOT_AT)).toBeNull(); expect(nearFeature(q, SPOT_NEAR)).toBe(near[1]); }
+      }
+  });
+});
+

@@ -1,5 +1,4 @@
-import { PLACES, isSpot } from '../sim/places';
-import { wrap, type Vec } from '../core/math';
+import { wrap } from '../core/math';
 
 /**
  * The nav strip's name for where she's bound (the owner, 20 Nov 2026, r272): "The player knows where they're going, so
@@ -13,20 +12,15 @@ export function shortName(name: string, opts: { race?: boolean; slip?: boolean }
   if (opts.slip) return 'Home';
   if (opts.race && name.includes(' · ')) return name.split(' · ')[0];
   let n = name.includes(' · ') ? name.split(' · ')[1] : name;
-  n = n.replace(/\s*\(.*?\)/g, '').replace(/^(Off|Under|North of|South of|East of|West of)\s+/i, '').replace(/^the\s+/i, '')
+  n = n.replace(/\s*\(.*?\)/g, '').replace(/^(Off|Near|Under|North of|South of|East of|West of)\s+/i, '').replace(/^the\s+/i, '')
     .replace(/,.*$/, '').replace(/\s+light\b.*$/i, '').replace(/\s+[RG]\s+"[^"]*".*$/, '').replace(/\s+"[^"]*".*$/, '')
     .replace(/\s+(start mark|outer buoy|mid-channel)$/i, '').replace(/"/g, '').trim();
   return n || name;
 }
 
-/** Where she's bound, by the nav strip's rule: a spot on open water takes the nearest named place's name. */
-export function destName(d: { name: string; key?: string; p: Vec }, race = false): string {
+/** Where she's bound, by the nav strip's rule (a spot on open water comes named by the sim already: places.ts spotLabel). */
+export function destName(d: { name: string; key?: string }, race = false): string {
   if (d.key === 'slip') return 'Home';
-  if (isSpot(d.name)) {
-    let best = PLACES[0], bd = Infinity;
-    for (const pl of PLACES) { const dd = Math.hypot(pl.p.x - d.p.x, pl.p.y - d.p.y); if (dd < bd) { bd = dd; best = pl; } }
-    return shortName(best.name);
-  }
   return shortName(d.name, { race });
 }
 

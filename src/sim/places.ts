@@ -113,18 +113,29 @@ const FEATURES: { name: string; p: Vec }[] = [
   ['m-16', 'Blackaller'], ['m-15', 'Yellow Bluff'], ['m-17', 'Harding Rock'], ['m-4', 'Angel Island'], ['m-18', 'Blossom Rock'], ['m-6', 'Fort Mason']
 ].flatMap(([id, name]) => { const pl = PLACES.find(p => p.id === id); return pl ? [{ name, p: pl.p }] : []; });
 
-/** The nearest named feature to a point, within `within` m (leaving out any within 600 m of the points in `not`). */
-export function nearFeature(p: Vec, within = 1800, not: Vec[] = []): string | null {
+/** The nearest named feature to a point and how far it is, within `within` m (leaving out any within 600 m of `not`). */
+function nearestFeature(p: Vec, within: number, not: Vec[] = []): { name: string; d: number } | null {
   let best: { name: string; d: number } | null = null;
   for (const f of FEATURES) { if (not.some(q => dist(q, f.p) < 600)) continue; const d = dist(f.p, p); if (d < within && (!best || d < best.d)) best = { name: f.name, d }; }
-  return best?.name ?? null;
+  return best;
 }
+/** The nearest named feature to a point, within `within` m (leaving out any within 600 m of the points in `not`). */
+export const nearFeature = (p: Vec, within = 1800, not: Vec[] = []): string | null => nearestFeature(p, within, not)?.name ?? null;
 
+/** How near a feature a spot takes its name, m, and how near it's "Near" it: the navigator's own radii for a place on
+ * the way (navigator.ts placeName), about 0.8 and 1.6 nm. Beyond that a name would mislead (the v215 review: "New
+ * destination: Alcatraz." for a point up to 9 km from it). Not "Off X": the old named spots ("Off Crissy Field" and the
+ * rest) are gone from what the player reads (the owner, 20 Nov 2026). */
+export const SPOT_AT = 1500, SPOT_NEAR = 3000;
 /**
- * A spot on the water as the player reads it: by the nearest named feature within about 5 nm, else "open water"; never
- * its coordinates (the owner's rule, r270).
+ * A spot on the water as the player reads it, by one rule everywhere (the sim's toast and log, the chart, the nav strip,
+ * the tags): the feature's name within SPOT_AT, "Near <feature>" within SPOT_NEAR, else "open water"; never its
+ * coordinates (the owner's rule, r270).
  */
-export const spotLabel = (p: Vec): string => nearFeature(p, 9000) ?? 'open water';
+export function spotLabel(p: Vec): string {
+  const f = nearestFeature(p, SPOT_NEAR); if (!f) return 'open water';
+  return f.d < SPOT_AT ? f.name : `Near ${f.name}`;
+}
 
 /**
  * A place by its id: one of the PLACES, or a spot picked on the chart, 'at:<lat>,<lon>' (named by the nearest feature,
