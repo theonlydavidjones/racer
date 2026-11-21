@@ -203,14 +203,25 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
  * Bridge's Pier A and centre anchorage stand well above the water. Where a pier is drawn exactly above, those blocks
  * would make a boat run aground 20–30 m short of it, so a patch of grid land that stands on its own in the water,
  * everywhere within 80 m of a pier, is water: the pier's outline is what's solid. (Land joined to real shore, such as
- * Yerba Buena Island's beside the Bay Bridge's Pier F, stays.)
+ * Yerba Buena Island's beside the Bay Bridge's Pier F, stays.) The Berkeley Pier too (EAST_PIERS, OpenStreetMap way
+ * 32211603): cells astride its 6.6 m deck read as land 20 m either side of it, where NOAA's chart has water (ENC
+ * US5OAKFH ed. 1 upd. 1 and US5OAKFI ed. 1 upd. 0: no LNDARE, no SLCONS beside the deck; w044, ROADMAP 8q8).
  */
 {
   // (each cell centred on its sample, at a grid node: see inTerrain)
   const cellC = (i: number, j: number): Vec => ({ x: (M.west + i * CW - LON0) * MLON, y: (M.north - j * CH - LAT0) * MLAT });
-  const nearPier = (q: Vec, r: number) => PIERS.some(P => q.x > P.box.x0 - r && q.x < P.box.x1 + r && q.y > P.box.y0 - r && q.y < P.box.y1 + r && P.pts.some((v, k) => segPt(q, v, P.pts[(k + 1) % P.pts.length]) < r || inPoly(q, P.pts)));
+  // (the bridges' piers and the Berkeley Pier's, areas closed, the ruin's line open and its width either side. Not yet
+  // Chevron's Long Wharf: 23 such cells along it, but two hold charted land 26–56 m off OpenStreetMap's outline, berths
+  // or dolphins the outline hasn't got; cleared, that land would go, so it waits for the chart's own structures)
+  const BERKELEY = (n?: string) => /^Berkeley Pier/.test(n ?? "");
+  const SOLID: { box: WharfPart['box']; pts: Vec[]; closed: boolean; half: number }[] = [
+    ...PIERS.map(P => ({ box: P.box, pts: P.pts, closed: true, half: 0 })),
+    ...EAST_PIERS.areas.filter(A => BERKELEY(A.name)).map(A => ({ box: A.box, pts: A.pts, closed: true, half: 0 })),
+    ...EAST_PIERS.lines.filter(L => BERKELEY(L.name)).map(L => ({ box: L.box, pts: L.pts, closed: false, half: (L.width ?? 0) / 2 }))];
+  const nearPier = (q: Vec, r: number) => SOLID.some(P => q.x > P.box.x0 - r && q.x < P.box.x1 + r && q.y > P.box.y0 - r && q.y < P.box.y1 + r
+    && (P.closed ? P.pts.some((v, k) => segPt(q, v, P.pts[(k + 1) % P.pts.length]) < r) || inPoly(q, P.pts) : P.pts.some((v, k) => k > 0 && segPt(q, P.pts[k - 1], v) < r + P.half)));
   const done = new Uint8Array(M.nx * M.ny);
-  for (const P of PIERS) {
+  for (const P of SOLID) {
     const toCell = (v: Vec) => [Math.floor(cellX(LON0 + v.x / MLON)), Math.floor(cellY(LAT0 + v.y / MLAT))];
     const [i0, j0] = toCell({ x: P.box.x0 - 80, y: P.box.y1 + 80 }), [i1, j1] = toCell({ x: P.box.x1 + 80, y: P.box.y0 - 80 });
     for (let j = Math.max(0, j0); j <= Math.min(M.ny - 1, j1); j++) for (let i = Math.max(0, i0); i <= Math.min(M.nx - 1, i1); i++) {
