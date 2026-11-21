@@ -1727,6 +1727,7 @@ const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k ===
   : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Practice');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
+  if (boatLesson.on) boatLesson.close(false); // (lesson 1 left for another page: its cue goes with it)
   startPageQuiet(false, view); // (off the start page: the race and the game's displays as they are)
   for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'drillView', 'seasonView', 'condDlg']) $(id).hidden = true;
   if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
@@ -1741,6 +1742,7 @@ function showPlace(p: Place): void {
 function openHome(): void { results.settleLog(openHomeNow); }
 function openHomeNow(): void {
   if (boatPanel.open && boatPanel.edited) { boatPanel.leave(openHomeNow); if (boatPanel.edited) return; } // (her changes unsaved: Save or Discard first)
+  if (boatLesson.on) boatLesson.close(false); // (lesson 1 left for the start page: its cue goes with it; the audit, 21 Nov 2026)
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
