@@ -978,7 +978,8 @@ export class Hud {
       if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
     } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
-    if (detail === 'chart') drawEncNamesAgain(ctx, pal); // (NOAA's names over the sim's lines, on a halo: chart audit #4)
+    if (detail === 'chart') { drawEncNamesAgain(ctx, pal); drawEta(ctx, I); } // (NOAA's names and the ETA over the sim's lines, on a halo: chart audit #4)
+    else etaLabel = null;
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     if (on('ships')) for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);
@@ -1123,6 +1124,13 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
 const NAV_PLAN_MIN = 10, NAV_PLAN_M = 1852;
 /** The current gates' and the strongest wind's colors on the navigator's layer. */
 const NAV_GATE = '#6fd0ff', NAV_WIND = '#e9f2f5';
+/** The full chart's ETA by the destination, set by drawNavLayer and drawn once the laylines are down (drawEta). */
+let etaLabel: { t: string; x: number; y: number } | null = null;
+function drawEta(ctx: CanvasRenderingContext2D, I: Ink): void {
+  const e = etaLabel; etaLabel = null; if (!e) return;
+  ctx.save(); ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 3.5; ctx.strokeStyle = I.halo; ctx.strokeText(e.t, e.x, e.y); ctx.fillStyle = '#e8601c'; ctx.fillText(e.t, e.x, e.y); ctx.restore();
+}
 /**
  * The navigator's layer over her course (drawTrack): a tick and the clock every 15 minutes along it (the full chart), the
  * current gates she passes (blue circles: when the tide there turns with her or against her) and where the wind's
@@ -1165,6 +1173,7 @@ function drawNavLayer(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark, n
     if (chart) say(m.label, s[0] + r + 5, s[1] + 4, I.edge, '600 11px "Saira Semi Condensed", sans-serif');
   }
   // (the inset gives when she'd get there once, in its own words at its foot: ui/hud.ts map)
-  if (chart && now.ok && now.eta != null) { const s = tf(dest.p.x, dest.p.y); say(`ETA ${clockOf(now.eta)}`, s[0] + 11, s[1] + 18, '#e8601c', '700 12px "Saira Semi Condensed", sans-serif'); }
+  // (the ETA by the destination waits for the laylines, drawn after this layer, so none crosses it: chart audit #4)
+  if (chart && now.ok && now.eta != null) { const s = tf(dest.p.x, dest.p.y); etaLabel = { t: `ETA ${clockOf(now.eta)}`, x: s[0] + 11, y: s[1] + 18 }; }
   ctx.restore();
 }
