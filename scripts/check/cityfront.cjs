@@ -36,6 +36,9 @@ const VIEWS = {
   palace_n: [LL(37.8085, -122.4470, 4), LL(37.8029, -122.4484, 20)], // the same from the north, the rotunda and the colonnades
   palace_over: [LL(37.8029, -122.4484, 260), LL(37.80291, -122.44841, 0)], // overhead: the rotunda, the colonnades and the lagoon
   palace_c: [LL(37.8037, -122.4500, 14), LL(37.8030, -122.4484, 28)], // the Palace from a point beside its lagoon, the rotunda and a colonnade
+  oracle_e: [LL(37.7812, -122.3835, 4), LL(37.7788, -122.3893, 24)], // Oracle Park from the Bay, over McCovey Cove: the right-field arcade, the stands and the light towers
+  oracle_n: [LL(37.7870, -122.3870, 5), LL(37.7786, -122.3893, 24)], // from the north, off South Beach
+  oracle_over: [LL(37.7786, -122.3893, 420), LL(37.77861, -122.38931, 0)], // overhead: the ballpark
   fp_over: [LL(37.8105, -122.4771, 90), LL(37.81051, -122.47710, 0)], // overhead: the fort's roof, courtyard and light
   over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill

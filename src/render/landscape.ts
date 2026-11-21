@@ -11,6 +11,7 @@ import { buildCityFront, inCityFront } from './cityfront';
 import { addFortPoint } from './fortPoint';
 import { addGgSouth } from './ggSouth';
 import { addPalace } from './palace';
+import { buildOraclePark } from './oraclePark';
 import { addAlcatrazExtras } from './alcatrazExtras';
 import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
@@ -37,6 +38,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   const terrain = await buildTerrain(scene, month);
   const alcatraz = await buildAlcatraz(scene);
   await buildCityFront(scene);
+  await buildOraclePark(scene); // (the ballpark on McCovey Cove, from the lidar: render/oraclePark.ts)
   buildBridge(scene, (x, y) => terrain.heightAt(x, y));
   const grp = new THREE.Group(); scene.add(grp);
   addHydeShips(grp);
@@ -97,7 +99,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       return null;
     };
     const keepClear = [[37.80240, -122.40584, 140], [37.80292, -122.44840, 170], [37.79519, -122.40279, 60], [37.7899, -122.3969, 55], [37.79554, -122.39369, 110],
-      [37.7897, -122.39535, 35], [37.7904, -122.3961, 35], [37.7903, -122.3943, 35], [37.785778, -122.392139, 35], [37.79285, -122.39793, 35], [37.7919, -122.4038, 45], [37.7925, -122.4005, 40]] as const; // landmarks' own ground
+      [37.7786, -122.3893, 175], [37.7897, -122.39535, 35], [37.7904, -122.3961, 35], [37.7903, -122.3943, 35], [37.785778, -122.392139, 35], [37.79285, -122.39793, 35], [37.7919, -122.4038, 45], [37.7925, -122.4005, 40]] as const; // landmarks' own ground
     const mats: { m: THREE.Matrix4; c: THREE.Color }[] = [];
     const pale = ['#e9e4d8', '#f1ede4', '#ddd6c6', '#e7dcc8', '#d5d2c9', '#ece0cf', '#cfd3d4'].map(h => new THREE.Color(h));
     const glass = ['#b7c1c6', '#c9cdc9', '#9fa9ae', '#d8d6cf', '#aab3b4'].map(h => new THREE.Color(h));
