@@ -1,0 +1,177 @@
+{
+ "home-start-page": {
+  "blocks": [],
+  "tips": []
+ },
+ "race-choose": {
+  "blocks": [],
+  "tips": []
+ },
+ "race-setup-practice": {
+  "blocks": [],
+  "tips": []
+ },
+ "race-setup-practice-lower": {
+  "blocks": [],
+  "tips": []
+ },
+ "cruise-setup": {
+  "blocks": [],
+  "tips": []
+ },
+ "drills": {
+  "blocks": [],
+  "tips": []
+ },
+ "past-races": {
+  "blocks": [],
+  "tips": []
+ },
+ "season": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-boats": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-members": {
+  "blocks": [],
+  "tips": []
+ },
+ "yacht-club-season": {
+  "blocks": [],
+  "tips": [
+   {
+    "el": ".sfoot > span",
+    "n": 115,
+    "text": "The Kelp Chowder's own sailing instructions couldn't be read; these are the best-supported answers ("
+   }
+  ]
+ },
+ "boat-editor": {
+  "blocks": [],
+  "tips": []
+ },
+ "settings-training-aids": {
+  "blocks": [],
+  "tips": []
+ },
+ "settings-keys": {
+  "blocks": [],
+  "tips": [
+   {
+    "el": ".kgroup > div.krow",
+    "n": 164,
+    "text": "At the dock: push off from her berth (the crew walks her out; held head to wind, let her go); coming"
+   },
+   {
+    "el": ".kgroup > div.krow",
+    "n": 112,
+    "text": "Weather helm at the foot of the tiller guide: the tiller's average, teal when balanced, amber past 8"
+   }
+  ]
+ },
+ "tools-tray": {
+  "blocks": [],
+  "tips": []
+ },
+ "pause-screen": {
+  "blocks": [],
+  "tips": []
+ },
+ "lessons": {
+  "blocks": [],
+  "tips": []
+ },
+ "results": {
+  "blocks": [
+   {
+    "el": "p",
+    "n": 121,
+    "text": "21 min 50 s upwind on the medium setting (9–14 kt) in about 6 kt, where the light-air setting (0–8 kt) would have fitted."
+   },
+   {
+    "el": "p",
+    "n": 107,
+    "text": "38 s sailing too high or too low for the best speed downwind; 1 min 16 s sailing deep without the pole set."
+   },
+   {
+    "el": "p",
+    "n": 198,
+    "text": "You crossed 6.1 s after the gun, 12 m back from the line at the gun, going 2.0 kt at the gun. The Dorado YC flagpole end was favored by 36°;"
+   },
+   {
+    "el": "p",
+    "n": 219,
+    "text": "You 4:46, Green 2:51. You sailed 21 m further (about 17 s lost) and were slower over the ground (about 99 s). Green's line lay on average 78"
+   },
+   {
+    "el": "p",
+    "n": 184,
+    "text": "You 16:40, Green 10:15. You sailed 242 m further (about 410 s lost) and were faster over the ground (about 24 s). Green rounded X at 15:36 w"
+   },
+   {
+    "el": "p",
+    "n": 154,
+    "text": "You 16:36, Green 19:21. You were faster over the ground (about 165 s). Green rounded 6 · Fort Mason at 34:57 with you 197 m back; you rounde"
+   },
+   {
+    "el": "p",
+    "n": 137,
+    "text": "You 6:10, Green 6:19. You were faster over the ground (about 8 s). Green rounded X at 41:16 with you 629 m back; you rounded 183 s later."
+   },
+   {
+    "el": "p",
+    "n": 92,
+    "text": "You 1:55, Green 1:55. Green rounded A at 43:11 with you 556 m back; you rounded 182 s later."
+   },
+   {
+    "el": "p",
+    "n": 139,
+    "text": "You 8:27, Green 5:23. You were slower over the ground (about 183 s). Green rounded X at 48:34 with you 208 m back; you rounded 366 s later."
+   },
+   {
+    "el": "p",
+    "n": 153,
+    "text": "You 17:53, Green 19:11. You were faster over the ground (about 78 s). Green rounded 6 · Fort Mason at 67:46 with you 357 m back; you rounded"
+   },
+   {
+    "el": "p",
+    "n": 233,
+    "text": "You 9:58, Green 7:05. You sailed 59 m further (about 28 s lost) and were slower over the ground (about 144 s). Green's line lay on average 9"
+   }
+  ],
+  "tips": [
+   {
+    "el": "li",
+    "n": 161,
+    "text": "Know who has right of way before you get close: port gives way to starboard, windward to leeward, an"
+   },
+   {
+    "el": "li",
+    "n": 332,
+    "text": "Tune the rig at the dock for the forecast: the forestay and shrouds can't be touched once racing (CR"
+   },
+   {
+    "el": "li",
+    "n": 198,
+    "text": "Get out of another boat's shadow fast: it lies along her apparent wind (look at her masthead fly). T"
+   },
+   {
+    "el": "li",
+    "n": 175,
+    "text": "Downwind, sail the best angle for the wind (the downwind laylines show it): heat up a little in the "
+   },
+   {
+    "el": "li",
+    "n": 167,
+    "text": "On a beat, watch your heading (the compass says \"headed\"): when the wind heads you a few degrees for"
+   }
+  ]
+ }
+}
