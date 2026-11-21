@@ -41,4 +41,4 @@ Requested by Coordinator 2: a one-by-one check of the sim's chart features again
 
 ## Fixed here
 
-- **#1:** the chart data regenerated from the 2026-11-21 catalog, with US4CA2CJ at update 2 and US5OAKFF at update 3 (the commit cites "ENC check #1"). It's data under src/, so the batch it's in needs the full `npm test` (CLAUDE.md).
+- **#1:** the chart data regenerated from the 2026-11-21 catalog, with US4CA2CJ at update 2 and US5OAKFF at update 3, in 3e0ad73e. It's data under src/, so the batch it's in needs the full `npm test` (CLAUDE.md).
