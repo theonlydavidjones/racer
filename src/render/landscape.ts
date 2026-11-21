@@ -10,6 +10,7 @@ import { buildAlcatraz } from './alcatraz';
 import { buildCityFront, inCityFront } from './cityfront';
 import { addFortPoint } from './fortPoint';
 import { addGgSouth } from './ggSouth';
+import { addPalace } from './palace';
 import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
@@ -408,20 +409,8 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     bridgeLights.push(pts(steady, 0xff2a1a, 3));
     place(g, 37.75523, -122.45284);
   }
-  // the Palace of Fine Arts: the rotunda (an octagon of columns under a salmon dome, 49 m) and the colonnades
-  {
-    const STONE = lam(0xcaa682), DOME = lam(0xb9775a), g = new THREE.Group();
-    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, c = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 24, 8), STONE); c.position.set(19 * Math.sin(a), 12, 19 * Math.cos(a)); g.add(c); }
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(19, 19, 7, 8), STONE); drum.position.y = 27.5; g.add(drum);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(17, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), DOME); dome.position.y = 31; dome.scale.y = 1.05; g.add(dome);
-    // the colonnades: an arc wrapped around the west side of the lagoon, the rotunda at its middle
-    for (let th = -0.95; th <= 0.951; th += 0.075) {
-      if (Math.abs(th) < 0.2) continue;
-      const c = new THREE.Mesh(new THREE.BoxGeometry(6, 13, 8.5), STONE);
-      c.position.set(110 - 110 * Math.cos(th), 6.5, -110 * Math.sin(th)); c.rotation.y = th; g.add(c);
-    }
-    place(g, 37.80292, -122.44840);
-  }
+  // the Palace of Fine Arts: the rotunda, the two colonnades and the lagoon, at real scale from OSM and the lidar (render/palace.ts)
+  addPalace(scene, (x, y) => terrain.heightAt(x, y));
   // the yacht clubs, and the GGYC flagpole (the inner end of the start line)
   place(group(block(47, 91, 10, lam(0xf1ede2)), block(40, 80, 3, lam(0xb5654a), 10)), 37.80728, -122.44664, 81, 2.3); // St. Francis YC: white walls, red tile roof
   // Golden Gate YC: OpenStreetMap's footprint (way 239024736, 1 Yacht Road: about 22 × 25 m, 8 m high, its long side

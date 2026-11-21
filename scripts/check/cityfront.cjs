@@ -32,6 +32,10 @@ const VIEWS = {
   over_shoal_crissy: [LL(37.8083, -122.4620, 300), LL(37.80831, -122.46201, 0)], // overhead: Crissy Field's shallows
   over_shoal_aq: [LL(37.8100, -122.4240, 300), LL(37.81001, -122.42401, 0)], // overhead: Aquatic Park's shallows
   shoal_aq_low: [LL(37.8105, -122.4252, 2.6), LL(37.8098, -122.4240, -1)], // from a boat in the cove, looking down at the water ahead
+  palace_w: [LL(37.8070, -122.4506, 4), LL(37.8029, -122.4484, 22)], // the Palace of Fine Arts from the Marina's water west of it
+  palace_n: [LL(37.8085, -122.4470, 4), LL(37.8029, -122.4484, 20)], // the same from the north, the rotunda and the colonnades
+  palace_over: [LL(37.8029, -122.4484, 260), LL(37.80291, -122.44841, 0)], // overhead: the rotunda, the colonnades and the lagoon
+  palace_c: [LL(37.8037, -122.4500, 14), LL(37.8030, -122.4484, 28)], // the Palace from a point beside its lagoon, the rotunda and a colonnade
   fp_over: [LL(37.8105, -122.4771, 90), LL(37.81051, -122.47710, 0)], // overhead: the fort's roof, courtyard and light
   over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
