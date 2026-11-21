@@ -6,13 +6,15 @@
  */
 const { chromium } = require('playwright');
 const [url, out] = [process.argv[2] || 'http://localhost:5173/', process.argv[3] || '.'];
-const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog', '#toast', '#crewPop', '#toolsTray', '#nextCard', '#coachPanel', '#tiller', '#dial', '#hudRight'];
+const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog', '#toast', '#crewPop', '#toolsTray', '#nextCard', '#coachPanel', '#tiller', '#dial', '#hudRight', '#hud', '#sigPanel', '#compassBar', '#navStrip']; // (r272: the instruments, the compass and the nav strip too)
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const bad = [], errs = [];
   const run = async (name, size, start) => {
     const p = await b.newPage({ viewport: { width: size[0], height: size[1] } }); p.setDefaultTimeout(180000);
     p.on('pageerror', e => errs.push(`${name}: ${e.message}`));
+    // (the cruise bound somewhere, so the nav strip shows: r272)
+    if (name === 'cruise') await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); s.sailTo = 'alcatraz'; localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
     await p.goto(url); await p.waitForTimeout(5000);
     await p.evaluate(start); await p.waitForTimeout(9000);
     const tag = `${name}-${size[0]}`;

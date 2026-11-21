@@ -17,3 +17,4 @@
 @import './styles/15-boat-editor.css'; /* the boat editor: groups, one color picker, lines as rope (8i) */
 @import './styles/16-trim-coach.css'; /* the trim coach: its held note, the band's cue, Trim Notes (and the cue marks Learn to sail shares) */
 @import './styles/17-tools.css'; /* Tools: the top bar's tray of what shows on the surface */
+@import './styles/18-layout-d.css'; /* layout D (r272): the instruments down the left edge, the compass top centre, the nav strip and the inset top right */
