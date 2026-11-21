@@ -24,7 +24,10 @@ const ABBR_RE = new RegExp(`\\b(${REAL_ABBR.map(a => a.replace(/[.]/g, '\\.')).j
 const TS = import.meta.glob('../src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const JSONS = import.meta.glob(['../src/**/*.json', '!**/sf-folkboat-results.json', '!**/real-club-codes.json'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const DOCS = import.meta.glob(['../index.html', '../README.md'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const ALLOWED: string[] = [];
+/** Whole names that contain a banned one but aren't a club's: each blanked out of a line before it's checked, so a club's
+ * name beside one is still caught. r274 (the owner's rule, docs/FTUE-BRIEF.md §2): a publicly owned marina keeps its
+ * real name: Marina Bay Yacht Harbor (the City of Richmond's) and Coyote Point Marina (San Mateo County's). */
+const ALLOWED: string[] = ['Marina Bay Yacht Harbor', 'Coyote Point Marina'];
 /** Source with comments removed (what's left is code and strings, which the player can see). */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
@@ -33,7 +36,7 @@ function hits(text: string): string[] {
   const out: string[] = [];
   text.split('\n').forEach((l, i) => {
     l = l.replace(/'m-[A-Za-z0-9]+'/g, "''"); // (mark ids are internal, never shown)
-    if (ALLOWED.some(a => l.includes(a))) return;
+    for (const a of ALLOWED) l = l.split(a).join('');
     if (REAL_NAMES.some(n => l.includes(n)) || ABBR_RE.test(l)) out.push(`${i + 1}: ${l.trim().slice(0, 120)}`);
   });
   return out;
@@ -59,6 +62,14 @@ describe('no real yacht club name reaches the player', () => {
     const bad: string[] = [];
     for (const [f, t] of Object.entries(DOCS)) for (const h of hits(t)) bad.push(`${f}:${h}`);
     expect(bad).toEqual([]);
+  });
+});
+
+describe('the allowed public marinas let no club through (r274)', () => {
+  it('the clubs beside them, and their abbreviations, are still caught', () => {
+    for (const l of ['Marina Bay Yacht Club', 'Coyote Point Yacht Club', 'Coyote Point YC', 'MBYC', 'CPYC', 'Marina Bay Yacht Harbor, home of the Marina Bay Yacht Club', 'Coyote Point Marina · CPYC'])
+      expect(hits(l), l).toHaveLength(1);
+    for (const l of ['Marina Bay Yacht Harbor', 'Coyote Point Marina']) expect(hits(l), l).toEqual([]);
   });
 });
 

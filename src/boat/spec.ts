@@ -134,6 +134,24 @@ export const DEFAULT_BOAT: BoatSpec = {
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
+/**
+ * A new player's boat (docs/FTUE-PLAN.md; the owner, 17 Nov 2026): her own, not the owner's Josephine (DEFAULT_BOAT stays
+ * his, and every save made before this keeps her). Her look is the owner's (r273, 20 Nov 2026): a glassfibre Folkboat
+ * dressed as a classic one, with a laid deck of warm (polished) teak, wooden spars, a teak cockpit and forehatch, the
+ * companionway shut, buff topsides, a pearl boot stripe and black antifouling. Sail number USA 000, the owner's: clear of
+ * the real San Francisco fleet's numbers (56 to 125 in boat/data/sf-folkboat-results.json), the club's stock boats' and
+ * the generic boats' (30 to about 150, boat/generic.ts). No club: one is joined, not given (and no real club's name).
+ */
+export const NEW_BOAT: BoatSpec = {
+  id: 'my-folkboat', name: 'KESTREL',
+  hull: { material: 'fiberglass', upper: '#d9c49a', lower: '#2a2d33', stripe: '#f4f1e8' }, // Buff, Black, Pearl (HULL_COLORS, BOTTOM_COLORS)
+  deck: 'teak-polished',
+  hatch: 'teak', cockpit: 'teak', companionway: 'closed',
+  sails: { country: 'USA', number: '000', color: 'white' },
+  club: '', skipper: 'you',
+  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'wood', boom: 'wood', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
+};
+
 /** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */
 export const HULL_COLORS: [string, string][] = [
   ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Bone', '#e8e3d6'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'], // (Bone: a new player's boat's light deck, named: the owner, 18 Nov 2026)
@@ -222,7 +240,7 @@ export const sailNo = (s: BoatSpec) => `${s.sails.country ? s.sails.country + ' 
 
 const newId = () => 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 /** A new boat for your list: the standard Folkboat, under a new name. */
-export function newBoat(name: string, from: BoatSpec = DEFAULT_BOAT): BoatSpec {
+export function newBoat(name: string, from: BoatSpec = NEW_BOAT): BoatSpec {
   return fixSpec({ ...structuredClone(from), id: newId(), name: name.toUpperCase().slice(0, 18) });
 }
 

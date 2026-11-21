@@ -1,8 +1,10 @@
 import type { LessonId } from './sim/lessons';
-import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
+import type { PrepFlag } from './sim/signals';
+import { DEFAULT_BOAT, NEW_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 import { PLACES } from './sim/places';
+import { clubFromBoats, setClub } from './club/membership';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings' | 'lesson'; // (and a Learn to sail lesson, open water, alone: sim/lessons.ts) full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
@@ -37,13 +39,15 @@ export interface Settings {
   turnHoUses?: number;
   /** Starts in which you've called the favored end: the read's drawn on the water for the first three (app/drills.ts). */
   favCalls?: number;
-  drillFrom?: number; drillSolo?: boolean; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
+  drillFrom?: number; drillSolo?: boolean; /** The start drill's preparatory flag (rule 30's: P, I, Z, U or black; the owner, 21 Nov 2026). */ drillFlag?: PrepFlag; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
   /** Sail it yourself: the Case sailed (its number), with mode 'lesson' and lesson 'case'. */
   rulesCase?: number;
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
+  /** Your yacht club (r276): one at a time, switched any time; '' none. A season's races need one, any one (club/membership.ts). */
+  club?: string;
   /** The last float plan left with the club (Before you go): where, back by (hh:mm), how many aboard. */
   floatPlan?: { where: string; back: string; aboard: number };
   aids: 0 | 1; // line, zones and laylines drawn
@@ -111,15 +115,20 @@ export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet' | 'dri
 export const isRemovedSpot = (id: string | undefined): boolean => !!id && PLACES.some(p => p.id === id && !p.buoy);
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };
-  try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) Object.assign(s, saved); } catch { /* private mode etc. */ }
+  let fresh = true; // (no save at all: a new player, who gets a boat of their own, NEW_BOAT, not the owner's Josephine)
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) { Object.assign(s, saved); fresh = false; } } catch { /* private mode etc. */ }
+  if (fresh) { s.boats = [NEW_BOAT]; s.boat = NEW_BOAT; s.boatId = NEW_BOAT.id; }
   s.crew = structuredClone(s.crew ?? DEFAULT_SETTINGS.crew); // a copy: editing your crew mustn't change the defaults
   // your boats: older saves had one boat (and before that, only a burgee)
-  let boats = s.boats !== DEFAULT_SETTINGS.boats && s.boats?.length ? s.boats
+  let boats = (fresh || s.boats !== DEFAULT_SETTINGS.boats) && s.boats?.length ? s.boats
     : [s.boat === DEFAULT_BOAT ? { ...DEFAULT_BOAT, club: s.burgee ?? DEFAULT_BOAT.club } : s.boat];
   // (older saves had no skipper: the boat you were sailing is yours to skipper, the rest have the AI's)
   boats = structuredClone(boats).map(b => fixSpec({ ...b, skipper: b.skipper ?? (b.id === s.boatId ? 'you' : 'ai') }));
   const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
+  // (a save from before membership, r276: you belong to the club your boats fly, so your season stays open; a new player, none)
+  if (typeof s.club !== 'string') s.club = fresh ? '' : clubFromBoats(boats, s.boatId);
+  setClub(s, s.club); // (your boats fly your club's burgee: older saves had one per boat, r293)
   // (before real rain, rain 0 was the only "nothing set": an older save's 0 becomes the real record's, once)
   if (!s.rainV) { if (!s.rain) s.rain = 'real'; s.rainV = 1; }
   // your opponents: older saves had only a number of stock boats

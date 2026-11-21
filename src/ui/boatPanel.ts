@@ -3,7 +3,6 @@ import { BOTTOM_COLORS, BRIGHT_FINISH, DEFAULT_ROPES, HULL_COLORS, ROPES, SAIL_C
 import { saveSettings } from '../settings';
 import { berthRows } from './berthName';
 import { ROPE_SHADE, hexToHsv, hsvToHex, isHex, pickerHtml, ropeSvg, ropesHtml } from './colorPicker';
-import { CLUBS } from '../render/burgees';
 import { conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
 import { TUNE_DEFAULT, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
@@ -21,7 +20,7 @@ export class BoatPanel {
    * `changed(save)`: her setup changed (`save`: keep it: your boats saved; else shown in the showroom only, until you Save).
    * `done(saved)`: back to her page (`saved`: just saved, a quick confirmation there).
    */
-  constructor(private S: Settings, private changed: (save: boolean) => void, private done: (saved: boolean) => void) {
+  constructor(private S: Settings, private changed: (save: boolean) => void, private done: (saved: boolean, discarded?: boolean) => void) {
     this.el = document.getElementById('boatPanel')!;
     this.el.addEventListener('click', e => this.click(e));
     this.el.addEventListener('keydown', e => { const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act="grp"]'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); } });
@@ -58,11 +57,17 @@ export class BoatPanel {
   private setColor(k: ColorKey, v: string): void { this.set(b => COLORS[k].set(b, v)); }
 
   get open(): boolean { return !this.el.hidden; }
-  show(id = this.S.boatId): void {
-    this.editId = id; this.leaving = null; this.grpOpen = null; this.pickKey = null; this.ropeKey = null;
+  show(id = this.S.boatId, isNew = false): void {
+    this.editId = id; this.leaving = null; this.askDrop = false; this.grpOpen = new Set(['her']); this.pickKey = null; this.ropeKey = null;
     this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); // for "Discard changes"
+    // (a new boat: Discard throws her away, so the starting point is your boats without her; r293, the owner)
+    this.fresh = isNew ? structuredClone(this.editing) : null;
+    if (isNew) this.snap.boats = this.snap.boats.filter(x => x.id !== id);
     this.render(); this.el.hidden = false;
   }
+  /** A new boat, as she was made (the editor opened on her from New boat), until she's saved; and Discard's confirm showing. */
+  private fresh: BoatSpec | null = null;
+  private askDrop = false;
   /** Your boats as they were when you opened the panel. */
   private snap: { boats: BoatSpec[]; boatId: string; opponents: string[] } | null = null;
   /** Leaving with changes unsaved (the owner): where to, once you've said Save or Discard. */
@@ -71,8 +76,9 @@ export class BoatPanel {
   /** The showroom's slow turn: pause it to look at her from one side (set by main; returns whether she's turning now). */
   onSpin: (() => boolean) | null = null;
   private spinning = true;
-  /** The group open (one at a time), the color whose picker is open, the line whose ropes are open. */
-  private grpOpen: string | null = null;
+  /** The sections open (the owner, 20 Nov 2026, r293: each collapsed but the first, toggled by its header's arrow), the
+   * color whose picker is open, the line whose ropes are open. */
+  private grpOpen = new Set<string>(['her']);
   private pickKey: ColorKey | null = null;
   private ropeKey: LineColorKey | null = null;
   hide(): void { this.el.hidden = true; }
@@ -93,7 +99,7 @@ export class BoatPanel {
     this.changed(false); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="save"]') && this.edited) this.render(); } // (shown, not yet kept: Save keeps it)
   }
   /** Keep her changes: your boats saved, and the panel's starting point moved up to them. */
-  private keep(): void { this.changed(true); this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  private keep(): void { this.fresh = null; this.askDrop = false; this.changed(true); this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
   /** Put her back as she was when the panel opened. */
   private revert(): void {
     if (!this.snap) return;
@@ -110,6 +116,8 @@ export class BoatPanel {
     if (!this.edited) { next(); return; }
     this.leaving = next; this.render();
   }
+  /** The new boat thrown away: your boats as they were before New boat, and back to the Yacht Club's list. */
+  private dropNew(): void { this.fresh = null; this.askDrop = false; this.leaving = null; this.revert(); this.done(false, true); }
   private uniqueName(base: string): string {
     const names = new Set(this.S.boats.map(b => b.name)); let n = base, k = 2;
     while (names.has(n)) n = `${base} ${k++}`;
@@ -120,19 +128,21 @@ export class BoatPanel {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!t) return;
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
-      case 'grp': this.grpOpen = this.grpOpen === v ? null : v; this.pickKey = null; this.ropeKey = null; this.render(); return;
+      case 'grp': if (!this.grpOpen.delete(v)) this.grpOpen.add(v); this.pickKey = null; this.ropeKey = null; this.render(); return;
       case 'pick': this.pickKey = this.pickKey === v ? null : v as ColorKey; this.render(); return;
       case 'ropePick': this.ropeKey = this.ropeKey === v ? null : v as LineColorKey; this.render(); return;
       case 'rope': { const k = t.dataset.line as LineColorKey, r = ROPES.find(x => x.id === v); if (!r) return;
         this.set(b => { const l = { ...b.lineRopes, [k]: r.id }; if (r.id === DEFAULT_ROPES[k]) delete l[k]; if (Object.keys(l).length) b.lineRopes = l; else delete b.lineRopes; }); return; }
-      case 'toClub': this.leave(() => this.done(false)); return; // (her skipper is chosen on her page in the Yacht Club)
       case 'deckKind': this.set(b => { if (v === 'painted') { if (!isHex(b.deck)) b.deck = '#8e9f7c'; } else b.deck = v; }); return;
       case 'done': this.leave(() => this.done(false)); return;
       case 'save': this.keep(); this.done(true); return;
+      // (a new boat: Discard throws her away; asked first if she's been changed since she was made)
+      case 'drop': if (this.fresh && JSON.stringify(this.fresh) !== JSON.stringify(this.editing)) { this.askDrop = true; this.render(); } else this.dropNew(); return;
+      case 'dropYes': this.dropNew(); return;
+      case 'dropNo': this.askDrop = false; this.render(); return;
       case 'askSave': { const go = this.leaving; this.leaving = null; this.keep(); go?.(); return; }
       case 'askDiscard': { const go = this.leaving; this.leaving = null; this.revert(); go?.(); return; }
       case 'spin': if (this.onSpin) { this.spinning = this.onSpin(); t.textContent = this.spinning ? 'Pause turning' : 'Turn her'; t.setAttribute('aria-pressed', String(!this.spinning)); } return;
-      case 'skipper': this.set(b => { b.skipper = v === 'you' ? 'you' : 'ai'; }); return;
       case 'material': this.set(b => { b.hull.material = v as BoatSpec['hull']['material']; if (v === 'wood' && b.deck === '#8e9f7c') b.deck = 'teak-silver'; }); return;
       case 'upper': this.set(b => { b.hull.upper = v; }); return;
       case 'lower': this.set(b => { b.hull.lower = v; }); return;
@@ -171,10 +181,8 @@ export class BoatPanel {
       case 'name': if (final) this.set(b => { b.name = t.value.trim().toUpperCase() || this.uniqueName('UNNAMED'); }); return;
       case 'number': if (final) this.set(b => { b.sails.number = t.value; }); return;
       case 'country': this.set(b => { b.sails.country = t.value; }); return;
-      case 'club': this.set(b => { b.club = t.value; }); return;
       case 'marina': this.set(b => { if (t.value) { if (t.value !== b.marina) delete b.slip; b.marina = t.value; } else { delete b.marina; delete b.slip; } }); return; // (a slip belongs to its marina)
       case 'slip': this.set(b => { if (t.value) { b.slip = t.value; b.marina = slipById(t.value)?.marina ?? b.marina; } else delete b.slip; }); return;
-      case 'weeks': { const out = this.el.querySelector('#bpWeeksV'); if (out) out.textContent = weeksLabel(Number(t.value)); if (final) this.set(b => { b.perf.cleanedWeeks = Number(t.value); }, false); return; }
       case 'gear': if (final) this.set(b => { b.perf.gearKg = Number(t.value) * 0.4536; }, false); return;
       case 'jumpersUnderWay': if (final) this.set(b => { if ((t as HTMLInputElement).checked) delete b.perf.jumpersUnderWay; else b.perf.jumpersUnderWay = false; }); return; // (on unless you say not: the owner, r246)
       case 'tuneMark': case 'tuneFoot': case 'tuneShroud': case 'tuneJumper': {
@@ -232,12 +240,8 @@ export class BoatPanel {
     const b = this.b, S = this.S;
     const seg = (act: string, opts: [string, string][], cur: string) => `<div class="seg">${opts.map(([v, n]) => `<button type="button" data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join('')}</div>`;
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
-    const ageName = (a: SailAge) => ages.find(x => x[0] === a)![1];
     // one property per row: the label left, its value or control right
     const kv = (label: string, v: string) => `<div class="be-kv"><span>${label}</span>${v}</div>`;
-    const val = (t: string, mu = false) => `<span class="be-v${mu ? ' mu' : ''}">${t}</span>`;
-    const sq = (c: string) => `<i class="be-sq" style="background:${c}"></i>`;
-    const colorVal = (k: ColorKey) => { const c = COLORS[k], v = c.get(b); return isHex(v) ? val(`${sq(v)}${esc(colorName(v, c.presets(b)))}`) : val(esc(c.clear ?? ''), true); };
     // a color's row (open): its button, and the one picker under it while it's the one being set
     const colorRow = (k: ColorKey) => {
       const c = COLORS[k], v = c.get(b), on = this.pickKey === k;
@@ -248,41 +252,31 @@ export class BoatPanel {
     const ropeRow = (k: LineColorKey, n: string) => { const r = rope(k), on = this.ropeKey === k;
       return kv(n, `<button type="button" class="be-cbtn${on ? ' on' : ''}" data-act="ropePick" data-v="${k}">${r.svg}${esc(r.name)}</button>`) + (on ? ropesHtml(k, lineRope(b, k).id) : ''); };
     const deckKind = b.deck.startsWith('teak') ? b.deck : 'painted';
-    const tune = b.perf.tune ? tuneName(fixTune(b.perf.tune)) : 'auto';
-    const slip = slipById(b.slip);
-    // the groups: folded to a short summary; Change opens one (and folds the others)
-    // (each group's own verb: a read-only one says View / Hide, an editable one Change / Done)
+    // the sections: each collapsed to its header (▾) but the first; its header opens it (▴) and shuts it again
     const berth = berthRows(b.marina);
-    const grp = (id: string, label: string, sum: string[], open: () => string, verb: [string, string] = ['Change ▾', 'Done ▴']) => {
-      const on = this.grpOpen === id;
-      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? verb[1] : verb[0]}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
+    const grp = (id: string, label: string, open: () => string) => {
+      const on = this.grpOpen.has(id);
+      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i aria-hidden="true">${on ? '▴' : '▾'}</i></header>${on ? `<div class="be-in">${open()}</div>` : ''}</section>`;
     };
     morph(this.el, `
-      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving ? '' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
+      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving || this.askDrop ? '' : this.fresh ? '<button type="button" class="cta" data-act="save">Save</button><button type="button" class="ghost" data-act="drop">Discard</button>' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
       <div class="garage">
+        ${this.askDrop ? `<div class="gconfirm">Discard ${esc(this.b.name || 'this boat')}? <button type="button" class="ghost danger" data-act="dropYes">Discard</button><button type="button" class="ghost" data-act="dropNo">Keep editing</button></div>` : ''}
         ${this.leaving ? '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-act="askSave">Save</button><button type="button" class="ghost" data-act="askDiscard">Discard</button></div>' : ''}
       </div>
       <div class="bpbody be">${ROPE_SHADE}
-      ${grp('her', 'Her', [
-        kv('Boat', val(`<span class="be-tile"><i style="border-color:${b.hull.upper}"></i>${esc(b.name || 'Unnamed')}</span>`)),
-        kv('Sail number', val(esc(`${b.sails.country} ${b.sails.number}`.trim()))),
-        kv('Club', val(esc(CLUBS.find(c => c.id === b.club)?.club ?? 'None'))),
-        kv('Skipper', val(`${b.skipper === 'you' ? 'You' : 'AI skipper'} · <button type="button" class="linkbtn" data-act="toClub">Yacht Club ›</button>`))
-      ], () => [
+      ${grp('her', 'Registration', () => [
         kv('Name', `<input data-k="name" class="pick" maxlength="18" value="${esc(b.name)}">`),
         kv('Sail number', `<span class="be-row2"><select data-k="country" class="pick" aria-label="Home country (national letters)">${SAIL_COUNTRIES.some(c => c[0] === b.sails.country) ? '' : `<option value="${esc(b.sails.country)}" selected>${esc(b.sails.country || 'No letters')}</option>`}${SAIL_COUNTRIES.map(([c, n]) => `<option value="${c}"${c === b.sails.country ? ' selected' : ''}>${c ? `${c} · ${esc(n)}` : esc(n)}</option>`).join('')}</select><input data-k="number" class="pick be-num" inputmode="numeric" maxlength="5" value="${esc(b.sails.number)}" aria-label="Number"></span>`),
-        kv('Club', `<select data-k="club" class="pick"><option value="">None</option>${CLUBS.map(c => `<option value="${c.id}"${c.id === b.club ? ' selected' : ''}>${esc(c.club)}</option>`).join('')}</select>`),
-        kv('Skipper', val(`${b.skipper === 'you' ? 'You' : 'AI skipper'} · <button type="button" class="linkbtn" data-act="toClub">Yacht Club ›</button>`))
       ].join(''))}
-      ${grp('hull', 'Hull', [kv('Topsides', colorVal('upper')), kv('Boot stripe', colorVal('stripe')), kv('Bottom', colorVal('lower')), kv('Last cleaned', val(weeksLabel(b.perf.cleanedWeeks)))], () => [
+      ${grp('hull', 'Hull', () => [
         kv('Hull', seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood']], b.hull.material)),
         colorRow('upper'), colorRow('stripe'), colorRow('lower'),
         kv('Bottom finish', seg('finish', [['antifouling', 'As rolled on'], ['race', 'Burnished']], b.perf.finish)),
-        kv('Last cleaned', `<span class="be-v be-slide"><input type="range" data-k="weeks" min="0" max="26" step="1" value="${b.perf.cleanedWeeks}"><em id="bpWeeksV">${weeksLabel(b.perf.cleanedWeeks)}</em></span>`),
         colorRow('nameColor'),
         kv('Over the minimum', `<span class="be-v"><input data-k="gear" class="pick be-num" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</span>`)
       ].join(''))}
-      ${grp('deck', 'Deck and cabin', [kv('Deck', deckKind === 'painted' ? colorVal('deck') : val(esc(TEAK_DECKS.find(x => x[1] === deckKind)?.[0] ?? 'Teak'))), kv('Forehatch', val(b.hatch === 'teak' ? 'Teak' : 'Acrylic')), kv('Outboard', val(({ none: 'Ashore', stowed: 'Stowed aboard', bracket: 'On the bracket' } as const)[b.perf.outboard]))], () => [
+      ${grp('deck', 'Deck and cabin', () => [
         kv('Deck', seg('deckKind', [['painted', 'Painted'], ...TEAK_DECKS.map(([n, k]) => [k, n.replace(' teak', '')] as [string, string])], deckKind)),
         deckKind === 'painted' ? colorRow('deck') : '', colorRow('cabinTop'),
         kv('Forehatch', seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic']], b.hatch ?? 'acrylic')),
@@ -294,24 +288,24 @@ export class BoatPanel {
         kv('Outboard', seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed'], ['bracket', 'Bracket']], b.perf.outboard)),
         b.perf.outboard !== 'none' ? kv('Outboard size', seg('outboardHp', [['2.5', '2.5 hp'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5))) : ''
       ].join(''))}
-      ${grp('rig', 'Rig', [kv('Mast and boom', val(b.perf.mast === b.perf.boom ? (b.perf.mast === 'wood' ? 'Wood' : 'Aluminum') : `${b.perf.mast === 'wood' ? 'Wood' : 'Aluminum'} · ${b.perf.boom === 'wood' ? 'wood' : 'aluminum'}`)), kv('Rig tune', val(tune === 'auto' ? 'For the forecast' : tune === 'custom' ? 'Your own' : esc(tune)))], () => [
+      ${grp('rig', 'Rig', () => [
         kv('Mast', seg('mast', [['aluminium', 'Aluminum'], ['wood', 'Wood']], b.perf.mast)),
         b.perf.mast === 'wood' ? kv('Mast stiffness', seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness)) : '',
         kv('Boom', seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood']], b.perf.boom)),
         `<div class="be-tune">${rigTuneFields(b, seg)}</div>`
       ].join(''))}
-      ${grp('sails', 'Sails', [kv('Sailcloth', val(b.sails.color === 'black' ? 'Black' : 'White polyester')), kv('Main · jib', val(b.perf.mainAge === b.perf.jibAge ? ageName(b.perf.mainAge) : `${ageName(b.perf.mainAge)} · ${ageName(b.perf.jibAge).toLowerCase()}`)), kv('Numbers and F', colorVal('numberColor'))], () => [
+      ${grp('sails', 'Sails', () => [
         kv('Sailcloth', seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)),
         kv('Mainsail', seg('mainAge', ages, b.perf.mainAge)), kv('Jib', seg('jibAge', ages, b.perf.jibAge)),
         colorRow('numberColor'), colorRow('insigniaColor')
       ].join(''))}
-      ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change', true))], () =>
+      ${grp('lines', 'Lines', () =>
         LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
-      ${grp('berth', 'Home berth', [kv('Marina', val(esc(berth.marina))), ...(berth.slipRow ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
+      ${grp('berth', 'Home berth', () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
         berth.slipRow ? kv(esc(berth.slipRow), `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
       ].join(''))}
-      ${grp('speed', 'Speed', [], () => '<div class="bpreport" id="bpReport"></div>', ['View ▾', 'Hide ▴'])}
+      ${grp('speed', 'Speed', () => '<div class="bpreport" id="bpReport"></div>')}
       </div>`);
     this.report();
   }

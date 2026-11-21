@@ -552,7 +552,7 @@ export class SceneView {
     this.laylineAcc += dt; if (this.laylineAcc < 0.5) return; this.laylineAcc = 0;
     const L = w.settings.aids ? laylinesFor(w, w.user) : null;
     this.laylines.forEach((line, i) => {
-      line.visible = !!L;
+      line.visible = !!L && !this.quietOn;
       if (!L) return;
       const m = L.mark.p, g = L.tracks[i], a = P3(m.x, m.y, 0.3), b = P3(m.x - g.x * 900, m.y - g.y * 900, 0.3);
       const arr = (line.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
@@ -574,7 +574,21 @@ export class SceneView {
   private hullCam = new THREE.Vector3();
   private sunLit = true;
   private readonly farCam = new THREE.Vector3();
+  /**
+   * The start page (app/firstRun.ts): her alone behind it, sailing; the rest of the fleet, the course's marks and line,
+   * and the laylines hidden. Only hidden and shown again: nothing built, nothing freed, so the race after it starts as
+   * one with nothing behind the page would. A new World's scene (setWorld) starts with it off.
+   */
+  private quietOn = false;
+  quiet(on: boolean): void {
+    if (on === this.quietOn) return; this.quietOn = on;
+    this.boatMeshes.forEach((m, i) => { if (i > 0) m.grp.visible = !on; });
+    for (const o of this.courseObjs) o.visible = !on;
+    if (on) for (const l of this.laylines) l.visible = false;
+  }
+
   setWorld(w: SimView): void {
+    this.quietOn = false; // (her new fleet and course are built visible)
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
@@ -1047,7 +1061,7 @@ export class SceneView {
         mo.float.position.y = waves.height(mo.p, tw, 1, 1);
       }
       const len = Math.min(1.6, kt / 1.5);
-      mo.wake.visible = kt > 0.15; mo.wake.scale.set(0.6 + 0.4 * len, len, 1);
+      mo.wake.visible = kt > 0.15 && !this.quietOn; mo.wake.scale.set(0.6 + 0.4 * len, len, 1);
       mo.wake.rotation.z = -set + Math.PI; // trailing downstream
       mo.wake.position.set(mo.p.x + Math.sin(set) * 5 * len, 0.12, -(mo.p.y + Math.cos(set) * 5 * len));
       (mo.wake.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, kt / 1.2);

@@ -3,7 +3,6 @@ import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
-import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/ghost';
@@ -73,6 +72,9 @@ import { Nav, type Place } from './ui/nav';
 import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
+import { canEnterSeason } from './club/membership';
+import { startPageQuiet, startPageReady } from './app/firstRun';
+import { seasonRaceFor } from './club/practice';
 import { mountBoatLesson } from './app/boatLesson';
 import { mountDrills } from './app/drills';
 import { DrillCoach } from './app/drillCoach';
@@ -1501,7 +1503,9 @@ $('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // (never below 0: the first frame's time is when it began, before `last` was taken at the end of a long load, and its
+  // negative step held the readouts back a second or more behind the start page)
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (still) return; // (behind the setup: the last frame stays, and its race waits untouched for the start)
   // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
   // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
@@ -1613,7 +1617,8 @@ boatPanel = new BoatPanel(S, save => {
   if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => { const t0 = performance.now(); view.rebuildBoat(w, w.boats.indexOf(w.user)); performance.measure('editor: restyle', { start: t0 }); }); // (timed: scripts/check/editor-perf.cjs)
   else setup.newGame();
   boatSummary(); oppRows();
-}, saved => {
+}, (saved, discarded) => {
+  if (discarded) { boatPanel.hide(); fleet.openList(); return; } // (a new boat thrown away: back to the Yacht Club's list, where New boat was)
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
   if (saved) fleet.flashSaved();
 });
@@ -1635,7 +1640,7 @@ const fleet: Fleet = new Fleet(S, {
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
   // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
-  edit: id => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
+  edit: (id, isNew) => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id, isNew); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
@@ -1654,9 +1659,10 @@ const fleet: Fleet = new Fleet(S, {
  * back link of the screen above it.
  */
 const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'past' ? 'Past races' : p.k === 'drill' ? 'Drill' : p.k === 'season' ? (seasonById(p.id)?.title ?? 'Season') : p.k === 'club' ? 'Yacht Club'
-  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
+  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Practice');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
+  startPageQuiet(false, view); // (off the start page: the race and the game's displays as they are)
   for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'drillView', 'seasonView', 'condDlg']) $(id).hidden = true;
   if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
   if (p.k === 'race') { $('raceBack').textContent = nav.backLabel(); paintSeasonCard(); $('raceChoose').hidden = false; }
@@ -1678,6 +1684,7 @@ function openHomeNow(): void {
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
+  startPageQuiet(true, view); // (her alone behind it: app/firstRun.ts)
   $('home').hidden = false;
 }
 document.addEventListener('click', e => {
@@ -1686,7 +1693,7 @@ document.addEventListener('click', e => {
   if (where === 'home') openHome();
   else if (where === 'back') nav.back(); // (a back link: where you came from, ui/nav.ts)
   else if (where === 'race') nav.go({ k: 'race' });
-  else if (where === 'season') { const c = currentSeason(); if (c) nav.go({ k: 'season', id: c.id }); }
+  else if (where === 'season') { const c = currentSeason(); if (!canEnterSeason(S)) nav.go({ k: 'club' }); else if (c) nav.go({ k: 'season', id: c.id }); } // (r276: not a member of any club, the Yacht Club to join one)
   else if (where === 'create') { seasonPick = null; if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'cruise') { seasonPick = null; S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'fleet') nav.go({ k: 'club' });
@@ -1817,21 +1824,17 @@ function openSeason(id: string, no?: number): void {
 function paintSeasonCard(): void {
   const series = currentSeason(); $('bSeasonCard').hidden = !series; if (!series) return;
   const res = seasonResults(series.id), me = Object.keys(res).length ? standings(series, res, liveBoat).rows.find(r => r.you) : undefined;
-  $('seasonCardSub').innerHTML = seasonCardHtml({ series, res, burgee: burgeeUrl(), place: me?.rank ?? null });
+  $('seasonCardSub').innerHTML = seasonCardHtml({ series, res, burgee: burgeeUrl(), place: me?.rank ?? null, locked: !canEnterSeason(S) });
+  $('bSeasonCard').classList.toggle('locked', !canEnterSeason(S));
 }
 $('svCal').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-sv-race]'); if (b && seasonPick) nav.go({ k: 'season', id: seasonPick.series.id, no: +b.dataset.svRace! }); });
 $('svHead').addEventListener('change', e => { const v = (e.target as HTMLSelectElement).value; if ((e.target as HTMLElement).id === 'svSeason' && v) nav.go({ k: 'season', id: v }); });
-$('bSailSeason').onclick = () => { if (seasonPick) nav.go({ k: 'setup' }); };
+$('bSailSeason').onclick = () => { if (!canEnterSeason(S)) nav.go({ k: 'club' }); else if (seasonPick) nav.go({ k: 'setup' }); }; // (r276: members of any club only)
 /** The season race this race is, if it's one: that race's course, day and start, in the day's real conditions, against the series' fleet. */
+// (only a race entered from the Season page counts: a Practice sailing set up the same way never writes to a season, r275)
 function seasonRaceOf(): { series: Series; no: number } | null {
-  if (S.mode !== 'race' || !w || w.freeSail) return null;
-  for (const series of seasons()) for (const r of series.races) {
-    if (r.abandoned || S.course !== r.courseId || S.tideDate !== r.date || S.tideTime !== r.start) continue;
-    if (S.windKind !== 'auto' || S.windKt || S.windTurn || S.windDir != null || replayPin != null || S.current !== 'real') continue;
-    if (S.opponents.length !== series.fleet.length || !series.fleet.every(o => S.opponents.includes(o))) continue;
-    return { series, no: r.no };
-  }
-  return null;
+  if (S.mode !== 'race' || !w || w.freeSail || !canEnterSeason(S)) return null; // (r276: a non-member's sailing counts in no season)
+  return seasonRaceFor(S, seasonPick, replayPin != null);
 }
 /** Her hull's colour, for a boat in the race: yours, a club boat, or one of the club's other Folkboats. */
 function hullOf(b: Boat): string {
@@ -1940,7 +1943,8 @@ for (const [k, a] of Object.entries(ADJ)) {
 }
 
 setup.buildSetupChoices();
-setup.newGame(); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.tideBox(); boatSummary(); oppRows();
+setup.newGame(); startPageQuiet(true, view); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.tideBox(); boatSummary(); oppRows();
 requestAnimationFrame(frame);
 
 installDevHandles(ctx); // (src/app/devHandles.ts)
+startPageReady(); // (the start page's cards light up: src/app/firstRun.ts)

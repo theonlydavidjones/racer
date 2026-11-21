@@ -58,6 +58,11 @@ export function startSequence(seqMin: number, prep: PrepFlag): Signal[] {
     out.push({ t: -(seqMin - 1) * 60, name: 'Preparatory signal', up: [prep], down: [], sound: 'one', say: `Preparatory signal: ${p} up, one sound. ${seqMin - 1} minutes. ${PREP_MEANING[prep]}` });
     out.push({ t: -60, name: 'One-minute signal', up: [], down: [prep], sound: 'long', say: `One-minute signal: ${p} down, one long sound.${prep === 'P' ? '' : ` The ${p} rule applies from now until the start.`}` });
     out.push({ t: 0, name: 'Starting signal', up: [], down: ['class'], sound: 'one', say: 'Starting signal: class flag down, one sound. Go!' });
+  } else if (seqMin < 2) {
+    // (a one-minute sequence, the owner's Practice choice, 21 Nov 2026: the warning signal is the last minute, so there's
+    // no time for a preparatory signal of its own; the start comes on the class flag alone, as RRS 26 allows sailing
+    // instructions to shorten it. With no preparatory flag, rule 30's flags can't apply: the plain P start)
+    out.push({ t: 0, name: 'Starting signal', up: [], down: ['class'], sound: 'one', say: 'Starting signal: class flag down, one sound. Go!' });
   } else {
     out.push({ t: -60, name: 'Preparatory signal', up: [prep], down: [], sound: 'one', say: `Preparatory signal: ${p} up, one sound. One minute. ${PREP_MEANING[prep]}` });
     out.push({ t: 0, name: 'Starting signal', up: [], down: ['class', prep], sound: 'one', say: 'Starting signal: class and preparatory flags down, one sound. Go!' });

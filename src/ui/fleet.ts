@@ -3,6 +3,7 @@ import { bottomLine, colorName } from './colorName';
 import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { burgeeCanvas } from '../render/burgees';
 import { clubFullName } from '../club/clubs';
+import { SEASON_NEEDS_CLUB, joinableClubs, myClub, setClub } from '../club/membership';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
@@ -21,8 +22,8 @@ export interface FleetHooks {
   changed(): void;
   /** Show her in the showroom (her page is open), or stop (null). */
   showroom(b: BoatSpec | null): void;
-  /** Edit her in the boat panel; it calls back `fleet.openBoat(id)` when you're done. */
-  edit(id: string): void;
+  /** Edit her in the boat panel (`isNew`: just made by New boat, which Discard throws away); it calls back `fleet.openBoat(id)` when you're done. */
+  edit(id: string, isNew?: boolean): void;
   /** Sail her: race or cruise, from her slip or not. */
   sail(id: string, mode: 'race' | 'cruise', fromSlip: boolean): void;
   /** Leave the Fleet, or her page (back where you came from: ui/nav.ts). */
@@ -73,8 +74,8 @@ export class Fleet {
   }
   /** A quick "Saved" on her page (the boat editor's Save). */
   flashSaved(): void { this.saved('boat'); if (this.boatOpen) this.drawBoat(); }
-  private saved(where: 'list' | 'boat'): void {
-    this.flash = 'Saved ✓'; clearTimeout(this.flashT);
+  private saved(where: 'list' | 'boat', word = 'Saved'): void {
+    this.flash = `${word} ✓`; clearTimeout(this.flashT);
     this.flashT = window.setTimeout(() => { this.flash = ''; if (where === 'list' && !this.list.hidden) this.drawList(); else if (where === 'boat' && this.boatOpen) this.drawBoat(); }, 1500);
   }
   private saveMember(): void {
@@ -103,6 +104,7 @@ export class Fleet {
     this.list.addEventListener('change', e => {
       const t = e.target as HTMLInputElement;
       if (t.dataset.f === 'sseason') { this.seasonId = t.value; this.drawList(); return; } // (the Season tab's season)
+      if (t.dataset.f === 'club') { if (t.value) { const was = this.S.club; setClub(this.S, t.value); this.hooks.changed(); this.saved('list', was ? 'Switched' : 'Joined'); this.drawList(); } return; } // (r276: one club at a time, switched free)
       const m = this.member(); if (!m || !t.dataset.m) return;
       if (applyMemberInput(m, t.dataset.m, t.value, t.dataset.a, t.checked)) this.drawList(); // (the draft: kept when you Save)
     });
@@ -154,8 +156,8 @@ export class Fleet {
       case 'toList': this.guard(() => this.hooks.back()); return;
       case 'new': {
         const names = new Set(this.S.boats.map(b => b.name)); let n = 'NEW BOAT', k = 2; while (names.has(n)) n = `NEW BOAT ${k++}`;
-        const nb = newBoat(n); nb.sails.number = freeNumber(this.S.boats, 100); delete nb.slip; delete nb.marina;
-        this.S.boats.push(nb); this.hooks.changed(); this.close(); this.hooks.edit(nb.id); return;
+        const nb = newBoat(n); nb.sails.number = freeNumber(this.S.boats, 100); nb.club = this.S.club ?? ''; delete nb.slip; delete nb.marina; // (she flies your club's burgee)
+        this.S.boats.push(nb); this.hooks.changed(); this.close(); this.hooks.edit(nb.id, true); return;
       }
       // (into her editor: her page hidden, but the showroom left on, so the editor opens on her as she's shown; ROADMAP 8v)
       case 'edit': this.guard(() => { this.list.hidden = true; this.page.hidden = true; this.hooks.edit(this.boatId); }); return;
@@ -190,6 +192,18 @@ export class Fleet {
     }
   }
 
+  /**
+   * The Yacht Club page leads with your club (r276, r281: the owner's approval): its burgee and name, and a menu to
+   * switch, free, any time; or, a member of none, the menu to join one (a season's races need a club, any one).
+   */
+  private clubHead(): string {
+    const c = myClub(this.S), opts = joinableClubs().filter(x => x.id !== c?.id).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    // (the Join/Switch menu waits for the club browser: membership.ts SEASON_NEEDS_CLUB, r276)
+    const pick = SEASON_NEEDS_CLUB ? `<select class="ycjoin" data-f="club" aria-label="${c ? 'Switch club' : 'Join a club'}"><option value="">${c ? 'Switch club…' : 'Join a club…'}</option>${opts}</select>` : '';
+    const flag = c ? flagImg('b:' + c.id, () => burgeeCanvas(c.id), c.name).replace('class="fflag"', 'class="ycburgee"') : '';
+    return `<div class="ychead">${flag}<div><div class="eyebrow">${c ? 'Your yacht club' : 'San Francisco · Folkboat fleet'}</div><h1>${c ? esc(c.name) : 'The Yacht Club'}</h1></div>${pick}</div>`;
+  }
+
   /* ---------- the list ---------- */
   private drawList(): void {
     const boats = this.S.boats;
@@ -202,7 +216,7 @@ export class Fleet {
     if (this.tab === 'season') {
       morph(this.list, `<div class="panel wide fleetpanel">
         <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
-        <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
+        <div class="fhead">${this.clubHead()}</div>${tabs}
         ${this.hooks.seasonHtml(this.seasonId)}</div>`);
       return;
     }
@@ -210,13 +224,13 @@ export class Fleet {
       const ms = this.hooks.members(), m = this.member();
       morph(this.list, `<div class="panel wide fleetpanel">
         ${m ? '' : `<button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>`}
-        <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
+        <div class="fhead">${this.clubHead()}</div>${tabs}
         ${m ? memberPage(m, boats, this.confirmMemberDel, { dirty: this.memberDirty, asking: !!this.leaving }) : membersGrid(ms, boats)}</div>`);
       return;
     }
     morph(this.list, `<div class="panel wide fleetpanel">
       <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
-      <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div>
+      <div class="fhead">${this.clubHead()}
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>${tabs}
       ${body}
