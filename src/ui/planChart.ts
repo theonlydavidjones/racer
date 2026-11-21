@@ -1,7 +1,8 @@
 import type { Hud } from './hud';
 import { navRoute } from './hud';
 import { $ } from './dom';
-import { PLACES, place, spotId } from '../sim/places';
+import { spotId } from '../sim/places';
+import { PICKABLE, placeLabel, spotName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { inBasin, slipPlace } from '../geo/marina';
 import { chartPoint } from './chart';
@@ -23,13 +24,13 @@ export type Drop = { id: string; p: Vec; name: string } | { err: string; p: Vec 
  */
 export function dropAt(w: SimView, q: Vec, px: (p: Vec) => number): Drop {
   const slip = w.homeSlip;
-  if (slip && (px(slip.p) < 16 || dist(slip.p, q) < 60)) return { id: 'slip', p: slip.p, name: `her slip (${slipPlace(slip)})` };
-  let best: (typeof PLACES)[number] | null = null, bd = 16;
-  for (const pl of PLACES) { const d = px(pl.p); if (d < bd) { bd = d; best = pl; } }
+  if (slip && (px(slip.p) < 16 || dist(slip.p, q) < 60)) return { id: 'slip', p: slip.p, name: 'Home' };
+  let best: (typeof PICKABLE)[number] | null = null, bd = 16;
+  for (const pl of PICKABLE) { const d = px(pl.p); if (d < bd) { bd = d; best = pl; } }
   if (best) return { id: best.id, p: best.p, name: best.name };
   if (onLand(q)) return { err: 'That\'s land: pick a spot on the water.', p: q };
   if (inBasin(q)) return { err: slip ? 'Inside a harbor: use her slip, or pick open water outside.' : 'Inside a harbor: pick open water outside (or give her a slip in the Fleet).', p: q };
-  return { id: spotId(q), p: q, name: 'open water' };
+  return { id: spotId(q), p: q, name: spotName(q) };
 }
 
 /**
@@ -166,7 +167,7 @@ export class PlanChart {
     s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
     $('bPlanNone').hidden = this.which !== 'to' || !this.picks.get('to');
-    const name = (id: string) => id === 'slip' ? (slip ? `her slip (${slipPlace(slip)})` : 'her slip') : id ? place(id)?.name ?? '?' : 'nowhere in particular';
+    const name = placeLabel;
     const from = this.picks.get('from'), to = this.picks.get('to');
     let way = '';
     if (w.dest) {

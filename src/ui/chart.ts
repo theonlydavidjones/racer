@@ -2,7 +2,8 @@ import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES, latLon } from '../sim/places';
+import { PLACES } from '../sim/places';
+import { destName, spotName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -31,6 +32,12 @@ export class Chart {
   constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private race: { send(c: Command): void; ask(c: Command): Promise<CommandResult> }) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
+    // (the fog caption is one short line: its source and caveats are the hover)
+    this.c.addEventListener('pointermove', e => {
+      const r0 = this.c.getBoundingClientRect(), fc = this.hud.fogCaption, x = e.clientX - r0.left, y = e.clientY - r0.top;
+      const tip = fc && x >= fc.rect[0] && x <= fc.rect[2] && y >= fc.rect[1] && y <= fc.rect[3] ? fc.tip : '';
+      if (this.c.title !== tip) this.c.title = tip;
+    });
     this.c.addEventListener('pointermove', e => {
       const r = this.c.getBoundingClientRect(); this.cursor = e.pointerType === 'mouse' ? [e.clientX - r.left, e.clientY - r.top] : null;
       if (!drag) return;
@@ -49,12 +56,12 @@ export class Chart {
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });
     $('bChartClose').onclick = () => this.close();
-    $('bChartPal').onclick = () => {
+    // Day | Dusk, a two-state toggle at the top right beside the field picker (the owner, 20 Nov 2026)
+    document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.addEventListener('click', () => {
       if (!this.w) return;
       // (the palette is the page's own (Hud.shown): the chart redraws with it at once; the race learns it by command)
-      const pal = (this.hud.shown(this.w).chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
-      this.setPal(pal); this.palLabel(); this.draw();
-    };
+      this.setPal(b.dataset.pal === 'dusk' ? 'dusk' : 'day'); this.palLabel(); this.draw();
+    }));
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
@@ -93,7 +100,7 @@ export class Chart {
     if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
-  private palLabel(): void { $('bChartPal').textContent = ((this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
+  private palLabel(): void { const pal = (this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day'; document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.pal === pal))); }
 
   close(): void {
     if (!this.isOpen) return;
@@ -114,11 +121,12 @@ export class Chart {
     // a place near the tap: take it, by name
     let best: { p: Vec; name: string } | null = null, bd = 16;
     for (const pl of PLACES) {
+      if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const px = r.width / 2 + (pl.p.x - this.cx) * this.scale, py = r.height / 2 - (pl.p.y - this.cy) * this.scale, d = Math.hypot(px - sx, py - sy);
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }
     if (!best && onLand(q)) { this.pick = null; this.info('That\'s land. Pick a spot on the water.'); this.draw(); return; }
-    this.pick = best ?? { p: q, name: latLon(q) };
+    this.pick = best ?? { p: q, name: spotName(q) };
     this.info(); this.draw();
   }
 
@@ -128,7 +136,7 @@ export class Chart {
     go.hidden = !(w?.cruising && this.pick);
     $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${destName(w.dest)}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);

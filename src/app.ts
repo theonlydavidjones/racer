@@ -61,7 +61,8 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } fro
 import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, keyMenu, layersMenu, withLayer, type LayerKey } from './ui/layers';
+import { destName } from './ui/placeNames';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
@@ -386,7 +387,7 @@ function setControlsIdle(): void {
 }
 
 /** A cluster button's word (under its icon), set only when it changes. */
-function word(id: string, t: string): void { const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
+function word(id: string, t: string): void { if (id === 'bFast') $(id).classList.toggle('on', t !== 'Speed 1×'); /* (lit while time runs fast) */ const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
@@ -988,7 +989,7 @@ function pilotTick(dt: number): void {
   else if (p.mode === 'wind') txt = `Apparent wind ${side(p.awa)}`;
   else {
     const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
-    txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
+    txt = d ? `→ ${destName(d).replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
   }
   if (txt !== pilotShown && performance.now() > pilotNoteUntil) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
@@ -1086,7 +1087,9 @@ $('chartPlanLink').onclick = e => { e.preventDefault(); navView.open(w); };
 let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
-$('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
+/** The speed button's step (and its key): 1× → 2× → 4× → 1×. (The owner, 20 Nov 2026: one button beside Pause; it left Tools.) */
+function cycleSpeed(): void { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); }
+$('bFast').onclick = cycleSpeed;
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 // Sound and Exit sit with Pause and Speed, top right, Exit outermost (the owner, 13 Nov 2026)
 const results = mountResults(ctx); // (src/app/results.ts)
@@ -1124,19 +1127,11 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
     else setLayer(f as LayerKey, true);
   });
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
-  // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
-  const views: MenuView[] = [
-    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
-    { name: 'Points of sail', what: 'The points of sail and the wind on the water round her, turning with every shift (on in the lessons)', keyLabel: () => keymap.label('pointsRose'), on: () => roseOn(), set: on => roseShow(on) },
-    { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
-  // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
-  // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
-  const insetChoice: MenuChoice = {
-    heading: 'The inset map shows', shown: () => !!w?.cruising,
-    options: [{ v: 'map', name: 'The water round her', what: 'The chart round her, turned north up' }, { v: 'nav', name: 'The passage', what: 'The navigator\'s course to the destination, whole; tap the inset for the passage plan' }],
-    get: () => S.insetView ?? 'map', set: v => { S.insetView = v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews(); }
-  };
-  const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
+  // (the owner, 20 Nov 2026: the Key lists what's on the map; the switches are the Layers dropdown beside the field picker;
+  // the training views are in Tools and Keys, and what the inset shows cruising is in Settings)
+  const menus = [
+    keyMenu($('bChartLayers'), $('chartLayersPop'), (el, f) => hud.keyInto(el, 'chart', f)),
+    layersMenu($('bChartShow'), $('chartShowPop'), () => S, setLayer, () => {})];
 }
 $('map').addEventListener('click', () => { if (w.running && !chart.isOpen) openChart(); });
 function openChart(): void { releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel(); }
@@ -1160,11 +1155,14 @@ function chartNavLabel(): void {
 function chartToNav(): void { chart.close(); if (w.cruising) navView.open(w); else courseView.open(w); }
 $('bChartNav').onclick = chartToNav;
 /** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
- * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
+ * chosen in Settings and remembered with your settings (no buttons on the inset: the owner). */
+const insetNavTog = $<HTMLInputElement>('insetNavTog');
+insetNavTog.addEventListener('change', () => { S.insetView = insetNavTog.checked ? 'nav' : 'map'; saveSettings(S); insetViews(); });
 function insetViews(): void {
+  insetNavTog.checked = S.insetView === 'nav';
   const cruising = !!w?.cruising;
   $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
-  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
+  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in Settings, and remembered)
   $('map').title = hud.insetView === 'nav' ? 'Click for the chart, with the passage plan' : 'Click the map for the chart'; // (the hover says it: no words on the inset)
 }
 
@@ -1209,7 +1207,7 @@ function keysHint(): void {
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bPilot', 'Tiller pilot: steers for you (cruising only); on standby, lifts it off the tiller pin', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
-  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
+  $('bFast').title = `Speed up time: 1×, 2×, 4× (${keymap.label('speed')})`; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -1316,6 +1314,7 @@ function runAction(a: Action): void {
     case 'weatherHelm': S.weatherHelm = S.weatherHelm === false; saveSettings(S); toast(`Weather helm at the tiller guide ${S.weatherHelm ? 'on' : 'off'}.`, 1600); break;
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
+    case 'speed': cycleSpeed(); break;
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
@@ -1466,6 +1465,7 @@ const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'pointsRose', label: 'Points of sail', icon: 'rose', key: () => toolKey('pointsRose'), on: () => roseOn(), act: () => runAction('pointsRose') },
   { id: 'weatherHelm', label: 'Weather helm', icon: 'helm', key: () => toolKey('weatherHelm'), on: () => S.weatherHelm !== false, act: () => runAction('weatherHelm') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
@@ -1476,10 +1476,7 @@ const TOOLS: Tool[] = [
   { id: 'log', label: 'Log', icon: 'log', key: () => toolKey('log'), on: () => !$('logView').hidden, act: () => { if ($('logView').hidden) openLog(); else $('logView').hidden = true; } },
   { id: 'perfMeter', label: 'Frame readout', icon: 'perf', key: () => toolKey('perfMeter'), on: () => perf.on, act: () => runAction('perfMeter') },
 ];
-const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS, {
-  get: () => speedSet,
-  set: v => { speedSet = v; send({ k: 'speed', v }); word('bFast', 'Speed ' + v + '×'); },
-});
+const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS);
 $('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);
