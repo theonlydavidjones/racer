@@ -26,6 +26,12 @@ const VIEWS = {
   pier39: [LL(37.8150, -122.4125, 6), LL(37.8070, -122.4110, 25)], // Pier 39 and Telegraph Hill's west slope, from the water north of the pier
   over_ne: [LL(37.8030, -122.4150, 1100), LL(37.8030, -122.41501, 0)], // overhead: North Beach, Telegraph Hill, Cow Hollow's east end: the strip's east and south edges
   fp_mid: [LL(37.8200, -122.4690, 3), LL(37.8105, -122.4772, 24)], // mid-channel, north of the bridge's south end, looking at the pylons, the arch and the fort
+  shoal_crissy: [LL(37.8100, -122.4590, 2.6), LL(37.8072, -122.4610, 0)], // the sea floor (render/bathy.ts): the shallows off Crissy Field, from a boat close to the beach
+  shoal_aquatic: [LL(37.8128, -122.4262, 2.6), LL(37.8098, -122.4240, 0)], // the shallows off Aquatic Park's beach
+  shoal_midbay: [LL(37.8330, -122.4400, 3), LL(37.8330, -122.4300, 0)], // mid-Bay: deep water, no floor
+  over_shoal_crissy: [LL(37.8083, -122.4620, 300), LL(37.80831, -122.46201, 0)], // overhead: Crissy Field's shallows
+  over_shoal_aq: [LL(37.8100, -122.4240, 300), LL(37.81001, -122.42401, 0)], // overhead: Aquatic Park's shallows
+  shoal_aq_low: [LL(37.8105, -122.4252, 2.6), LL(37.8098, -122.4240, -1)], // from a boat in the cove, looking down at the water ahead
   fp_over: [LL(37.8105, -122.4771, 90), LL(37.81051, -122.47710, 0)], // overhead: the fort's roof, courtyard and light
   over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
