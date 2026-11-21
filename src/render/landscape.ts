@@ -9,6 +9,7 @@ import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildAlcatraz } from './alcatraz';
 import { buildCityFront, inCityFront } from './cityfront';
 import { addFortPoint } from './fortPoint';
+import { addGgSouth } from './ggSouth';
 import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
@@ -784,15 +785,8 @@ function buildBridge(scene: THREE.Scene, groundAt: (x: number, y: number) => num
   // how far the roadway runs on past each anchorage before the land comes up to it (at most 900 m, the toll plaza)
   const reach = (sgn: number, from: number) => { for (let d = from; d < 900; d += 10) if (ground(sgn * (END + d)) > deckY(sgn * (END + d)) - 4) return d; return 900; };
   const southRun = reach(-1, ARCH + 20), northRun = reach(1, 20);
-  // anchorages at each end: the cables go down into them; a stepped art-deco pylon rises through the roadway
-  const pylon = (z: number) => {
-    const g0 = ground(z), top = deckY(z) + 14;
-    box(34, top - g0, 26, 0, (top + g0) / 2, z, CONCRETE);
-    box(28, 6, 21, 0, top + 3, z, CONCRETE); box(20, 4, 15, 0, top + 8, z, CONCRETE); // the stepped top
-    for (const sx of [-1, 1]) box(1.2, top - g0 - 12, 0.8, sx * 9, (top + g0) / 2, z + 13.2 * Math.sign(z), DARK); // fluting on the faces
-  };
-  // the San Francisco anchorage at Fort Point
-  { const z = -END, g0 = ground(z); box(50, deckY(z) - 6 - g0, 45, 0, (deckY(z) - 6 + g0) / 2, z, CONCRETE); pylon(z); }
+  // the San Francisco end: the pylons S1 and S2 and the South Anchorage housing, from OSM's outlines and the lidar (render/ggSouth.ts)
+  addGgSouth(scene, 0xb8b2a6);
   // the Marin anchorage on the hillside at Lime Point, in OpenStreetMap's outlines (scripts/make-marin-piers.mjs): the
   // housing the cables go down into, about 109 × 48 m along the bridge from where the side span ends, and its four pylons,
   // N1 and N2 either side of the roadway, about 9 × 5 m each. Their heights aren't in the data: the housing up to just
@@ -818,7 +812,6 @@ function buildBridge(scene: THREE.Scene, groundAt: (x: number, y: number) => num
       }
     }
   }
-  pylon(-(END + ARCH));
   // the Fort Point arch: two steel ribs under the roadway, springing from the rock either side of the fort, with
   // posts up to the deck
   {
