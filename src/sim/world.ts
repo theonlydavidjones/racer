@@ -366,7 +366,7 @@ function asDoubles(b: Boat): Boat {
 export function boatLook(spec: BoatSpec) {
   return {
     no: sailNo(spec), hullColor: spec.hull.upper, sailColor: spec.sails.color === 'black' ? '#232427' : '#fbfaf5',
-    paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
+    paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, cabinSides: spec.cabinSides, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
   };
 }
 /** A main that's up and let fly at the dock or on her lines: its sheet eased out to the boom on the shroud (dockStep). */

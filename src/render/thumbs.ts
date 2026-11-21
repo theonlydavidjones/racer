@@ -108,7 +108,7 @@ function keep(key: string, url: string): void {
 let purged = false;
 /** Her picture, as a data URL (kept by her looks). */
 export function boatThumb(spec: BoatSpec, S: Settings): string {
-  const key = JSON.stringify([LOOK_VERSION, spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.nameColor, spec.companionway, spec.navLights, spec.lineColors, spec.lineRopes, spec.perf.mast, spec.perf.boom, spec.perf.outboard]);
+  const key = JSON.stringify([LOOK_VERSION, spec.hull, spec.deck, spec.cabinTop, spec.cabinSides, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.nameColor, spec.companionway, spec.navLights, spec.lineColors, spec.lineRopes, spec.perf.mast, spec.perf.boom, spec.perf.outboard]);
   if (!purged) { purged = true; purgeOldThumbs(); }
   const hit = cache.get(key) ?? kept().find(e => e[0] === key)?.[1]; if (hit) { cache.set(key, hit); return hit; }
   gl ??= setup();

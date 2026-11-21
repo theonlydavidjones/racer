@@ -207,13 +207,15 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cabinTopMat = ct ? (ct.startsWith('teak') ? new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(ct === 'teak-silver'), side: THREE.DoubleSide }) : nonSkidMaterial('top', ct, glass ? GELCOAT : ct))
     : teak ? new THREE.MeshLambertMaterial({ color: 0xd9cfb6, side: THREE.DoubleSide }) : nonSkidMaterial('top', paint.deck, glass ? GELCOAT : paint.deck);
   grp.add(new THREE.Mesh(planUV(deckGeometry(), 'deck'), deckMat));
-  // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top
+  // cabin trunk: cream sides (varnished mahogany on the wooden boats), deck-coloured top; or, chosen in the boat editor
+  // (r291), the sides and coamings in laid teak like a teak deck, weathered silver or oiled warm, the grain fore and aft
   const cab = cabinGeometry();
-  const sideMat = glass ? MAT.cream : MAT.mahogany;
+  const sideTeak = paint.cabinSides, sideMat = sideTeak ? teakSideMat(sideTeak === 'teak-silver') : glass ? MAT.cream : MAT.mahogany;
+  const sideUV = (g: THREE.BufferGeometry, across = false) => sideTeak ? grainUV(g, across) : g; // (across: the cabin's after face and the after coaming)
   grp.userData.sideMat = sideMat; // (the winches' pedestals, moulded with the coamings: buildLines)
-  grp.add(new THREE.Mesh(cab.sides, sideMat));
+  grp.add(new THREE.Mesh(sideUV(cab.sides), sideMat));
   grp.add(new THREE.Mesh(planUV(cab.top, 'top'), cabinTopMat));
-  grp.add(new THREE.Mesh(cab.aft, sideMat));
+  grp.add(new THREE.Mesh(sideUV(cab.aft, true), sideMat));
   const zc = (u: number) => -L / 2 + u * L;
   // the cabin window: one long, narrow light each side with rounded ends, set in an aluminium frame (as on Josephine;
   // portholes' shape is free, CR 3.19)
@@ -311,7 +313,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
       const u = COCKPIT.u0 + (uLip - COCKPIT.u0) * i / 16, x = cockpitHalf(u) + COAMING_T / 2, y = deckY(u, x);
       pts.push(new THREE.Vector3(s * x, y, zc(u))); caps.push(new THREE.Vector3(s * x, y + COAMING_H(zc(u)), zc(u)));
     }
-    grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
+    grp.add(new THREE.Mesh(sideUV(rail(pts, i => COAMING_H(pts[i].z), COAMING_T)), sideMat));
     capSide[s] = caps; // (the cap is laid in one piece with the after coaming's, below)
     // the toerail along the sheer, unbroken; and alongside the cockpit, just inboard of it, the hiking rail, a broad varnished plank laid flat along
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
@@ -336,7 +338,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // (joined to the side coamings' after ends, so the walls and the cap turn the corners in one smooth curve)
     const side = (s: number) => capSide[s].map(q => q.clone().setY(q.y - COAMING_H(q.z)));
     const round = [side(-1).at(-1)!, ...lip, side(1).at(-1)!];
-    grp.add(new THREE.Mesh(wall(round, i => COAMING_H(round[i].z), COAMING_T), sideMat));
+    grp.add(new THREE.Mesh(sideUV(wall(round, i => COAMING_H(round[i].z), COAMING_T), true), sideMat));
     // the wooden cap, one piece from the cabin along both sides and round the after coaming (Josephine, the owner's photo)
     const cap = [...side(-1), ...lip, ...side(1).reverse()].map(q => q.clone().setY(q.y + COAMING_H(q.z)));
     grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
@@ -389,7 +391,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   if (paint.boatName) {
     const name = /[a-z]/.test(paint.boatName) ? paint.boatName : paint.boatName.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
     const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 200;
-    const ctx = cv.getContext('2d')!, col = paint.nameColor || nameColor(C(glass ? '#ebe5d6' : '#6e3f22').getStyle(), paint.boot);
+    const ctx = cv.getContext('2d')!, col = paint.nameColor || nameColor(C(paint.cabinSides ? TEAK_TONE[paint.cabinSides] : glass ? '#ebe5d6' : '#6e3f22').getStyle(), paint.boot);
     const draw = () => {
       ctx.clearRect(0, 0, cv.width, cv.height); ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       let px = 170; ctx.font = `${px}px ${NAME_FONT}`;
@@ -513,6 +515,12 @@ function teakMat() {
     warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide })
   };
 }
+/** The cabin sides' and coamings' teak (r291), one material for each finish: plain grain (no deck seams), satin like the trim. */
+const teakSides = new Map<boolean, THREE.Material>();
+const teakSideMat = (silver: boolean) => teakSides.get(silver) ?? (m => (teakSides.set(silver, m), m))(
+  new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(silver, false), specular: silver ? 0x1a1a1a : 0x332211, shininess: silver ? 10 : 30, side: THREE.DoubleSide }));
+/** The teak's mean tone (teakTexture's planks), for lettering her name to stand out on it. */
+const TEAK_TONE = { 'teak-silver': '#a8a398', 'teak-polished': '#b0743e' } as const;
 /** Texture coordinates for a piece of teak: the grain along its length (z, fore and aft; or x, across, for the washboards), about 0.3 m across a repeat. */
 function grainUV(g: THREE.BufferGeometry, across = false): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();

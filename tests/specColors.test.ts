@@ -26,3 +26,13 @@ describe('cockpit', () => {
     expect(fixSpec({ cockpit: 'marble' } as never).cockpit).toBe('teak');
   });
 });
+
+/** The coamings and cabin sides (r291): as built (gelcoat, or varnished mahogany on a wooden boat), or laid teak like the deck. */
+describe('cabin sides', () => {
+  it('are as built unless teak is chosen', () => {
+    expect(fixSpec({}).cabinSides).toBeUndefined();
+    expect(fixSpec({ cabinSides: 'teak-silver' }).cabinSides).toBe('teak-silver');
+    expect(fixSpec({ cabinSides: 'teak-polished' }).cabinSides).toBe('teak-polished');
+    expect(fixSpec({ cabinSides: '#123456' } as never).cabinSides).toBeUndefined();
+  });
+});

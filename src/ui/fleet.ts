@@ -288,6 +288,7 @@ export class Fleet {
         ${row('Bottom', bottomLine(colour(BOTTOM_COLORS, b.hull.lower), p.cleanedWeeks))}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
         ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
+        ${row('Cabin sides and coamings', b.cabinSides ? colour(TEAK_DECKS, b.cabinSides) : b.hull.material === 'wood' ? 'Varnished mahogany' : 'Gelcoat')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
         ${row('Sails', `${b.sails.color === 'black' ? 'Black' : 'White'}; main ${ages[p.mainAge]}, jib ${ages[p.jibAge]}`)}
         ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`)}

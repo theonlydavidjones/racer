@@ -20,6 +20,9 @@ export interface BoatSpec {
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
   /** The cabin top, painted or teak, if not like the deck ('' or absent: like the deck; on a teak deck, painted canvas). */
   cabinTop?: string;
+  /** The cabin sides and cockpit coamings (r291): laid teak, weathered silver or polished warm, like a teak deck; absent:
+   * as built (white gelcoat on a glassfibre boat, varnished mahogany on a wooden one). */
+  cabinSides?: 'teak-silver' | 'teak-polished';
   /** Which side deck the whisker pole is stowed on, alongside the toe rail. */
   poleSide?: 'port' | 'starboard';
   /** Her navigation lights under sail: sidelights and a sternlight on deck, or a tricolour at the masthead (Rule 25(a), (b)). */
@@ -193,6 +196,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     sails: (sl => (sl.number === '110' && (typeof x.name === 'string' ? x.name : d.name).trim().toUpperCase() === 'JOSEPHINE' ? { ...sl, number: '122' } : sl))({ ...d.sails, ...x.sails }), perf: { ...d.perf, ...x.perf },
     club: typeof x.club === 'string' ? x.club : x.flags?.burgee ?? '', // older saves: her burgee was her club
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
+    ...(x.cabinSides === 'teak-silver' || x.cabinSides === 'teak-polished' ? { cabinSides: x.cabinSides } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
     hatch: x.hatch === 'acrylic' || x.hatch === 'teak' ? x.hatch : d.hatch ?? 'teak',

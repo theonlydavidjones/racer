@@ -15,7 +15,7 @@ import { newCrew, DEFAULT_CREW, type CrewPlace } from '../../../src/boat/crewPhy
 import { testBoat, sail, startTack } from '../../../tests/helpers/testBoat';
 import { beatAngle } from '../../../src/boat/polar';
 import { FULL_RUDDER } from '../../../src/boat/balance';
-import type { Boat } from '../../../src/boat/boat';
+import { FLEET, type Boat, type Paint } from '../../../src/boat/boat';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -53,7 +53,7 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign']; spec?: Partial<BoatSpec> }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign']; spec?: Partial<BoatSpec>; paint?: Partial<Paint>; hull?: 'wood' | 'fiberglass' }) {
     (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
@@ -61,6 +61,8 @@ const lab = {
     if (o.place) b.crew.place = o.place;
     if (o.pole) b.poleWant = true;
     if (o.spec) b.spec = { ...structuredClone(DEFAULT_BOAT), ...o.spec }; // (her looks: the boat editor's choices, e.g. her lines' colorways)
+    if (o.paint) b.paint = { ...(b.paint ?? FLEET[b.id]?.paint ?? FLEET[1].paint), ...o.paint }; // (her paint and finishes: the boat editor's choices, as the World passes them)
+    if (o.hull) b.build = { ...b.build, hull: o.hull };
     if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: the tiller's sweep past it)
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;

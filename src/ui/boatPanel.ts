@@ -149,6 +149,7 @@ export class BoatPanel {
       case 'stripe': this.set(b => { b.hull.stripe = v; }); return;
       case 'deck': this.set(b => { b.deck = v; }); return;
       case 'cabinTop': this.set(b => { if (v) b.cabinTop = v; else delete b.cabinTop; }); return;
+      case 'cabinSides': this.set(b => { if (v === 'teak-silver' || v === 'teak-polished') b.cabinSides = v; else delete b.cabinSides; }); return;
       case 'poleSide': this.set(b => { b.poleSide = v === 'starboard' ? 'starboard' : 'port'; }); return;
       case 'navLights': this.set(b => { b.navLights = v === 'tricolour' ? 'tricolour' : 'deck'; }); return;
       case 'hatch': this.set(b => { b.hatch = v === 'acrylic' ? 'acrylic' : 'teak'; }); return;
@@ -279,6 +280,7 @@ export class BoatPanel {
       ${grp('deck', 'Deck and cabin', () => [
         kv('Deck', seg('deckKind', [['painted', 'Painted'], ...TEAK_DECKS.map(([n, k]) => [k, n.replace(' teak', '')] as [string, string])], deckKind)),
         deckKind === 'painted' ? colorRow('deck') : '', colorRow('cabinTop'),
+        kv('Cabin sides', seg('cabinSides', [['', b.hull.material === 'wood' ? 'Mahogany' : 'Gelcoat'], ...TEAK_DECKS.map(([n, k]) => [k, n.replace(' teak', '')] as [string, string])], b.cabinSides ?? '')),
         kv('Forehatch', seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic']], b.hatch ?? 'acrylic')),
         kv('Cockpit', seg('cockpit', [['teak', 'Teak'], ['fiberglass', 'Fiberglass']], b.cockpit ?? 'teak')),
         kv('Companionway', seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')),
