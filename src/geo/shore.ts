@@ -5,6 +5,7 @@ import marinaCoast from './data/marina-coast.json';
 import pilePiers from './data/pile-piers.json';
 import wharf from './data/wharf.json';
 import eastPiers from './data/east-piers.json';
+import longWharfEnc from './data/long-wharf-enc.json';
 import bridgePiers from './data/bridge-piers.json';
 import limePoint from './data/lime-point.json';
 import { HARBORS, harborIndex, hitsHarbor, inBasin } from './marina';
@@ -159,7 +160,14 @@ export const WHARF: PierGroup = group(W);
  * question about a point (or a line) far from either group doesn't look at the other's parts.
  */
 export const EAST_PIERS: PierGroup = group(eastPiers as unknown as WharfData);
-const GROUPS = [WHARF, EAST_PIERS];
+/**
+ * Chevron's Long Wharf as NOAA's chart has it, where OpenStreetMap's outline (EAST_PIERS) lacks it: the berth heads'
+ * platforms (LNDARE), the wharf's pier lines (SLCONS) and its mooring dolphin (MORFAC), from ENC US5OAKGG ed. 1 upd. 1
+ * (scripts/make-long-wharf-enc.mjs). Solid, as the rest of the wharf is: the dolphin wasn't, and the platforms only by
+ * the terrain's 50 m cells, which also made the water beside the wharf land.
+ */
+export const LONG_WHARF_ENC: PierGroup = group(longWharfEnc as unknown as WharfData);
+const GROUPS = [WHARF, EAST_PIERS, LONG_WHARF_ENC];
 const inB = (p: Vec, b: WharfPart['box']) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1;
 
 /**
@@ -210,14 +218,13 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
 {
   // (each cell centred on its sample, at a grid node: see inTerrain)
   const cellC = (i: number, j: number): Vec => ({ x: (M.west + i * CW - LON0) * MLON, y: (M.north - j * CH - LAT0) * MLAT });
-  // (the bridges' piers and the Berkeley Pier's, areas closed, the ruin's line open and its width either side. Not yet
-  // Chevron's Long Wharf: 23 such cells along it, but two hold charted land 26–56 m off OpenStreetMap's outline, berths
-  // or dolphins the outline hasn't got; cleared, that land would go, so it waits for the chart's own structures)
-  const BERKELEY = (n?: string) => /^Berkeley Pier/.test(n ?? "");
+  // (the bridges' piers, the Berkeley Pier's and Chevron's Long Wharf, OpenStreetMap's outline with the chart's own
+  // platforms, pier lines and dolphin (LONG_WHARF_ENC); areas closed, lines open and their width either side)
+  const EAST = (n?: string) => /^(Berkeley Pier|Long Wharf)/.test(n ?? "");
   const SOLID: { box: WharfPart['box']; pts: Vec[]; closed: boolean; half: number }[] = [
     ...PIERS.map(P => ({ box: P.box, pts: P.pts, closed: true, half: 0 })),
-    ...EAST_PIERS.areas.filter(A => BERKELEY(A.name)).map(A => ({ box: A.box, pts: A.pts, closed: true, half: 0 })),
-    ...EAST_PIERS.lines.filter(L => BERKELEY(L.name)).map(L => ({ box: L.box, pts: L.pts, closed: false, half: (L.width ?? 0) / 2 }))];
+    ...[...EAST_PIERS.areas, ...LONG_WHARF_ENC.areas].filter(A => EAST(A.name)).map(A => ({ box: A.box, pts: A.pts, closed: true, half: 0 })),
+    ...[...EAST_PIERS.lines, ...LONG_WHARF_ENC.lines].filter(L => EAST(L.name)).map(L => ({ box: L.box, pts: L.pts, closed: false, half: (L.width ?? 0) / 2 }))];
   const nearPier = (q: Vec, r: number) => SOLID.some(P => q.x > P.box.x0 - r && q.x < P.box.x1 + r && q.y > P.box.y0 - r && q.y < P.box.y1 + r
     && (P.closed ? P.pts.some((v, k) => segPt(q, v, P.pts[(k + 1) % P.pts.length]) < r) || inPoly(q, P.pts) : P.pts.some((v, k) => k > 0 && segPt(q, P.pts[k - 1], v) < r + P.half)));
   const done = new Uint8Array(M.nx * M.ny);
