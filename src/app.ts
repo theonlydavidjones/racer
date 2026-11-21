@@ -1695,6 +1695,7 @@ function showroom(on: boolean): void {
   if (on) queueMicrotask(showBar); // (once she's on show: the time she's shown at)
   if (on && !document.body.classList.contains('showroom')) { look.yaw = 0.6; look.pitch = 0; }
   document.body.classList.toggle('showroom', on);
+  view.quiet(on); // (her alone on show: the fleet and the course hidden behind her page, as on the start page; render/scene.ts quiet)
   if (!on) { look.shift = 0; look.yaw = 0; look.pitch = 0; look.chase = undefined; }
 }
 const fleet: Fleet = new Fleet(S, {
