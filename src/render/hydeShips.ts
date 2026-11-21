@@ -12,7 +12,7 @@ import data from './data/hyde-ships.json';
  * give each ship its berth. OSM notes that all but Alma are "moved to Mare Island/Vallejo while Hyde Street Pier is being
  * rebuilt": the berths are where they lay before, and all six are shown there by the owner's choice (21 Nov 2026). The bow is the narrower end of the outline, which is a guess for a berth.
  * Freeboard, masts, yards, stacks and houses are massing from the ships' general arrangement and ESTIMATES (no measured
- * dimensions found yet: the HAER drawings at LoC, CA-54 and CA-60 to 63, give them). Merged into one draw a material.
+ * dimensions found yet: the HAER drawings at LoC, CA-54 and CA-60 to 63, give them). Merged into one draw, and out of the picture beyond 2.5 km.
  */
 interface Spec { freeboard: number; hull: number; masts?: { f: number; h: number; yards?: number }[]; stack?: { f: number; h: number; r: number }; house?: { f0: number; f1: number; h: number; w: number; color: number }; bowsprit?: number; paddle?: boolean; upper?: number }
 const SPECS: Record<string, Spec> = {
@@ -26,10 +26,13 @@ const SPECS: Record<string, Spec> = {
 };
 
 export function addHydeShips(grp: THREE.Group): void {
-  const mats = new Map<number, THREE.MeshLambertMaterial>(), geos = new Map<number, THREE.BufferGeometry[]>();
+  // one geometry for all six ships, each part's color in its vertices (so one material, one draw)
+  const geos: THREE.BufferGeometry[] = [], tint = new THREE.Color();
   const add = (g: THREE.BufferGeometry, color: number, m: THREE.Matrix4) => {
-    if (!mats.has(color)) { mats.set(color, new THREE.MeshLambertMaterial({ color })); geos.set(color, []); }
-    g.applyMatrix4(m); geos.get(color)!.push(g.index ? g.toNonIndexed() : g);
+    g.applyMatrix4(m); const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose();
+    n.deleteAttribute('uv'); tint.set(color);
+    const c = new Float32Array(n.attributes.position.count * 3); for (let i = 0; i < c.length; i += 3) { c[i] = tint.r; c[i + 1] = tint.g; c[i + 2] = tint.b; }
+    n.setAttribute('color', new THREE.BufferAttribute(c, 3)); geos.push(n);
   };
   const MASTC = 0x6b5a45, DARK = 0x2a2c2f, YARD = 0x7a6a52;
   for (const sh of data.ships) {
@@ -76,5 +79,11 @@ export function addHydeShips(grp: THREE.Group): void {
     if (sp.stack) put(new THREE.CylinderGeometry(sp.stack.r * 0.85, sp.stack.r, sp.stack.h, 10), DARK, midX, deck + (sp.upper ?? 0) + sp.stack.h / 2, zAt(sp.stack.f));
     if (sp.paddle) for (const s of [-1, 1]) put(new THREE.BoxGeometry(1.4, (sp.upper ? 5 : 3), (sp.upper ? 12 : 5)), 0x8a2e26, midX + s * (beam / 2 - 0.4), deck + 1.5, zAt(0.5));
   }
-  for (const [color, list] of geos) grp.add(new THREE.Mesh(mergeGeometries(list), mats.get(color)!));
+  const merged = mergeGeometries(geos); geos.forEach(g => g.dispose()); merged.computeBoundingSphere();
+  // seen only from within 2.5 km (the berths are 50 to 90 m ships: past that a few pixels): beyond it the level is empty, no draw
+  const lod = new THREE.LOD(), c = merged.boundingSphere!.center;
+  lod.position.copy(c); lod.updateMatrix(); lod.matrixAutoUpdate = false; merged.translate(-c.x, -c.y, -c.z); merged.computeBoundingSphere();
+  const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true })); mesh.matrixAutoUpdate = false;
+  lod.addLevel(mesh, 0); lod.addLevel(new THREE.Group(), 2500);
+  grp.add(lod);
 }
