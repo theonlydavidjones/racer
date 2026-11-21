@@ -18,7 +18,7 @@ Stills are in `stills/`. The capture script is on the session branch's scratch (
 | M5 | Missing for a racer: the results table has each boat's elapsed time, but not the gap to the winner or to you; the replay has it, the results don't. | src/app/results.ts:369 | M | 12-results (**fixed**, af4c0ef6, 46bf199f: "47:50 +0:35") |
 | M6 | At 22 kt the race never finished. Boat 0, on the AI skipper, sat on leg 2 for more than 90 simulated minutes, so there are no 22 kt results here. That's an AI/sim matter, not these screens. For the Skipper Model and AI sessions. | (the AI skipper, src/ai) | M | 22-replay (**not a bug**: the committee's 23 kt limit, signals.ts:33 CANCEL_KT; a 22 kt setting's two-minute mean crosses it and racing is called off, AP over A. Seed 1523510690 calls it at t = −180) |
 
-Also fixed: the start and downwind notes in one line of figures (37a867b1); the replay map's rival label as USA (d6be48f0).
+Also fixed: the start and downwind notes in one line of figures (37a867b1); the replay map's rival label as USA (d6be48f0); the tactics chart's off-scale labels apart (b35ae729); the moments against the rival in one line each, "L8 44:33 · Blue tacked to port · you 59 s later", the sentence on the hover, in the results and the replay (none wraps at 1280 px: stills/after-vs-moments-1280.jpg).
 
 No overlaps were found:
 - The grown card sits in the bottom-left above Crew · Auto, clear of the sail band and Messages.

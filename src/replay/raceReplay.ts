@@ -164,7 +164,7 @@ export class RaceReplay {
     const kindW = { beat: 'a beat', reach: 'a reach', run: 'a run', start: '' } as const;
     const lede = esc(gapWords(V));
     // each leg's moments (her tacks against yours, the shifts, the mark), under the leg, each one to jump to
-    const mom = (L: LegVs) => L.moments.length ? `<ul class="rrMoments">${L.moments.map(m => `<li class="rrPick rrVsm" data-vsm="${V.moments.indexOf(m)}" tabindex="0"><span class="dbLost">${m.kind === 'mark' ? '⚑' : `${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m`}</span> ${esc(m.text)}</li>`).join('')}</ul>` : '';
+    const mom = (L: LegVs) => L.moments.length ? `<ul class="rrMoments">${L.moments.map(m => `<li class="rrPick rrVsm" data-vsm="${V.moments.indexOf(m)}" tabindex="0" title="${escA(m.text)}"><span class="dbLost">${m.kind === 'mark' ? '⚑' : `${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m`}</span> ${esc(m.line)}</li>`).join('')}</ul>` : '';
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p class="dbLine" title="${escA(legWords(L, V.rivalName))}">${esc(legLine(L))}</p>${mom(L)}</li>`).join('');
@@ -287,7 +287,7 @@ export class RaceReplay {
     const el = this.root.querySelector<HTMLElement>('.rrCaption'); if (!el) return;
     const m = this.sel, L = this.selLeg, V = this.D!.vs, M = this.selVsm;
     if (M && V) {
-      el.innerHTML = `<span class="rrNo rrVs ${M.lostM > 0 ? 'lost' : 'won'}">L${M.leg}</span><span>${M.kind === 'mark' ? '' : `<span class="dbLost">${M.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(M.lostM))} m</span> `}${esc(M.text)}</span>`;
+      el.innerHTML = `<span class="rrNo rrVs ${M.lostM > 0 ? 'lost' : 'won'}">L${M.leg}</span><span>${M.kind === 'mark' ? '' : `<span class="dbLost">${M.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(M.lostM))} m</span> `}<span title="${escA(M.text)}">${esc(M.line)}</span></span>`;
       return;
     }
     if (L && V) {

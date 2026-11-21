@@ -179,7 +179,7 @@ function vsDebriefHtml(log: NonNullable<typeof app.w.log>): string {
     return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${app.esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p class="dbLine" title="${app.esc(legWords(L, V.rivalName) + (mark ? ` ${mark.text}` : '')).replace(/"/g, '&quot;')}">${app.esc(legLine(L))}</p></li>`;
   }).join('');
   const big = bigMoments(V);
-  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${app.esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
+  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span class="dbLine" title="${app.esc(m.text).replace(/"/g, '&quot;')}"><b>L${m.leg}</b> ${app.esc(m.line)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
   return `<div class="eyebrow">Against ${app.esc(V.rivalName)}, ${rivalWho(V, app.w.boats[V.rival].finished)}</div><p class="lede">${app.esc(gapWords(V))}</p><ol>${legs}</ol>${moments}`;
 }
 

@@ -94,6 +94,9 @@ describe('your race against the winner', () => {
     // the cost: 40 s at 3 m/s with 20° worse to the mark than her: about 40·3·(cos 35° − cos 55°) ≈ 30 m
     expect(tack.lostM).toBeGreaterThan(20); expect(tack.lostM).toBeLessThan(45);
     expect(V.moments.some(m => m.kind === 'mark' && /Blue finished at 6:35 with you \d+ m back; you finished 5 s later/.test(m.text))).toBe(true);
+    // and each in one line of figures, the sentence kept for the hover
+    expect(tack.line).toBe('1:50 · Blue tacked to port, 10° header · you 40 s later');
+    expect(V.moments.find(m => m.kind === 'mark')!.line).toMatch(/^6:35 · Blue finished · you \d+ m back, 5 s later$/);
   });
 
   it('a penalty\'s turns aren\'t tacks (the track flags them; in the sim they come 17–32 s apart)', () => {
@@ -171,5 +174,28 @@ describe('legLine: a leg in one short line (the copy sweep, 21 Nov 2026)', () =>
   it('small causes and a near line left out; the start as the gun', () => {
     expect(legLine(L({ fromDist: 1, fromSpeed: 1, apartM: 10 }))).toBe('16:40 vs 10:15');
     expect(legLine(L({ i: 0, kind: 'start', you: 3.4, them: 1.2, lost: 2.2 }))).toBe('Gun +3.4 s vs +1.2 s');
+  });
+});
+
+describe('the moments in one line each (Coordinator 2, 21 Nov 2026: no note wraps at 1280 px)', () => {
+  // every kind of moment, against a rival with a long name: the time first, figures after, none over the budget.
+  // (70 characters: at 1280 px the results' debrief column holds about 82 of its 16 px type beside "L1" and "+24 m",
+  // measured in the page; the margin is for wider glyphs. The debrief stills check the rows' heights in the page itself)
+  const beat = (tacks: number[], wind: (t: number) => number, T = 500) => { const P: Frame['b'][number][] = []; let x = 0, y = 0, tack = 'S';
+    for (let t = 0; t <= T; t++) { if (tacks.includes(t)) tack = tack === 'S' ? 'P' : 'S'; const W = wind(t), h = tack === 'S' ? W - 45 : W + 45;
+      P.push([x, y, (h + 360) % 360, tack as 'S', 0, tack === 'S' ? -(((W + 540) % 360) - 180) : ((W + 540) % 360) - 180, W, 0]); x += 3 * Math.sin(h * Math.PI / 180); y += 3 * Math.cos(h * Math.PI / 180); }
+    return P; };
+  const long = 'Seaweed Soup 2';
+  const w = (t: number) => t < 100 ? 0 : 350;
+  const run = (you: number[], her: number[], yf = 500, hf = 495) => { const A = beat(you, w), B = beat(her, w);
+    return versus(input(A.map((p, t) => ({ t, b: [p, B[t]] })) as Frame[], yf, hf, { boats: [{ id: 0, name: 'You', finishT: yf, dsq: false }, { id: 1, name: long, finishT: hf, dsq: false }] }))!; };
+  const cases = [run([150], [110]), run([110], [150], 495, 500), run([110], [110], 500, 500), run([], [110]), run([110], [])];
+  it('every moment has a line: the clock first, then figures; the full sentence stays in `text`', () => {
+    const all = cases.flatMap(V => V.moments);
+    expect(all.length).toBeGreaterThan(4);
+    for (const m of all) { expect(m.line, m.text).toMatch(/^\d+:\d\d · /); expect(m.text.length).toBeGreaterThan(m.line.length); }
+  });
+  it('no line over 70 characters, so none wraps', () => {
+    for (const m of cases.flatMap(V => V.moments)) expect(m.line.length, m.line).toBeLessThanOrEqual(70);
   });
 });

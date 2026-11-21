@@ -41,7 +41,9 @@ export interface LegVs {
  * A moment on a leg where you lost or gained on her, in a line: `lostM` metres you lost (− gained) in distance made good
  * along the leg, over the same stretch of clock time (so you both sailed in the same wind); `t0`–`t1` that stretch.
  */
-export interface VsMoment { leg: number; kind: 'tack' | 'mark'; t0: number; t1: number; lostM: number; text: string }
+export interface VsMoment { leg: number; kind: 'tack' | 'mark'; t0: number; t1: number; lostM: number; text: string;
+  /** The same in one line of figures, the clock first ("2:14 · Blue tacked to stbd · you held port 23 s"): `text` is for the hover. */
+  line: string }
 
 /** `won`: she won; `youWon`: you did; `youDone`: you've finished and both of you sailed every leg (the gap is the finish gap). */
 export interface Versus { rival: number; rivalName: string; tie?: boolean; won: boolean; youWon: boolean; youDone: boolean; legs: LegVs[]; total: number; moments: VsMoment[] }
@@ -204,6 +206,8 @@ const clock = (t: number) => { const r = Math.round(t); return `${Math.floor(r /
 const metres = (m: number) => `${m > 0 ? 'lost' : 'gained'} ${Math.round(Math.abs(m))} m`;
 const aN = (n: number) => /^(8|11|18|8\d)$/.test(String(n)) ? 'an' : 'a';
 /** "on an 8° header" / "on a 5° lift" / "" (within SHIFT_DEG, the wind's own wobble: sim/debrief.ts). */
+/** ", 8° header" / ", 5° lift" / "": the same, for a moment's one line. */
+const shiftTag = (d: number) => { const n = Math.round(Math.abs(d)); return d > SHIFT_DEG ? `, ${n}° header` : d < -SHIFT_DEG ? `, ${n}° lift` : ''; };
 const onShift = (d: number) => { const n = Math.round(Math.abs(d)); return d > SHIFT_DEG ? ` on ${aN(n)} ${n}° header` : d < -SHIFT_DEG ? ` on ${aN(n)} ${n}° lift` : ''; };
 /**
  * Seconds a Folkboat takes, from the change of tack, to be back near full speed: the sim's own boat measured 21–39 s
@@ -251,6 +255,7 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
   };
   const verb = (g: boolean) => g ? 'jibed' : 'tacked';
   const side = (t: string) => t === 'S' ? 'starboard' : 'port', other = (t: string) => side(t === 'S' ? 'P' : 'S');
+  const ab = (t: string) => t === 'S' ? 'stbd' : 'port', abO = (t: string) => ab(t === 'S' ? 'P' : 'S');
   // where your winds differed enough to say so (the shifts move across the water: you may not have had hers)
   // (by the wind each felt, its direction: the header/lift sign flips with the tack, so two boats on opposite tacks in
   // the same wind would seem far apart by it)
@@ -263,7 +268,7 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
   if (hi > lo + 10) {
     const hers = turnsOf(F, r, lo, hi, [b0, b1]), mine = turnsOf(F, me, a0, a1, [a0, a1]), used = new Set<number>();
     hers.forEach((h, n) => {
-      const next = hers[n + 1]?.t ?? hi, sh = onShift(shiftOver(F, r, h.t - 10, h.t)), v = verb(h.gybe);
+      const hs = shiftOver(F, r, h.t - 10, h.t), next = hers[n + 1]?.t ?? hi, sh = onShift(hs), tag = shiftTag(hs), v = verb(h.gybe);
       let k = -1;
       if (tackAt(F, me, h.t - 1) === h.to) {
         // you were already there: your last turn onto it (if on this leg, within 5 min, not already paired)
@@ -279,28 +284,37 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
         const text = d > 5 ? `${name} ${v} onto ${side(h.to)}${sh} at ${clock(h.t)}; you stayed on ${other(h.to)} ${Math.round(d)} s longer${myShift ? `,${myShift}` : ''}, and ${metres(m)}${apart(h.t, y.t)}.`
           : d < -5 ? `You ${verb(y.gybe)} onto ${side(y.to)} ${Math.round(-d)} s before ${name} (at ${clock(y.t)}${onShift(shiftOver(F, me, y.t - 10, y.t))}), and ${metres(m)}.`
           : `You both ${v} onto ${side(h.to)} at ${clock(h.t)}${sh ? `,${sh.replace(/ on an? /, ' on the ')}` : ''}: through it you ${metres(m)}.`;
-        out.push({ leg, kind: 'tack', t0, t1, lostM: m, text });
+        const yTag = shiftTag(shiftOver(F, me, y.t - 10, y.t));
+        const line = d > 5 ? `${clock(h.t)} · ${name} ${v} to ${ab(h.to)}${tag} · you ${Math.round(d)} s later`
+          : d < -5 ? `${clock(y.t)} · you ${verb(y.gybe)} to ${ab(y.to)}${yTag} · ${Math.round(-d)} s before ${name}`
+          : `${clock(h.t)} · you both ${v} to ${ab(h.to)}${tag}`;
+        out.push({ leg, kind: 'tack', t0, t1, lostM: m, text, line });
       } else {
         const t1 = Math.min(h.t + 120, next, hi), m = lost(h.t - 5, t1);
-        if (m != null && Math.abs(m) >= MIN_M && t1 - h.t >= 15) out.push({ leg, kind: 'tack', t0: h.t - 5, t1, lostM: m, text: `${name} ${v} onto ${side(h.to)}${sh} at ${clock(h.t)}; you stayed on ${other(h.to)}, and over the next ${Math.round(t1 - h.t)} s you ${metres(m)}${apart(h.t, t1)}.` });
+        if (m != null && Math.abs(m) >= MIN_M && t1 - h.t >= 15) out.push({ leg, kind: 'tack', t0: h.t - 5, t1, lostM: m, text: `${name} ${v} onto ${side(h.to)}${sh} at ${clock(h.t)}; you stayed on ${other(h.to)}, and over the next ${Math.round(t1 - h.t)} s you ${metres(m)}${apart(h.t, t1)}.`,
+          line: `${clock(h.t)} · ${name} ${v} to ${ab(h.to)}${tag} · you held ${abO(h.to)} ${Math.round(t1 - h.t)} s` });
       }
     });
     mine.forEach((y, i) => {
       if (used.has(i) || y.t <= lo || y.t > hi || tackAt(F, r, y.t) === y.to) return; // (onto the tack she was on: catching up, not a choice against her)
       const t1 = Math.min(y.t + RECOVER, hi), m = lost(y.t - 5, t1);
-      if (m != null && Math.abs(m) >= MIN_M) out.push({ leg, kind: 'tack', t0: y.t - 5, t1, lostM: m, text: `You ${verb(y.gybe)} onto ${side(y.to)} at ${clock(y.t)}${onShift(shiftOver(F, me, y.t - 10, y.t))}; ${name} stayed on ${other(y.to)}, and over the next ${Math.round(t1 - y.t)} s you ${metres(m)}.` });
+      const ys = shiftOver(F, me, y.t - 10, y.t);
+      if (m != null && Math.abs(m) >= MIN_M) out.push({ leg, kind: 'tack', t0: y.t - 5, t1, lostM: m, text: `You ${verb(y.gybe)} onto ${side(y.to)} at ${clock(y.t)}${onShift(ys)}; ${name} stayed on ${other(y.to)}, and over the next ${Math.round(t1 - y.t)} s you ${metres(m)}.`,
+        line: `${clock(y.t)} · you ${verb(y.gybe)} to ${ab(y.to)}${shiftTag(ys)} · ${name} held ${abO(y.to)} ${Math.round(t1 - y.t)} s` });
     });
   }
   // the mark (or the finish line) at the end of the leg: who got there first, and how far back the other was
-  const finish = !!finishLine, where = finish ? 'the finish' : L.name;
+  const finish = !!finishLine, where = finish ? 'the finish' : L.name, at = finish ? 'finished' : `at ${L.name}`;
   const back = (p: Vec | null) => !p ? null : finishLine ? segDist(p, finishLine[0], finishLine[1]) : Math.hypot(p.x - M.x, p.y - M.y);
-  if (Math.abs(a1 - b1) < 0.5) out.push({ leg, kind: 'mark', t0: b1 - 10, t1: b1, lostM: 0, text: `You and ${name} ${finish ? 'finished' : `rounded ${where}`} together, at ${clock(b1)}.` });
+  if (Math.abs(a1 - b1) < 0.5) out.push({ leg, kind: 'mark', t0: b1 - 10, t1: b1, lostM: 0, text: `You and ${name} ${finish ? 'finished' : `rounded ${where}`} together, at ${clock(b1)}.`, line: `${clock(b1)} · you and ${name} ${at} together` });
   else if (a1 > b1) {
     const d = back(posAt(F, me, b1));
-    out.push({ leg, kind: 'mark', t0: b1 - 10, t1: a1, lostM: d ?? 0, text: `${name} ${finish ? 'finished' : `rounded ${where}`} at ${clock(b1)}${d != null ? ` with you ${Math.round(d)} m back` : ''}; you ${finish ? 'finished' : 'rounded'} ${Math.round(a1 - b1)} s later.` });
+    out.push({ leg, kind: 'mark', t0: b1 - 10, t1: a1, lostM: d ?? 0, text: `${name} ${finish ? 'finished' : `rounded ${where}`} at ${clock(b1)}${d != null ? ` with you ${Math.round(d)} m back` : ''}; you ${finish ? 'finished' : 'rounded'} ${Math.round(a1 - b1)} s later.`,
+      line: `${clock(b1)} · ${name} ${at} · ${d != null ? `you ${Math.round(d)} m back, ` : 'you '}${Math.round(a1 - b1)} s later` });
   } else {
     const d = back(posAt(F, r, a1));
-    out.push({ leg, kind: 'mark', t0: a1 - 10, t1: b1, lostM: -(d ?? 0), text: `You ${finish ? 'finished' : `rounded ${where}`} at ${clock(a1)}, ${Math.round(b1 - a1)} s ahead of ${name}${d != null ? ` (${Math.round(d)} m back)` : ''}.` });
+    out.push({ leg, kind: 'mark', t0: a1 - 10, t1: b1, lostM: -(d ?? 0), text: `You ${finish ? 'finished' : `rounded ${where}`} at ${clock(a1)}, ${Math.round(b1 - a1)} s ahead of ${name}${d != null ? ` (${Math.round(d)} m back)` : ''}.`,
+      line: `${clock(a1)} · you ${at} · ${Math.round(b1 - a1)} s ahead${d != null ? `, ${name} ${Math.round(d)} m back` : ''}` });
   }
   return out.sort((a, b) => a.t0 - b.t0);
 }
