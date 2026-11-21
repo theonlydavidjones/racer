@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { Bathy, BATHY_DECL, BATHY_FRAGMENT } from './bathy';
 import { setVisibility } from '../environment/weather';
 import { D2R, V, ZONE, easeAngle } from '../core/math';
 import type { Vec } from '../core/math';
@@ -188,6 +189,7 @@ const WATER_FRAGMENT = `
   float specks = smoothstep(0.62, 0.8, vnoise(vWaveP / 0.9 + 3.1));
   float debris = tl * patchy * (0.35 + 0.65 * specks);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.83, 0.76), clamp(debris * 0.8, 0.0, 0.8));
+  ${BATHY_FRAGMENT}
   // the waves: their slope tilts the surface (light and reflections), whitecaps break on the crests
   float camDF = length(vPuffXZ - cameraPosition.xz);
   float foot = max(length(dFdx(vWaveP)), length(dFdy(vWaveP))); // meters of water under this pixel
@@ -367,6 +369,7 @@ export class SceneView {
   private sun!: THREE.DirectionalLight;
   private hemi!: THREE.HemisphereLight;
   private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>;
+  private bathy!: Bathy; // the sea floor's picture and its mesh (render/bathy.ts)
   private skyUni = { uSkyCol: { value: new THREE.Color('#aecbdb') }, uDay: { value: 1 } };
   private fogBank: THREE.Sprite[] = [];
   private skyAcc = 1;
@@ -491,9 +494,11 @@ export class SceneView {
     this.curTex.magFilter = this.curTex.minFilter = THREE.LinearFilter;
     this.fineTex.magFilter = this.fineTex.minFilter = THREE.LinearFilter;
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
+    this.bathy = new Bathy(scene);
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
+    waterMat.transparent = true; // (clear over the shallows where the floor is known: render/bathy.ts; opaque elsewhere)
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni, this.roseUni);
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni, this.roseUni, this.bathy.uniforms);
       const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uFoamDir; uniform vec2 uFoamQ; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM; uniform sampler2D uCurF; uniform vec2 uCurFO; uniform float uCurFOn;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
@@ -512,7 +517,7 @@ export class SceneView {
           vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
           vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE + HULL_DECL + ROSE_DECL)
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + BATHY_DECL + VNOISE + HULL_DECL + ROSE_DECL)
         .replace('#include <map_fragment>', HULL_CUT + WATER_FRAGMENT + ROSE_FRAGMENT)
         .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
         // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
@@ -1177,6 +1182,7 @@ export class SceneView {
     const dc = import.meta.env.DEV ? (window as unknown as { __cam?: { pos: number[]; at: number[] } }).__cam : undefined;
     if (dc) { camera.up.set(0, 1, 0); if (Math.hypot(dc.pos[0] - dc.at[0], dc.pos[1] - dc.at[1]) < 1) camera.up.set(0, 0, -1); // straight down: north at the top
        camera.position.copy(P3(dc.pos[0], dc.pos[1], dc.pos[2])); camera.lookAt(P3(dc.at[0], dc.at[1], dc.at[2])); }
+    this.bathy.update(camera.position.x, -camera.position.z);
     // the showroom shifts the picture right, clear of the panel on the left; a panel docked beside the view in any view
     // (the flow view, on the right) shifts it the other way
     const shift = (viewMode === 3 ? (look.shift ?? 0) : 0) + (look.panelShift ?? 0), size = this.renderer.getSize(new THREE.Vector2());
