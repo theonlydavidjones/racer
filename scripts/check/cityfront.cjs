@@ -16,7 +16,9 @@ const VIEWS = {
   marina_low: [LL(37.8100, -122.4480, 2.5), LL(37.8050, -122.4400, 12)], // the same from a boat's deck, near the shore
   fortmason: [LL(37.8150, -122.4300, 5), LL(37.8070, -122.4300, 20)], // Fort Mason's piers and the Great Meadow, from the water off Gashouse Cove
   aquatic: [LL(37.8140, -122.4255, 5), LL(37.8070, -122.4230, 25)], // Aquatic Park, Hyde Street Pier and Ghirardelli, from the water north of Municipal Pier
-  hyde: [LL(37.8125, -122.4200, 3), LL(37.8090, -122.4225, 8)], // Hyde Street Pier and the ships, close
+  hyde: [LL(37.8125, -122.4215, 6), LL(37.8097, -122.4225, 12)], // Hyde Street Pier and the ships, from the north-east
+  hyde_w: [LL(37.8110, -122.4262, 5), LL(37.8097, -122.4225, 12)], // the same from the west, across Aquatic Park
+  over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
   over_west: [LL(37.8080, -122.4720, 900), LL(37.8080, -122.47201, 0)], // overhead: Fort Point, the Presidio and Crissy Field
   over_marina: [LL(37.8055, -122.4400, 1000), LL(37.8055, -122.44001, 0)], // overhead: the Marina

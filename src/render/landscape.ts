@@ -8,6 +8,7 @@ import { HARBOR } from '../geo/marina';
 import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildAlcatraz } from './alcatraz';
 import { buildCityFront, inCityFront } from './cityfront';
+import { addHydeShips } from './hydeShips';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
@@ -34,6 +35,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   await buildCityFront(scene);
   buildBridge(scene, (x, y) => terrain.heightAt(x, y));
   const grp = new THREE.Group(); scene.add(grp);
+  addHydeShips(grp);
   const ground = (lat: number, lon: number) => { const p = LL(lat, lon); return Math.max(0, alcatraz.heightAt(p.x, p.y) ?? terrain.heightAt(p.x, p.y)); };
   const lam = (color: number | string) => new THREE.MeshLambertMaterial({ color });
   /** Put an object on the ground at a lat/lon (its origin at its base), turned to a compass bearing. */
