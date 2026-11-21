@@ -28,7 +28,14 @@ import type { Wind } from './wind';
 
 const G = 9.81;
 const MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * D2R);
-/** Longest fetch counted, m: beyond it the sea breeze itself runs out. */
+/** Longest fetch counted (m). Fetch is open water over which a steady wind blows, so it ends at land or where the
+ * wind field does (US Army Corps of Engineers, Coastal Engineering Manual EM 1110-2-1100, Part II ch. 2; Shore
+ * Protection Manual 1984). No published figure says where the Bay's westerly ends. NOAA puts the sea breeze over
+ * Monterey Bay at "at least 20 km" from the coast (MBNMS site characterization, climate), a lower bound for a
+ * neighboring bay; nothing found bounds it from above. So 20 km is an estimate. It is no fully developed sea (that
+ * takes a fetch of hundreds of km at these winds), so wherever it binds it cuts the growth short. On the course it
+ * binds only on the longest rays: in through the Gate from the open sea, and down the South Bay. The westerly's run
+ * from the Gate to the East Bay shore is about 16 km, inside it. */
 export const MAX_FETCH = 20000;
 
 /* ---------- the coastline, for fetch ---------- */
