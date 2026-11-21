@@ -27,13 +27,28 @@ import { prepTime, reactTime, skillOf, type Pose } from './crewPhys';
  *   estimate (the owner, 15 Nov 2026); Skipper Model's ratings will move it to their consistency when they reach a race.
  */
 export { PREPARED, prepLeft, prepTime } from './crewPhys';
+/** How long a call stands, waiting for the turn (s). No sailing text gives the gap between "Ready about" and "Helm's
+ * a-lee": they fix the order of the calls, the helm putting her over once the crew answer "Ready" (the US Naval Academy's
+ * Navy 44 tacking guide), so the gap is the crew's getting ready, not a set time. World Sailing Case 54 (Case Book
+ * 2021-2024, answer 2) gives none either, only "the time required for a competent, but not expert, crew to prepare for
+ * and execute her tack ... as soon as possible". So 12 s is an estimate: twice the slowest getting ready (CUE_MAX). */
 export const CALL_KEEP = 12;
 /** A turn seen coming: she's swinging faster than this (deg/s) up into the wind close-hauled, or her stern through it
- * deep; and the most that counts (s), past the longest getting ready (estimates). */
+ * deep; and the most that counts (s), past the longest getting ready.
+ * - TURN_SEEN, 3 deg/s: above what a person can feel. The yaw thresholds for slow turns of 0.05-0.2 Hz, which is what the
+ *   start of a tack is, are reported at about 1.5-3 deg/s (Benson et al. 1989, Aviat Space Environ Med 60:205;
+ *   Grabherr et al. 2008, Exp Brain Res 186:677). Those are taken seated and still, in the dark, at a detection rate
+ *   near 75%, so a crew busy on a moving boat need more. The figures come from reviews and were not checked against
+ *   the papers' text. No one has published a measured yaw rate for a Folkboat starting a tack. An estimate,
+ *   consistent with those thresholds.
+ * - CUE_MAX, 6 s: just past the slowest getting ready (crewPhys.ts prepTime: a novice's 1.6 s reaction and 4 s of work,
+ *   both estimates). No published figure for either. */
 export const TURN_SEEN = 3, CUE_MAX = 6;
-/** Your call waiting on a busy crew is dropped after this long (s): an estimate, the job most likely done or the moment gone. */
+/** Your call waiting on a busy crew is dropped after this long (s). The Navy 44 guide has the helm wait for "Ready" but
+ * sets no limit, and Case 54 gives none. An estimate: by then the job is most likely done, or the moment has gone. */
 export const CALL_WAIT_MAX = 15;
-/** A decided turn held as one this long at most, waiting for her to make it (s): an estimate. */
+/** A decided turn held as one this long at most, waiting for her to make it (s). No published figure: it is how
+ * long the sim keeps a decision, not something a crew does. An estimate, well past a slow bear-away and jibe. */
 export const TURN_HOLD = 60;
 /** An AI helm waits for her crew this long at most (s): past the slowest crew's getting ready. */
 export const AI_WAIT_MAX = 6;
