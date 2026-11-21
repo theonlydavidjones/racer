@@ -11,7 +11,7 @@
  * The polar is the boat's speed with perfect trim, so trim efficiency scales the target speed.
  */
 import { BOOM_STOP, carLead } from './controls';
-import { STALL_SPAN, STALL_START, easedDrive } from './balance';
+import { STALL_SPAN, STALL_START } from './balance';
 
 export type SailName = 'main' | 'jib';
 export type Flow = 'good' | 'luffing' | 'stalled';
@@ -72,9 +72,9 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   // flow along the sail (upwind/reaching)
   let effUp = 1, flow: Flow = 'good', amount = 0;
   if (err < -LUFF_START) { amount = clamp((-err - LUFF_START) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
-  // eased below the best angle the sail makes less lift at the wing's slope (balance.ts), and less drive with it: the
-  // drive the force model gives at that lift, against its best (to first order nothing for a degree or two; then more)
-  if (err < 0) effUp = Math.min(effUp, easedDrive(sail, a, err));
+  // (eased below the best angle the sail makes less lift at the wing's slope, and less drag with it: the force model,
+  // balance.ts oneSail, takes heel off at once and keeps the drive at its peak there, falling as the square of the
+  // ease; the luff's own loss above is the drive's)
   else if (err > STALL_START) { amount = clamp((err - STALL_START) / STALL_SPAN, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
