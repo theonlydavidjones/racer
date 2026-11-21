@@ -2,6 +2,19 @@
 
 Player-visible changes per release, from git (the Coordinator's record; newest first).
 
+## v214 (21 Nov, code 6015e379)
+
+- **The chart, as the owner asked (r270, r284).** The Layers menu is now the Key; Layers is a collapsible panel at top left; the field picker and a Day | Dusk toggle sit flush at top right. The Fog layer now shows the fog and rain set in the conditions. "Recenter" brings the chart back to her. One Settings toggle shows the passage in the inset while cruising.
+- **No more named launch points (r270).** The old spots (Cityfront, Off Crissy Field, Under the Golden Gate Bridge…) are off the charts and pickers. You start from her slip ("Home"), a mark, or any water you click; a clicked spot reads the nearest place's name, never coordinates. Older saves that started from a removed spot start from her slip.
+- **The game surface (r271).** Crew beside the autopilot at bottom left; Pause, Speed, Sound and Tools at bottom right; the speed of time works in races and has a key.
+- **Coach help (r027, r032).** The trim diamond has a hover tip; a called order is carried out sooner.
+- **Coming home (r239, r240, r241, r242, r243).** Sail home is always on the page (dimmed, with the reason, when she can't go). Near home, the tie-up control ("G: lines ready") shows by the boat; her tag says Home, and her own berth is lit rather than a ring on the water.
+- **Gashouse Cove's entrance sign (r017).** 5 MPH coming in; IDLE SPEED / NO WAKE ZONE going out.
+- **Alcatraz (r254, r295).** The island's ground from the USGS 1 m lidar; its buildings at their real places and heights, the chimney, lighthouse and water tower placed by their own lidar tops, and pitched roofs where the scan shows a ridge.
+- **Sails (r036, r037, r248).** The flow view shows only the sails that are up, with one-line takeaways and colors every eye can tell apart; with the jib struck the boat sails on the main alone; the ensign staff and backstay chainplates in their real places.
+- **The AI in light air.** Where footing can't build enough way to tack, she now wears round instead of footing forever; her upwind angle in chop is steadier, with no jump at 65°.
+- Plus internal changes: perf.cjs's cruise views sail a passage every version has; ROADMAP rows; US spelling.
+
 ## v213 (20 Nov, code f8377d60)
 
 - In a choppy light breeze the AI no longer counts a tack as cheaper than it would be in flat water: its slow-tack speed is never below the flat-water value. (Skipper Model; 900f7570)

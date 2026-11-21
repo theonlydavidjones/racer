@@ -26,9 +26,11 @@ describe("the planner's pins", () => {
     const d = dropAt(w, q, far(q));
     expect('err' in d).toBe(true); if ('err' in d) expect(d.err).toMatch(/harbor/);
   });
-  it('take a place by its name when dropped on it, and open water as a spot', () => {
-    const al = place('alcatraz')!, q = { x: al.p.x + 50, y: al.p.y }; // (5 px off it)
-    expect(dropAt(w, q, far(q))).toMatchObject({ id: 'alcatraz' });
+  it('take a mark by its name when dropped on it, and open water as a spot (the old named spots are not picked: r270)', () => {
+    const mk = place('m-6')!, q = { x: mk.p.x + 50, y: mk.p.y }; // (5 px off it)
+    expect(dropAt(w, q, far(q))).toMatchObject({ id: 'm-6' });
+    const al = place('alcatraz')!, qa = { x: al.p.x + 50, y: al.p.y };
+    expect(dropAt(w, qa, far(qa))).not.toMatchObject({ id: 'alcatraz' });
     const open = LL(37.8300, -122.4500), d = dropAt(w, open, far(open));
     expect('id' in d && d.id.startsWith('at:')).toBe(true);
   });

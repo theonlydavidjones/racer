@@ -20,11 +20,12 @@ const warm = p => p.evaluate(() => { for (let i = 0; i < 150; i++) __hud.insetSt
   const clip = async () => { const r = await p.evaluate(() => { const q = document.getElementById('map').getBoundingClientRect(); return [q.left, q.top, q.width, q.height]; }); return { x: r[0] - 10, y: r[1] - 10, width: r[2] + 20, height: r[3] + 20 }; };
   console.log('Course button hidden cruising:', await p.evaluate(() => document.getElementById('bCourse').hidden), '· no buttons on the inset:', await p.evaluate(() => !document.getElementById('bMapNav') && !document.getElementById('bMapLayers')));
   await warm(p); await p.screenshot({ path: `${out}/inset-map.png`, clip: await clip() });
-  // the inset's view is chosen in the full chart's Layers menu (no buttons on the inset: the owner), and remembered
+  // the inset's view is chosen in Settings (no buttons on the inset: the owner), and remembered
   await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(2000);
-  await p.evaluate(() => document.getElementById('bChartLayers').click()); await p.waitForTimeout(800);
-  await p.evaluate(() => document.querySelector('#chartLayersPop input[data-choice][value="nav"]').click()); await p.waitForTimeout(500);
-  await p.screenshot({ path: `${out}/chart-menu-inset-choice.png` });
+  await p.evaluate(() => document.getElementById('bChartClose').click()); await p.waitForTimeout(500);
+  await p.evaluate(() => document.getElementById('insetNavTog').click()); await p.waitForTimeout(500);
+  await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(2000);
+  await p.screenshot({ path: `${out}/chart-after-inset-choice.png` });
   console.log('remembered:', await p.evaluate(() => JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}').insetView));
   await p.evaluate(() => document.getElementById('bChartClose').click()); await p.waitForTimeout(3000);
   await warm(p); await p.screenshot({ path: `${out}/inset-nav.png`, clip: await clip() });

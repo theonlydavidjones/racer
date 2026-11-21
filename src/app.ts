@@ -2,7 +2,8 @@ import { HelmFeed, passageLive } from './sim/navigator';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
-import { trimNotesHtml } from './ui/trimNotes';
+import { NAME as TRIM_NAME, trimNotesHtml } from './ui/trimNotes';
+import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/ghost';
@@ -48,6 +49,7 @@ import { pointTarget } from './sim/lessons';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
+import { Leaderboard } from './ui/leaderboard';
 import { ToolsTray, type Tool } from './ui/toolsTray';
 import { weatherHelmChip } from './ui/weatherHelm';
 import { degAndPoint, turnWords } from './core/compass';
@@ -60,7 +62,8 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } fro
 import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, keyMenu, layersMenu, withLayer, type LayerKey } from './ui/layers';
+import { dockHint } from './ui/dockHint';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
@@ -110,6 +113,7 @@ const ctx = {
   get newGame() { return setup.newGame; },
   get drillRuns() { return drillRuns; },
   get favCall() { return favCall; },
+  get favLine() { return favLine; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
   get esc() { return esc; },
@@ -186,6 +190,8 @@ S.windKind ??= 'auto';
 const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
 // the hint by her for the turn's key, until the helm's called a few turns (render/labels.ts)
+// (coming in, slow, by a free berth, her lines not yet ready: the key that gets them ready, by her)
+labels.dockHint = () => dockHint(w, keymap.label('pushOff')); // (coming in to a berth: ui/dockHint.ts)
 labels.hint = () => { const k = keymap.label('turnHo'); return (S.turnHoUses ?? 0) >= 3 || k === 'none' ? null : k; };
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
@@ -200,6 +206,10 @@ const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [
 /** The start practice's favored-end call this attempt (8za: the player reads the line and calls an end in the start
  *  line's card before the gun; the debrief scores it). */
 let favCall: 'pin' | 'committee' | null = null;
+/** Racing, the call's verdict, written at the gun (to Messages and the debrief's start: the owner, 20 Nov 2026). */
+let favLine = '';
+/** The race's leaderboard (ui/leaderboard.ts, r288): under the instruments for 12 s after each rounding; Shift+L. */
+const board = new Leaderboard($('lb'));
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -388,7 +398,7 @@ function setControlsIdle(): void {
 }
 
 /** A cluster button's word (under its icon), set only when it changes. */
-function word(id: string, t: string): void { const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
+function word(id: string, t: string): void { if (id === 'bFast') $(id).classList.toggle('on', t !== 'Speed 1×'); /* (lit while time runs fast) */ const e = $(id).querySelector('.w'); if (e && e.textContent !== t) e.textContent = t; }
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
@@ -636,8 +646,9 @@ function chaseFrame(): void {
   view.setChaseFrame({ top: 0, bottom: wx && wx.height > 0 ? wx.top - gl.top : r && r.height > 0 ? Math.min(r.top, tabs && tabs.height > 0 ? tabs.top : r.top) - gl.top : gl.height });
 }
 addEventListener('resize', chaseFrame); setInterval(chaseFrame, 1000);
-/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, beside the 3D view; off until you open it. The
- * picture moves left by half the panel, so she stays in the middle of what's left of the view. */
+/* The flow view (ui/flowPanel.ts): her sails cut across at three heights, over the 3D view; off until you open it. The
+ * picture doesn't move: she stays where she was, in the middle of the screen (the owner, 15 Nov 2026: "when I engage
+ * wind-over-sails, don't bump the boat to the left. keep her center screen."). */
 /** Re-draw the layer menus if open (a training view switched by its key: the menu's tick follows). */
 let refreshMenus = () => {};
 const flowPanel = new FlowPanel(document.body, () => openFlow(false));
@@ -645,9 +656,7 @@ function openFlow(open = !flowPanel.open): void {
   flowPanel.show(open);
   refreshMenus();
   document.body.classList.toggle('flow-open', open);
-  look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
 }
-addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
 // (the owner OKd the mock-up, 13 Nov: no Sail controls button. The ▾ tab on the band's edge puts the band away; put away,
@@ -674,11 +683,20 @@ const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 /* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
  * above her masthead, in the tack and gybe drill, the mark-rounding drill and the start practice. */
 const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
+hud.legCall = () => courseView.legCall(w); // (the Strategist card's leg call: the C view's own brief, r298)
 let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
-  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; } // (a new race: nothing carried over)
-  hud.favAsk = S.mode === 'drill' ? 'ask' : 'off';
+  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; hud.favNow = null; favLine = ''; } // (a new race: nothing carried over)
+  hud.favAsk = S.mode === 'drill' ? 'ask' : S.mode === 'race' ? 'race' : 'off'; // (racing: shown once called, the owner, 20 Nov)
+  // racing, at the gun: her call against the end favored at the gun (the card's last read before it, so a shift after
+  // the gun doesn't change the answer), one line in Messages and in the debrief's start
+  if (S.mode === 'race' && !favLine && w.t >= 0 && hud.favNow) {
+    // (one sentence, so the Messages card shows it whole: "the pin", "the X", "Dorado YC")
+    const the = (e: 'pin' | 'committee') => { const l = e === 'pin' ? w.C.pinLabel : w.C.committeeLabel; return /\s/.test(l) ? l : `the ${l.length > 2 ? l.toLowerCase() : l}`; };
+    favLine = `Favored end: ${hud.favNow === 'square' ? 'neither, a square line' : the(hud.favNow)}${favCall ? `, and you called ${the(favCall)}` : ''}`;
+    logMessage(favLine);
+  }
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
@@ -736,7 +754,43 @@ function closeTrimNotes(): void {
 }
 $('trimNotes').addEventListener('click', e => { const el = e.target as HTMLElement; if (el.id === 'bTrimNotesX' || el.id === 'trimNotes') closeTrimNotes(); });
 $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-all')) openTrimNotes(); });
-$('bCoach').onclick = () => openTrimNotes();
+// the Strategist card (r298): a click anywhere on it (not on a control in it) opens the whole of it: the racing lines and
+// the strategist, then every line's note (Trim Notes)
+let cardOpen = false, cardTimer = 0;
+$('trimPanel').addEventListener('click', e => {
+  const t = e.target as HTMLElement;
+  if (t.closest('.tpx-all')) { openTrimNotes(); return; }
+  if (t.closest('.tpx-strat')) { courseView.openStrategist(w); return; }
+  if (t.closest('button, a, input, .sb-ctl')) return;
+  cardShow(!cardOpen);
+});
+/** The card grown in place (r298; the owner's option A, design stills/r298-coach-card X-expanded): under its two lines,
+ *  the sails as pills (main, jib, heel, helm, crew), each line's note (the coach's own, lineNotes: what Trim Notes says,
+ *  fixes first), then the ways on: All notes (Trim Notes, also its key) and, racing, the Strategist (the C view). Kept
+ *  fresh twice a second while open. */
+function cardShow(on: boolean): void {
+  cardOpen = on; $('trimPanel').classList.toggle('open', on); $('tpX').hidden = !on;
+  clearInterval(cardTimer); if (on) { cardFill(); cardTimer = window.setInterval(cardFill, 500); }
+}
+function cardFill(): void {
+  if (!w.running && !w.paused) { cardShow(false); return; } // (the race over, or a new one: closed; paused, it stays)
+  const u = w.user, esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const pill = (k: string, v: string, cls = '') => `<span class="tpx-pill">${k} <b class="${cls}">${esc(v)}</b></span>`;
+  const st = (id: string) => { const e = $(id); return [e.textContent ?? '', /luffing/.test(e.className) ? 'warn' : /stalled|backed/.test(e.className) ? 'bad' : ''] as const; };
+  const [mw, mc] = st('tpMain'), [jw, jc] = st('tpJib'), hn = u.helmNeed ?? 0, crew = document.querySelector('#tpBalance .tp-crew')?.textContent?.replace(/^crew /, '') ?? '';
+  const helm = hn > 5 ? ['weather', 'warn'] : hn < -1.5 ? ['lee', 'warn'] : ['neutral', ''];
+  const { notes } = lineNotes(u, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band });
+  const lines = [...notes].sort((a, b) => (b.fix ? 1 : 0) - (a.fix ? 1 : 0)).slice(0, 6)
+    .map(n => `<div class="tpx-line${n.fix ? ' fix' : ''}"><span>${esc(TRIM_NAME[n.line] ?? n.line)}</span><span>${esc(n.fix ? (n.fix.short ?? n.fix.head) : n.ok)}</span></div>`).join('');
+  // (built once, then only the parts that changed rewritten: a click on a way on never lands on a node being replaced)
+  const x = $('tpX');
+  if (!x.querySelector('.tpx-ways')) x.innerHTML = '<div class="tpx-sec">Sails</div><div class="tpx-pills"></div><div class="tpx-sec">Lines</div><div class="tpx-lines"></div>'
+    + '<div class="tpx-ways"><button type="button" class="tpx-all">All notes ›</button><button type="button" class="tpx-strat">Strategist ›</button></div>';
+  const set = (q: string, html: string) => { const e = x.querySelector<HTMLElement>(q)!; if (e.innerHTML !== html) e.innerHTML = html; };
+  set('.tpx-pills', `${pill('Main', mw.toLowerCase(), mc)}${pill('Jib', jw.toLowerCase(), jc)}${pill('Heel', `${Math.abs(Math.round(u.heelMag ?? 0))}°`)}${pill('Helm', helm[0], helm[1])}${crew ? pill('Crew', crew) : ''}`);
+  set('.tpx-lines', lines);
+  x.querySelector<HTMLElement>('.tpx-strat')!.hidden = w.freeSail;
+}
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
@@ -765,7 +819,9 @@ function coachTick(): void {
   const r = coachShown, top = r.view.top, fix = !r.done && top.kind === 'fix';
   // the live note: one at a time, numbered, held (the bar runs out over its hold); what the line's doing and why under
   // it, with All notes; the line ringed in the band, its target on its track
-  $('tpHint').innerHTML = r.done ? ce(r.done) : fix ? `<span class="tp-n">1</span>${ce(top.head.replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(top.head);
+  // (in a race the Strategist card's racing line says it's the start: the trim line drops its "Pre-start:", r298)
+  const head = (t: string) => w.freeSail ? t : t.replace(/^Pre-start:\s*/i, '').replace(/^./, c => c.toUpperCase());
+  $('tpHint').innerHTML = r.done ? ce(head(r.done)) : fix ? `<span class="tp-n">1</span>${ce(head(top.head).replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(head(top.head));
   $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : top.kind);
   $('tpSub').innerHTML = fix ? `${top.now ? ce(top.now) + '. ' : ''}${ce(top.short ?? '')}<button type="button" class="tp-all">All notes ›</button>` : '';
   $('tpHold').hidden = !fix; ($('tpHold').firstElementChild as HTMLElement).style.width = `${Math.round((1 - r.held) * 100)}%`;
@@ -1023,19 +1079,37 @@ function goHome(): void {
 function homeNow(): void { void host.ask({ k: 'sendHome' }).then(ok => { if (ok) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); } }); }
 $('bHome').onclick = goHome;
 // Home is part of the navigator (the owner, 13 Nov: "Home really belongs inside the nav experience"): its Sail home
-$('bNavHome').onclick = () => { navView.close(); goHome(); };
+$('bNavHome').onclick = () => { if (homeWhyNot()) return; navView.close(); goHome(); }; // (dimmed: its hover says why)
+$('bCvHome').onclick = () => { if (homeWhyNot()) return; courseView.close(); goHome(); };
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
-/** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
+/** Why she can't be sent home just now, in a few words for the button's hover (null: she can). Racing, not from here: it
+ * would retire her, too much for one click (the Coordinator, 18 Nov 2026); the pause menu's Home asks first. */
+function homeWhyNot(): string | null {
+  const u = w.user;
+  if (!w.running) return 'Once she\'s under way';
+  if (S.mode === 'drill') return 'Not in a start practice';
+  if (S.mode === 'lesson') return 'Not in a lesson';
+  if (S.mode === 'manoeuvres' || S.mode === 'roundings') return 'Not in practice';
+  if (!w.freeSail && !u.finished && !u.retired) return 'Retire from the race to sail home';
+  if (w.dest?.key === 'slip' && w.arrivedT != null) return 'She\'s home already';
+  if (u.docked) return 'She\'s made fast: push off first';
+  if (u.handled) return 'Her crew are pushing her off: once she\'s free';
+  if (!w.homeSlip) return 'Give her a home slip in the Yacht Club first';
+  return null;
+}
+/** The Home button, in the navigator: always there, dimmed with the reason on its hover when she can't be sent home (the
+ * owner, 18 Nov 2026: "can't find Sail home": it vanished whenever it couldn't be used). */
 function homeButton(): void {
-  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden)
-  const el = $('bNavHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
-  const hide = !w.running || !w.cruising || S.mode === 'drill' || !!u.docked || !!u.handled || home;
-  if (el.hidden !== hide) el.hidden = hide;
+  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden. And in the Course panel,
+  // which M opens racing and in a lesson, where the navigator doesn't)
+  const why = homeWhyNot(), t = why ? `${why}.` : 'Send her back to her home slip';
+  for (const el of [$('bNavHome'), $('bCvHome')]) {
+    if (el.hidden) el.hidden = false;
+    el.classList.toggle('dim', !!why); el.setAttribute('aria-disabled', why ? 'true' : 'false');
+    if (el.title !== t) el.title = t;
+  }
   if (!$('bHome').hidden) $('bHome').hidden = true;
-  el.classList.toggle('dim', !w.homeSlip);
-  const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Yacht Club first)';
-  if (el.title !== t) el.title = t;
 }
 $('bPilot').onclick = pilotButton;
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.onclick = () => pilotOn(b.dataset.pm as Exclude<PilotMode, 'off'>);
@@ -1072,11 +1146,20 @@ $('bCourse').onclick = () => (w.cruising ? navToggle() : courseView.toggle(w));
 // the same as Shift+R, until the results open
 $('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode === 'drill') results.restartDrill(); });
 $('ncRestart').addEventListener('keydown', e => e.stopPropagation());
-// the favored-end call, in the start line's card (8za): which end you've read as favored, before the gun
-$('ncAsk').addEventListener('click', e => {
-  e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0) return;
+// the favored-end call (8za): an end of the start line's picture clicked, before the gun (the owner, 20 Nov 2026)
+function callEnd(e: Event): void {
+  e.stopPropagation(); const b = e.currentTarget as HTMLElement; if (b.hidden || w.t >= 0 || (hud.favAsk === 'race' && favCall)) return; // (racing, the call stands once made: the end's shown)
   favCall = b.dataset.end === 'pin' ? 'pin' : 'committee'; hud.favCall = favCall;
-});
+}
+for (const id of ['ncEndL', 'ncEndR']) {
+  $(id).addEventListener('click', callEnd);
+  $(id).addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); callEnd(e); } else e.stopPropagation(); });
+}
+// the flags in the start card: the flag index (the old Flags tile's click)
+$('ncFlags').addEventListener('click', e => { e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); });
+$('ncFlags').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); hud.flagIndex(w, !!$('flagIndex').hidden); } });
+// the start card sits under the instruments (r272, the owner): their bottom, for the CSS, as the cards shown change
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { document.body.style.setProperty('--hud-b', Math.round($('hud').getBoundingClientRect().bottom) + 'px'); }).observe($('hud'));
 $('nextCard').addEventListener('click', () => (w.cruising ? navToggle() : courseView.toggle(w)));
 $('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navToggle() : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
@@ -1088,7 +1171,9 @@ $('chartPlanLink').onclick = e => { e.preventDefault(); navView.open(w); };
 let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
-$('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
+/** The speed button's step (and its key): 1× → 2× → 4× → 1×. (The owner, 20 Nov 2026: one button beside Pause; it left Tools.) */
+function cycleSpeed(): void { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); }
+$('bFast').onclick = cycleSpeed;
 $('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
 // Sound and Exit sit with Pause and Speed, top right, Exit outermost (the owner, 13 Nov 2026)
 const results = mountResults(ctx); // (src/app/results.ts)
@@ -1126,19 +1211,11 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
     else setLayer(f as LayerKey, true);
   });
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
-  // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
-  const views: MenuView[] = [
-    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
-    { name: 'Points of sail', what: 'The points of sail and the wind on the water round her, turning with every shift (on in the lessons)', keyLabel: () => keymap.label('pointsRose'), on: () => roseOn(), set: on => roseShow(on) },
-    { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
-  // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
-  // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
-  const insetChoice: MenuChoice = {
-    heading: 'The inset map shows', shown: () => !!w?.cruising,
-    options: [{ v: 'map', name: 'The water round her', what: 'The chart round her, turned north up' }, { v: 'nav', name: 'The passage', what: 'The navigator\'s course to the destination, whole; tap the inset for the passage plan' }],
-    get: () => S.insetView ?? 'map', set: v => { S.insetView = v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews(); }
-  };
-  const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
+  // (the owner, 20 Nov 2026: the Key lists what's on the map; the switches are the Layers dropdown beside the field picker;
+  // the training views are in Tools and Keys, and what the inset shows cruising is in Settings)
+  const menus = [
+    keyMenu($('bChartLayers'), $('chartLayersPop'), (el, f) => hud.keyInto(el, 'chart', f)),
+    layersMenu($('bChartShow'), $('chartShowPop'), () => S, setLayer, () => {})];
 }
 $('map').addEventListener('click', () => { if (w.running && !chart.isOpen) openChart(); });
 function openChart(): void { releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel(); }
@@ -1162,11 +1239,14 @@ function chartNavLabel(): void {
 function chartToNav(): void { chart.close(); if (w.cruising) navView.open(w); else courseView.open(w); }
 $('bChartNav').onclick = chartToNav;
 /** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
- * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
+ * chosen in Settings and remembered with your settings (no buttons on the inset: the owner). */
+const insetNavTog = $<HTMLInputElement>('insetNavTog');
+insetNavTog.addEventListener('change', () => { S.insetView = insetNavTog.checked ? 'nav' : 'map'; saveSettings(S); insetViews(); });
 function insetViews(): void {
+  insetNavTog.checked = S.insetView === 'nav';
   const cruising = !!w?.cruising;
   $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
-  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
+  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in Settings, and remembered)
   $('map').title = hud.insetView === 'nav' ? 'Click for the chart, with the passage plan' : 'Click the map for the chart'; // (the hover says it: no words on the inset)
 }
 
@@ -1211,7 +1291,7 @@ function keysHint(): void {
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bPilot', 'Tiller pilot: steers for you (cruising only); on standby, lifts it off the tiller pin', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
-  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
+  $('bFast').title = `Speed up time: 1×, 2×, 4× (${keymap.label('speed')})`; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -1318,6 +1398,8 @@ function runAction(a: Action): void {
     case 'weatherHelm': S.weatherHelm = S.weatherHelm === false; saveSettings(S); toast(`Weather helm at the tiller guide ${S.weatherHelm ? 'on' : 'off'}.`, 1600); break;
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
+    case 'speed': cycleSpeed(); break;
+    case 'leaderboard': board.toggle(); break; // (r288: Shift+L, on or off till pressed again)
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
@@ -1451,7 +1533,7 @@ $('bCondReal').onclick = () => {
 };
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
 function resize(): void { view.resize(innerWidth, innerHeight); }
-addEventListener('resize', resize); resize();
+addEventListener('resize', () => { resize(); hud.fitCompass(); }); resize();
 
 let last = performance.now();
 /** The showroom's point of sail: a close reach, port tack (the wind 55° on her port bow); negative: starboard tack. */
@@ -1468,6 +1550,7 @@ const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'pointsRose', label: 'Points of sail', icon: 'rose', key: () => toolKey('pointsRose'), on: () => roseOn(), act: () => runAction('pointsRose') },
   { id: 'weatherHelm', label: 'Weather helm', icon: 'helm', key: () => toolKey('weatherHelm'), on: () => S.weatherHelm !== false, act: () => runAction('weatherHelm') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
@@ -1478,10 +1561,7 @@ const TOOLS: Tool[] = [
   { id: 'log', label: 'Log', icon: 'log', key: () => toolKey('log'), on: () => !$('logView').hidden, act: () => { if ($('logView').hidden) openLog(); else $('logView').hidden = true; } },
   { id: 'perfMeter', label: 'Frame readout', icon: 'perf', key: () => toolKey('perfMeter'), on: () => perf.on, act: () => runAction('perfMeter') },
 ];
-const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS, {
-  get: () => speedSet,
-  set: v => { speedSet = v; send({ k: 'speed', v }); word('bFast', 'Speed ' + v + '×'); },
-});
+const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS);
 $('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);
@@ -1521,6 +1601,7 @@ function frame(now: number): void {
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
   drillCues();
+  board.update(w, S.mode === 'race' && w.running && !w.cruising && !w.freeSail && w.t >= 0 && !w.user.retired, w);
   hud.update(w, dt);
   if (w.running) flowPanel.update(w.user, now, { preStart: !w.freeSail && w.t < 0 }); // (as the coach has it)
   if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);

@@ -70,7 +70,9 @@ export interface AiState {
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
-  goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
+  goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number; slow?: boolean } | null; // (slow: asked under physics.ts slowTack × 1.15 where footing couldn't build the way: her helm tacks her through, sculled, not round)
+  /** Footing (bearing away 10°) for the way to tack: how long, s (ai.ts; she asks the tack anyway after FOOT_FOR_S). */
+  footT?: number;
   /** A mark she's keeping clear of, and the side she's passing it on (+1: it to starboard), so she doesn't swap sides each second. */
   passing?: { key: string; side: number; away?: 'S' | 'P' } | null; // (away: turning away from it through the wind, begun on this tack, held until she's through)
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */

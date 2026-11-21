@@ -50,6 +50,7 @@ export interface CourseMark extends RulesMark {
   dir: Vec; // pass marks: direction of travel
   sv: Vec; // pass marks: unit vector from the mark toward the side boats pass on
   r: Vec; // rounding marks: unit vector pointing to the outside of the rounding
+  spot?: true; // a destination on open water, not a mark or a place: drawn as a plain pin (r270)
 }
 
 export interface Course {

@@ -3,6 +3,7 @@ import type { Tf } from './draw2d';
 import type { Ink } from './encChart';
 import type { Visibility } from '../environment/weather';
 import type { SeaHere } from '../environment/sea';
+import { setVisibility } from '../environment/weather';
 
 /*
  * The map's condition layers that aren't drawn elsewhere: the sea state (the sim's own waves) and the fog (real
@@ -20,6 +21,18 @@ export function wordsStrength(w: string): number {
   if (/chance|areas|scattered|occasional|intermittent|periods/.test(w)) return 2;
   if (/likely|widespread|numerous|frequent/.test(w)) return 3;
   return 4; // fog, with no qualifier: definite
+}
+
+/**
+ * The fog and rain set in the conditions (the owner, 20 Nov 2026: "I even went to 'change conditions' and bumped up the
+ * fog: no fog visible on chart"): the scene thickens to that visibility everywhere (render/scene.ts updateSky), so the
+ * chart's Fog layer veils the whole chart to it, by the same murk scale. Nothing set: no veil (the record's own fog is
+ * drawn by drawFog; nothing is made up).
+ */
+export const setFogAlpha = (s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): number => murk(setVisibility(s).m);
+export function drawSetFog(ctx: CanvasRenderingContext2D, w: number, h: number, I: Ink, s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): void {
+  const a = setFogAlpha(s); if (!(a > 0.02)) return;
+  ctx.save(); ctx.fillStyle = I.fog(a); ctx.fillRect(0, 0, w, h); ctx.restore();
 }
 
 /**

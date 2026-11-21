@@ -1,6 +1,6 @@
 import { CE_ABOVE_WL, RIG } from '../boat/balance';
 import type { Boat } from '../boat/boat';
-import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
+import { byHand, crewEaseBoom, sailFrame, sailUp } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
 import { boatTells, type TellState } from '../render/sails';
@@ -102,13 +102,18 @@ export interface FlowState { cuts: FlowCut[]; sails: FlowSail[]; running: boolea
 /** The sail's height fraction (0 at its foot, 1 at its head) at z, unclamped. */
 const fAt = (sail: SailName, z: number) => sail === 'main' ? (z - BOOM) / RIG.P : (z - JIB_TACK) / (JIB_HEAD - JIB_TACK);
 
+/** How far up a sail must be for the flow view to cut it: more than half its luff (physics.ts sailUp). Lower, it's a
+ * heap of cloth flogging at the mast or the stem, with no section to draw. */
+export const FLOW_HOISTED = 0.5;
+
 /** The flow view's state from the sim: its three cuts across her sails and each sail's own numbers. The jib only where
- * it's drawing on its sheet. */
+ * it's drawing on its sheet; each sail only while it's up (sailing on the main alone or the jib alone: no slot then, no
+ * jib bending the air onto the main's lee side, and the lowered sail's telltales go with it). */
 export function flowState(b: Boat): FlowState {
   const sails: FlowSail[] = [];
   for (const sail of ['jib', 'main'] as const) {
     const trim = b.trim[sail], shape = b.shape[sail];
-    if (!trim || !shape) continue;
+    if (!trim || !shape || sailUp(b, sail) <= FLOW_HOISTED) continue;
     // (the wind the sim worked this trim out at: trim.ts err = (awa − sheet) − best, so its awa is err + sheet + best)
     const awa = trim.err + b.sheets[sail] + SAILS[sail].aoa;
     sails.push({ sail, trim, awa, across: awa - b.sheets[sail], best: SAILS[sail].aoa, twist: shape.twist, sheet: b.sheets[sail], atMin: b.sheets[sail] <= SAILS[sail].min + 0.5, atMax: b.sheets[sail] >= SAILS[sail].max - 0.5 });
@@ -142,52 +147,59 @@ export function turnFor(b: Boat, dAwa: number): number {
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const deg = (x: number) => `${Math.round(x)}°`;
 
-/** What the flow and the telltales are saying, in words, from the sim's own trim for each sail (the same at every
- * height, as the 3D telltales show it): how it's drawing and what to do; its twist against the crew's target for the
- * wind; the slot; and the keel's leeway. */
-export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = {}): [string, string][] {
-  const out: [string, string][] = [], p = (cls: string, html: string) => { out.push([cls, html]); };
+/** One line of the flow view's words: its class, the takeaway the player reads (a few words: what's wrong and what to
+ * do), and the detail behind it (on hover: the numbers and the why). `fp-note` lines are hover only. */
+export type FlowLine = [cls: string, html: string, more?: string];
+
+/** What the flow and the telltales are saying, from the sim's own trim for each sail (the same at every height, as the
+ * 3D telltales show it): one short line a sail, what to do (the owner, 20 Nov 2026, r037: "clean up the massive strings of
+ * copy (replace with tight, easy to parse takeaways)"). The detail, the twist, the slot and the keel go behind a hover. */
+export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = {}): FlowLine[] {
+  const out: FlowLine[] = [], p = (cls: string, html: string, more?: string) => { out.push(more ? [cls, html, more] : [cls, html]); };
   const name = { main: 'Main', jib: 'Jib' } as const, foot = { main: 'the boom', jib: "the jib's foot" } as const;
-  const keel = () => p('fp-keel', `<b>Under water</b> leeway ${st.leeway.toFixed(1)}°: the keel's angle to the water, which makes its lift. Pinching grows it.`);
-  if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose, both sails meant to be stalled or luffing. With the main eased and the helm down she lies quiet, forereaching slowly.`); keel(); return out; }
+  const keel = () => p('fp-note', '', `Under water: leeway ${st.leeway.toFixed(1)}°, the keel's angle to the water, which makes its lift. Pinching grows it.`);
+  if (st.hove) { p('fp-sail', '<b>Hove to</b>: jib backed, main eased, helm down', 'Both sails meant to be stalled or luffing: she lies quiet, forereaching slowly.'); keel(); return out; }
   if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
   // (luffing on purpose, both sheets let go: the sim takes their drive away, and the telltales show it)
-  if (b.luff) { p('fp-sail', `<b>Luffing</b>: both sails let go, flogging, with no drive; the jib's windward luff telltales lifting. Let go of the luff to sail again.`); keel(); return out; }
+  if (b.luff) { p('fp-sail', '<b>Luffing</b>: both sails let go. Let go of the luff to sail', "Flogging, with no drive; the jib's windward luff telltales lifting."); keel(); return out; }
   for (const s of st.sails) {
-    const t = s.trim, by = Math.abs(t.err), main = s.sail === 'main';
+    const t = s.trim, by = Math.abs(t.err), main = s.sail === 'main', n = `<b>${name[s.sail]}</b>`;
+    const why = `The wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}).`;
     if (st.running) {
       // (the pole for the jib when she's nearly dead downwind; on a broad reach it stays to leeward)
-      const how = main ? "Ease it till it's nearly square across the wind (the boom at the shrouds)" : st.awa > 155 ? 'Pole it out to windward (wing on wing)' : 'Keep it eased to leeward, just short of collapsing';
-      p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, its telltales hanging. ${how}.`); continue;
+      const how = main ? 'ease till nearly square' : st.awa > 155 ? 'pole it out to windward' : 'ease to just short of collapsing';
+      p('fp-sail', `${n} off the wind: ${how}`, `Off the wind it works stalled, the air pushing on it, its telltales hanging. ${why}`); continue;
     }
     // (luffing because the crew's eased the boom down the traveller to depower, as far as that and no further, with
     // nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
     const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
-    const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
-    const stallTell = main ? (t.amount > 0.12 ? 'its leech telltales curling behind the leech' : 'the flow breaking away before the leech') : 'its leeward luff telltales drooping';
+    const turn = by <= 10 ? `, or bear away ${deg(turnFor(b, by))}` : '';
+    const tells = main ? (t.amount > 0.12 ? 'Its leech telltales curl behind the leech.' : 'The flow breaks away before the leech.') : 'Its leeward luff telltales droop.';
+    // (a sail with the wind outside its foot is just flogging)
+    if (s.across < 0) { p('fp-sail', `${n} <em class="luff">flogging</em>${ctx.preStart ? ', eased to hold her back' : ''}: trim in ${deg(by)}${ctx.preStart ? ' to go' : ''}`, `${foot[s.sail][0].toUpperCase()}${foot[s.sail].slice(1)} ${deg(-s.across)} outside the wind.`); continue; }
     // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
-    const pastStop = s.atMax && t.err > 4;
-    const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
-      : t.flow === 'good' ? (main ? 'attached: its leech telltales streaming' : 'attached: its luff telltales streaming, windward and leeward')
-      : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
-        : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
-        : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
-        : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': its windward luff telltales lifting'}. Trim in about ${deg(by)}${turn}`)
-      : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`
-      : `<em class="stall">stalled</em> ${pct(t.amount)}: ${stallTell}. Ease about ${deg(by)}, or head up`;
-    // (a sail with the wind outside its foot is just flogging: said once, with what to do)
-    if (s.across < 0) { p('fp-sail', `<b>${name[s.sail]}</b> flogging, ${foot[s.sail]} ${deg(-s.across)} outside the wind${ctx.preStart ? ': eased to hold her back. Trim in' : '. Trim in'} about ${deg(by)}${ctx.preStart ? ' to go' : ''}.`); continue; }
-    p('fp-sail', `<b>${name[s.sail]}</b> the wind ${deg(s.across)} across ${foot[s.sail]} (best ${deg(s.best)}): ${what}.`);
+    if (s.atMax && t.err > 4) { p('fp-sail', `${n} sheet all the way out: head up${main ? '' : ' or pole it out'}`, `The wind ${deg(t.err)} past its best: too far aft for it. ${why}`); continue; }
+    if (t.flow === 'good') { p('fp-sail', `${n} attached`, `${main ? 'Its leech telltales streaming.' : 'Its luff telltales streaming, windward and leeward.'} ${why}`); continue; }
+    if (t.flow === 'luffing') {
+      const pc = pct(t.amount), lu = `<em class="luff">luffing</em>`;
+      if (ctx.preStart) p('fp-sail', `${n} ${lu}, eased to hold her back: trim in ${deg(by)} to go`, `${pc} luffing. ${why}`);
+      else if (eased) p('fp-sail', `${n} ${lu} on purpose, eased to keep her on her feet`, `${pc} luffing: eased down the traveler to depower; the lifting luff is the price. ${why}`);
+      else if (s.atMin) p('fp-sail', `${n} ${lu}, sheet hard in: bear away ${deg(turnFor(b, Math.min(by, 10)))}`, `${pc} luffing with the sheet in as far as it goes: she's pinching. ${why}`);
+      else p('fp-sail', `${n} ${lu}: trim in ${deg(by)}${turn}`, `${pc} luffing: ${main ? 'its luff lifting' : 'its windward luff telltales lifting'}. ${why}`);
+      continue;
+    }
+    const sl = `<em class="stall">stalled</em>`;
+    if (s.atMax) p('fp-sail', `${n} ${sl}, sheet all the way out: head up`, `${pct(t.amount)} stalled: the wind's too far aft for it. ${tells} ${why}`);
+    else p('fp-sail', `${n} ${sl}: ease ${deg(by)}, or head up`, `${pct(t.amount)} stalled. ${tells} ${why}`);
   }
-  // twist, as facts (no verdict: the sim's best twist is the crew's whole-boat choice, which the coach judges): how open
-  // each head is set against its foot, and the wind's own twist up the sail
+  // the facts behind them (hover): each sail's twist against the wind's own twist up the mast, the slot, and the keel
   if (!st.running) {
     const [lo, , hi] = st.cuts, set = st.sails.map(s => `${s.sail} ${deg(s.twist)}`).join(', ');
-    p('fp-twist', `<b>Twist</b> ${set}, head open from foot: up high the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}. The coach says which line to change.`);
+    p('fp-note', '', `Twist ${set}, head open from foot: up high the wind is ${hi.aws.toFixed(1)} kt at ${deg(hi.awa)}, low down ${lo.aws.toFixed(1)} kt at ${deg(lo.awa)}. The coach says which line to change.`);
   }
-  if (st.sails.length === 2 && !st.running) p('fp-slot', `<b>The slot</b>: on real boats an over-trimmed jib backs the main before it luffs. The sim doesn't model it; the streamlines show the idea.`);
+  if (st.sails.length === 2 && !st.running) p('fp-note', '', `The slot: on real boats an over-trimmed jib backs the main before it luffs. The sim doesn't model it; the streamlines show the idea.`);
   keel();
   return out;
 }

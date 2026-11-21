@@ -81,6 +81,20 @@ export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: nu
   return Math.min(SLOW_TACK, TACK_WAY * Math.max(targetFor(her, beatFor(her)), targetFor(flat, beatFor(flat))));
 };
 
+/** Whether bearing away 10° below close-hauled can build her the way for a tack (slowTack × 1.15, as the AI asks) in the
+ * wind and chop she has. Not always: the chop is the day's wind's (world.ts seaWind), slowTack the wind at her, so in a
+ * deep lull or another boat's shadow on a breezy day her footed speed in the chop can stay under it (0.5 m chop and
+ * 2 kt at her), and footing for it she never came round (v213 review). Then she tacks slowly instead, sculled round
+ * (ai.ts, goTack.slow). */
+/** Footing in chop she settles 7–9% under the table's target (the v214 review: AI-steered 10° below close-hauled for
+ * 240 s, 0.428 m/s against 0.464 in 2 kt and 0.4 m, 0.827 against 0.890 in 4 kt and 0.8 m), so the target must clear
+ * the speed she needs by a tenth. */
+const FOOT_MARGIN = 1.1;
+export const footReaches = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): boolean => {
+  const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
+  return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15 * FOOT_MARGIN;
+};
+
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 
@@ -417,7 +431,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      // (but a tack asked slow where footing couldn't build the way (ai.ts goTack.slow), with way on, she takes slowly
+      // through the wind, sculled round onto the new tack's close-hauled course as 42.3(d) allows (SCULL 1, "on either
+      // tack"): 36 s against 97 s wearing in 2.5 kt and 0.5 m chop, 63 against 156 in 1.5 kt and 0.4 m (v213 and v214
+      // reviews). From a dead stop the wear still wins.)
+      const slowAsk = !!ai.goTack?.slow && b.v >= WAY_LOST;
+      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow && !slowAsk ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
@@ -489,20 +508,23 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
-  const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  // (how much of each sail is up: the rig's area, induced drag and centre of effort are weighted by it inside the force
+  // model, balance.ts sailForces, so on one sail the rig is that sail's; its force is scaled by it below. r037)
+  const hm = sailUp(b, 'main'), hj = sailUp(b, 'jib'), up = { main: hm, jib: hj };
+  const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff, up);
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
   let wornDrive = 1;
   if (cond && (b.shape.main.cd0 || b.shape.main.clMul || b.shape.jib?.cd0 || b.shape.jib?.clMul)) {
     const sound = (sh: Shape): Shape => ({ depth: sh.depth, draft: sh.draft, twist: sh.twist, ceAft: sh.ceAft });
-    const s0 = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff);
+    const s0 = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff, up);
     const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
     if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
   }
   // how much of each sail is up: its force goes with its hoisted area (after the wear is worked out, sail for sail, so
   // a part-hoisted sail isn't counted as worn: the hoist has its own speed term below)
   // (and a part-hoisted sail draws worse than its area: controls.ts hoistDraw)
-  const hm = sailUp(b, 'main'), hj = sailUp(b, 'jib'), dm = hm * hoistDraw(hm, 'main'), dj = hj * hoistDraw(hj, 'jib');
+  const dm = hm * hoistDraw(hm, 'main'), dj = hj * hoistDraw(hj, 'jib');
   if (hm < 1 || hj < 1) { sf.main.heel *= dm; sf.main.drive *= dm; sf.jib.heel *= dj; sf.jib.drive *= dj; }
   // the crew: where they'd put their weight to hold her at the heel they want (a little heel in light air, about 16°
   // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
@@ -571,7 +593,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const sway = rigSway(b), surge = rigSurge(b);
   if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
     const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across, b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
-    const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+    const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff, up);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - dm * sf0.main.drive - dj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
   }

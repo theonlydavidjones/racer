@@ -41,7 +41,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
-import { destMark, place as getPlace } from './places';
+import { destMark, isSpot, place as getPlace, spotLabel } from './places';
 import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, harborRoute, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, keptFastWhy, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
@@ -83,6 +83,8 @@ const OFF_HELD_S = 5;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
+/** How far off her own slip the crew can get her lines ready, m (freeBerthsNear): its fairway and the turn into it. */
+const HOME_REACH = 50;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -2084,11 +2086,18 @@ export class World {
     }
     return this.dockPointAbeam(b, at, side);
   }
-  /** The free berths near her: empty slips, end ties and guest docks (her own slip is always hers), nearest first. */
-  freeBerthsNear(p: Vec, within = 16): Slip[] {
+  /**
+   * The free berths near her: empty slips, end ties and guest docks (her own slip is always hers), nearest first, but her
+   * own slip ahead of the rest when it's in reach (r239: G in her own fairway, beside a nearer empty slip, is coming home),
+   * unless `nearest`: the berth she's actually at.
+   */
+  freeBerthsNear(p: Vec, within = 16, nearest = false): Slip[] {
     const H = harborAt(p); if (!H) return [];
     const mine = this.homeSlip?.id;
-    return slipsIn(H.id).filter(s => (s.id === mine || !slipTaken(s)) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
+    // (her own slip from further off: lines got ready as she turns into its fairway, as a crew does coming home, not only
+    // once she's at its mouth: the owner, 18 Nov 2026, "the tie-up option never appeared" coming home to slip 572, where
+    // its fairway square lies 16 m off and G there said "no free berth here")
+    return slipsIn(H.id).filter(s => s.id === mine ? dist(s.p, p) < HOME_REACH : !slipTaken(s) && dist(s.p, p) < within).sort((a, b) => (nearest ? 0 : (a.id === mine ? -1 : 0) - (b.id === mine ? -1 : 0)) || dist(a.p, p) - dist(b.p, p));
   }
   /**
    * Lines ready (the Crew panel, or G coming in): a hand goes to the shrouds on the dock's side with the line coiled (the bow
@@ -2116,7 +2125,7 @@ export class World {
   /** Coming in: the hand stepping off, the first line snubbed round a cleat, the rest going on, and made fast. */
   private mooringStep(b: Boat, dt: number): void {
     const m = b.mooring!; m.t += dt;
-    const berth = slipById(m.berth), sp = hypot(b.vx, b.vy);
+    let berth = slipById(m.berth); const sp = hypot(b.vx, b.vy);
     const hand = m.solo ? b.crew?.spec.helm : b.crew?.spec.crew[0], skill = hand ? skillOf(hand) : 0.6;
     if (m.phase === 'ready') {
       // (the hand goes to whichever side the dock comes up on: from outside a slip there's none yet either side)
@@ -2125,6 +2134,10 @@ export class World {
       const gap = Math.min(gp, gs);
       if (gap > stepGap(skill)) { this.cue(m, 'Closer'); return; }
       if (sp > STEP_SPEED) { this.cue(m, 'Too fast'); return; }
+      // (the berth she's at as the hand steps off, not the one by her when G was pressed: lines readied far off and brought
+      // alongside elsewhere, or readied for her own slip in its fairway and taken into the empty one beside it, lie where
+      // she is: r239)
+      const here = this.freeBerthsNear(b, 16, true)[0]; if (here && here.id !== m.berth) { m.berth = here.id; berth = here; }
       // step: the line from her bow cleat (alone: her midships cleat), round the dock cleat abeam her shrouds
       const at = m.solo ? 0 : 3.4, to = this.dockCleat(b, berth, at, m.side); if (!to) return;
       const p = cleatOf(b, { at, side: m.side });
@@ -2583,7 +2596,8 @@ export class World {
   /** Just sail: a new destination, a place or a spot picked on the chart. */
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
-    this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
+    this.dest = destMark({ id: 'pick', name, group: 'Spots', p }); // (a spot on open water comes by its position and is flagged by it, destMark)
+    if (this.dest!.spot) name = this.dest!.name = spotLabel(p); // (then named by the nearest place, never its coordinates: r270)
     this.arrivedT = null; HELM.delete(this); OFF.delete(this);
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
@@ -2725,6 +2739,7 @@ export class World {
    * that would be a restart. False on land.
    */
   moveHere(p: Vec, name: string): boolean {
+    if (isSpot(name)) name = spotLabel(p); // (r270: never its coordinates)
     prepareBasins([p], BASINS_NEAR); // (a jump: the harbors round where she lands, at once)
     if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
     const u = this.user;

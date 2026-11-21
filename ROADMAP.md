@@ -184,6 +184,8 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v214 (21 Nov, main f83cf802 (code 6015e379)):** the owner's chart and game surface (r270, r271, r284, r027, r032: the Key, a collapsible Layers panel, Day | Dusk, the Fog layer showing set fog, the old launch points off the charts and pickers, clicked spots by place name), coming home (r239, r240, r241, r242, r243: the tie-up control by the boat, her own berth lit, Sail home always in place), the Gashouse Cove sign (r017), Alcatraz from the lidar (r254, r295), the flow view and one-sail physics (r036, r037, r248; the ensign staff), the AI's light-air wear (light-steer-wear) and beat in chop (beat-v214). perf-pair --ai 0.9966; fouls-pair +0.00 a race at 12/22 kt and at 4/6 kt; perf-ab clean against v213 on a shared passage (the old cruise start was removed by r270; perf.cjs fixed). Physics review: nothing blocking; its follow-ups (footing margin, tack with way on, chop corrections, jib-alone heel, tie-up berth) are in v215.
+
 **v213 (20 Nov, main c3869cd6 (code f8377d60)):** v212's physics-review follow-ups: the AI's slow-tack floor in chop (light-steer-chop, Skipper Model) and the steadier beat in chop (beat-smooth: lean fade, search to 90°, BEAT_NO_WAY 65°; router give-up 326.606, Bay East). perf-pair --ai 0.9905, fouls-pair +0.10 a race (p 0.50; 22 kt +9, to watch); perf-ab clean against v212.
 
 **v212 (20 Nov, main c7f9b8c8 (code 99fc7ce2)):** the AI in a dying breeze (light-steer, approx.test on 96 seeds), the beat angle in chop (beat-chop), nav-unblock (the owner's one-day Nav exception: the Berkeley Pier chords and replans), the 20 Nov weather. perf-pair --ai 0.9864, fouls-pair −0.03 a race (p 0.50); perf-ab clean against v211 (night_start's JS +19%, one view only). Next, v213: light-steer-chop, beat-smooth.
@@ -865,6 +867,10 @@ sources. Each shipped item is added there when it's published.
    the weather loading, the shaders compiling, or the editor's speed report benching while it's open. First, profile both
    on the published page (perf.cjs's views, plus the editor open and a cruise's first 60 s), and name what runs. Then
    spread it out or defer it. Add both to perf-ab's views so it doesn't come back.
+   For v215 (Capacity, 21 Nov): perf.cjs's cruise views sail mark 18 to mark 16 (5e966235), because r270 sends a save
+   from an old named spot to her slip, and the views moved into the marina without saying so. Cruises now start from
+   her slip, so add a cruise_slip view that starts there among the moored boats, which is the start players see. Before it gates,
+   its ref has to be a version with the slip start too.
 8v. ~~**Now — the boat editor is very slow**~~ (done: look-only changes restyle her in place, sail pictures shared, the cockpit linings worked out once; a speed check) (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
@@ -1092,7 +1098,7 @@ sources. Each shipped item is added there when it's published.
      - The mainsheet follows the hand holding it on each tack: pull in and ease, toward and away from the helm.
      The swap happens when she's through the tack or jibe, not mid-turn, so a held key doesn't reverse under the
      player's finger. The keys' labels show which way each key works now. No new screen controls.
-     - **Asked again, 20 November** (side request; later, after the sprint): "I want the keyboard controls for main sheet and traveller to match their actual direction on the screen, meaning the controls need to switch with the tacks." The traveller's keys join the mainsheet's: they follow the tack the same way, as the same Keys option, so the key that moves the traveller to windward on the screen always moves it that way.
+     - **Asked again, 20 November** (side request; later, after the sprint): "I want the keyboard controls for main sheet and traveler to match their actual direction on the screen, meaning the controls need to switch with the tacks." The traveler's keys join the mainsheet's: they follow the tack the same way, as the same Keys option, so the key that moves the traveler to windward on the screen always moves it that way.
    - **The trim coach's ◆ unexplained** (owner, 15 November, from a screenshot of the mainsheet in the sail band;
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim

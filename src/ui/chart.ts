@@ -2,7 +2,8 @@ import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES, latLon } from '../sim/places';
+import { PLACES, isSpot, latLon } from '../sim/places';
+import { spotName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -31,6 +32,12 @@ export class Chart {
   constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private race: { send(c: Command): void; ask(c: Command): Promise<CommandResult> }) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
+    // (the fog caption is one short line: its source and caveats are the hover)
+    this.c.addEventListener('pointermove', e => {
+      const r0 = this.c.getBoundingClientRect(), fc = this.hud.fogCaption, x = e.clientX - r0.left, y = e.clientY - r0.top;
+      const tip = fc && x >= fc.rect[0] && x <= fc.rect[2] && y >= fc.rect[1] && y <= fc.rect[3] ? fc.tip : '';
+      if (this.c.title !== tip) this.c.title = tip;
+    });
     this.c.addEventListener('pointermove', e => {
       const r = this.c.getBoundingClientRect(); this.cursor = e.pointerType === 'mouse' ? [e.clientX - r.left, e.clientY - r.top] : null;
       if (!drag) return;
@@ -49,12 +56,12 @@ export class Chart {
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });
     $('bChartClose').onclick = () => this.close();
-    $('bChartPal').onclick = () => {
+    // Day | Dusk, a two-state toggle at the top right beside the field picker (the owner, 20 Nov 2026)
+    document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.addEventListener('click', () => {
       if (!this.w) return;
       // (the palette is the page's own (Hud.shown): the chart redraws with it at once; the race learns it by command)
-      const pal = (this.hud.shown(this.w).chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
-      this.setPal(pal); this.palLabel(); this.draw();
-    };
+      this.setPal(b.dataset.pal === 'dusk' ? 'dusk' : 'day'); this.palLabel(); this.draw();
+    }));
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
@@ -93,7 +100,7 @@ export class Chart {
     if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
-  private palLabel(): void { $('bChartPal').textContent = ((this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
+  private palLabel(): void { const pal = (this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day'; document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.pal === pal))); }
 
   close(): void {
     if (!this.isOpen) return;
@@ -114,10 +121,12 @@ export class Chart {
     // a place near the tap: take it, by name
     let best: { p: Vec; name: string } | null = null, bd = 16;
     for (const pl of PLACES) {
+      if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const px = r.width / 2 + (pl.p.x - this.cx) * this.scale, py = r.height / 2 - (pl.p.y - this.cy) * this.scale, d = Math.hypot(px - sx, py - sy);
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }
     if (!best && onLand(q)) { this.pick = null; this.info('That\'s land. Pick a spot on the water.'); this.draw(); return; }
+    // (a spot on the water goes to the sim named by its position: the pin in the 3D view and on the HUD is told by that form, the sim names it by the nearest place and flags it, sim/places.ts spotLabel; here the player reads that name, spotName)
     this.pick = best ?? { p: q, name: latLon(q) };
     this.info(); this.draw();
   }
@@ -136,7 +145,7 @@ export class Chart {
     const kind = twa < beat ? 'upwind of you: a beat, tacking' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'downwind: a run';
     const cur = w.currentDrawn(p), ckt = Math.hypot(cur.x, cur.y) / KT;
     const nm = d / 1852;
-    el.innerHTML = `<p><b>${this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
+    el.innerHTML = `<p><b>${isSpot(this.pick.name) ? spotName(this.pick.p) : this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
   }
 

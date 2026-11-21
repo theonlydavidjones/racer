@@ -3,7 +3,7 @@ import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
-import { PLACES, isSpot } from '../sim/places';
+import { PLACES } from '../sim/places';
 import { harborRouteCached, slipAt } from '../geo/marina';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
@@ -43,16 +43,19 @@ function shapeWords(u: Boat): string {
   one('main', u.shape.main); one('jib', u.shape.jib);
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
-import { toast } from './feedback';
+import { headline, toast } from './feedback';
+import { boatLabel, racingLine } from './racingLine';
 import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
+import { drawCompass } from './compassTape';
+import { canLay, destName } from './navNames';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import type { Settings } from '../settings';
-import { drawFog, drawSea, nm } from './mapLayers';
+import { drawFog, drawSea, drawSetFog, nm, setFogAlpha } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
 import { rainAt, rainLevel } from '../environment/rain';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -84,9 +87,15 @@ export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) =>
 
 export class Hud {
   /** The start practice's favored-end call (8za; app.ts): 'ask' before the gun, where the card hides which end is
-   *  favored and asks which you think; `favCall` the end you've called, if any. */
-  favAsk: 'off' | 'ask' = 'off';
+   *  favored and asks which you think; `favCall` the end you've called, if any. 'race' does the same in a race, but
+   *  shows the favored end (gold) as soon as you've called one; the verdict goes to Messages at the gun (the owner,
+   *  20 Nov 2026: "don't highlight the favored side until I've identified it myself"). */
+  favAsk: 'off' | 'ask' | 'race' = 'off';
+  /** Whether the committee's flags are flying in the start card now (signals()). */
+  private flagsUp = false;
   favCall: 'pin' | 'committee' | null = null;
+  /** The end favored on the line now, before the gun ('square' under 2° of bias): the race's call is judged on its last value. */
+  favNow: 'pin' | 'committee' | 'square' | null = null;
   private askKey = '';
   private acc = 0;
   mapZoom = false;
@@ -192,7 +201,6 @@ export class Hud {
     const h = u.h, hdg = String(Math.round(n360(h)) % 360).padStart(3, '0') + '°', hEl = $('hdg');
     if (hEl.textContent !== hdg) hEl.textContent = hdg;
     const upwind = u.twa < 80, from = u.ww.from;
-    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
     // average close-hauled heading on this tack: a slow running mean while you're close-hauled
     if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
     const mean = this.meanHdg[u.tack], lift = $('hdgLift');
@@ -201,41 +209,23 @@ export class Hud {
       const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
       if (Math.abs(d) >= 3) { note = d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`; cls = d > 0 ? 'lift' : 'head'; }
     }
-    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
+    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls ? 'vh ' + cls : 'vh'; } // (read out, not shown: the compass shows it)
     const m = w.nextMark(u), markB = m ? brg(m.p.x - u.x, m.p.y - u.y) : null;
+    // the lift/header tint (r272, the owner's H2): only close-hauled and settled on a mean, fading in over a second or two
+    const hauled = upwind && mean != null && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 10;
+    this.tintA = clamp(this.tintA + (hauled ? dt : -dt) / 1.5, 0, 1);
+    const dl = mean != null ? wrap(h - mean) * (u.tack === 'S' ? -1 : 1) : 0, shift = hauled && dl >= 3 ? 'lift' as const : hauled && dl <= -3 ? 'head' as const : null;
     // the tape: drawn again only when something on it has moved (a twentieth of a degree is about a tenth of a pixel on
     // it) or it's changed size. Steady on a course it was the same picture redrawn every frame
     const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), q = (a: number) => Math.round(a * 20);
-    const key = [W, H, q(h), q(other), upwind && mean != null ? q(mean) : -1, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
+    const key = [W, H, q(h), this.tintA > 0 && mean != null ? q(mean) : -1, Math.round(this.tintA * 20), shift === 'lift' ? 1 : shift === 'head' ? 2 : 0, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
     if (k0.length === key.length && key.every((v, i) => v === k0[i])) return;
     this.tapeKey = key;
-    const cx = W / 2, span = 50, px = (W - 12) / (2 * span);
-    ctx.clearRect(0, 0, W, H);
-    const x = (b: number) => cx + wrap(b - h) * px;
-    // ticks every 5°, longer every 10°, numbers every 30° (N E S W at the cardinals)
-    ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#9fb3bf'; ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center';
-    for (let d = Math.ceil((h - span) / 5) * 5; d <= h + span; d += 5) {
-      const X = x(d), big = d % 10 === 0;
-      ctx.beginPath(); ctx.moveTo(X, H - 1); ctx.lineTo(X, H - (big ? 8 : 5)); ctx.stroke();
-      if (d % 30 === 0) { const n = ((d % 360) + 360) % 360; ctx.fillText(({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[n] ?? String(n).padStart(3, '0'), X, H - 10); }
-    }
-    // a marker from the top edge (wind, mark): a triangle on the tape, or an arrow at the end when it's off the tape
-    const top = (b: number, col: string) => {
-      const X = x(b); ctx.fillStyle = col; ctx.beginPath();
-      if (X < 6) { ctx.moveTo(0, 6); ctx.lineTo(7, 1); ctx.lineTo(7, 11); }
-      else if (X > W - 6) { ctx.moveTo(W, 6); ctx.lineTo(W - 7, 1); ctx.lineTo(W - 7, 11); }
-      else { ctx.moveTo(X - 5, 0); ctx.lineTo(X + 5, 0); ctx.lineTo(X, 7); }
-      ctx.fill();
-    };
-    // a small tick under the tape (the other tack, the average): only while it's on the tape
-    const low = (b: number, col: string) => { const X = x(b); if (X < 2 || X > W - 2) return; ctx.fillStyle = col; ctx.fillRect(X - 1, H - 10, 2, 10); };
-    low(other, '#7f949f');
-    if (upwind && mean != null) low(mean, '#e8e8e8');
-    top(from, '#6fb7ff');
-    if (markB != null) top(markB, '#ffd21a');
-    // the lubber line
-    ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
+    drawCompass(ctx, W, H, h, from, markB, this.tintA > 0 && mean != null ? { mean, lifted: dl >= 0, alpha: this.tintA } : null, shift);
   }
+  /** The lift/header tint's opacity (0 hidden … 1 shown): it fades in once she's close-hauled and settled. */
+  private tintA = 0;
+
 
 
   private trCache: { key: string; t: ReturnType<SimView['laylineTransit']> } = { key: '', t: null };
@@ -278,12 +268,13 @@ export class Hud {
     // the moment a flag goes up, the class and prep flags before the start, a recall, a postponement; the owner, 15 Nov)
     const flying = w.flags.length > 0 || (!!w.courseSignal && !w.cancelled);
     const show = !w.freeSail && flying && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd || !!w.cancelled);
-    const el = $('sigPanel'); el.hidden = !show; if (!show) return;
+    // (the flags fly in the start card now, beside its timer: r272, the owner, 20 Nov; the old tile stays hidden)
+    $('sigPanel').hidden = true; this.flagsUp = show; $('ncFlags').hidden = !show; if (!show) return;
     const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
     if (key !== this.sigKey) {
       this.sigKey = key;
       if (!$('flagIndex').hidden) this.flagIndex(w); // (open: what's flying changes under you)
-      const box = $('sigFlags'); box.innerHTML = '';
+      const box = $('ncFlags'); box.innerHTML = '';
       const flagPic = (f: Flag) => { const c = document.createElement('canvas'); c.width = 66; c.height = 44; c.getContext('2d')!.drawImage(signalCanvas(f), 0, 0, 66, 44); c.title = FLAG_NAME[f]; return c; };
       // a flag flown over A (AP over A, N over A) is one hoist, one above the other, as it's flown
       const over = w.flags.includes('A') ? w.flags.filter(f => f !== 'A') : [];
@@ -313,17 +304,19 @@ export class Hud {
     this.acc += dt; if (this.acc < 0.1) return; this.acc = 0;
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
+    // (racing, the clock lives in the start card before the gun and in the nav strip after it: r272, the owner, 20 Nov)
+    { const pod = $('clock').closest<HTMLElement>('.pod')!, d = w.freeSail ? '' : 'none'; if (pod.style.display !== d) pod.style.display = d; }
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
     // a boat scored DSQ, UFD, BFD or ZFP while racing sees it here, first on the line, for the rest of her race (the
     // Flags tile shows flags only: the owner, 12 Nov; the Coordinator's ruling, 15 Nov)
     const code = !w.freeSail && !w.cancelled && !u.retired && w.t >= 0 && u.scoring ? u.scoring : '';
     const sub = $('clockSub'), state = (w.freeSail ? (w.lesson ? 'Lesson' : 'Cruising') : w.cancelled ? (w.cancelled.up[0] === 'N' ? 'Abandoned' : 'Postponed') : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     const subKey = code + '|' + w.clock + '|' + state;
     if (sub.dataset.k !== subKey) { // (in the give-way red, the one word that has to be seen)
       sub.dataset.k = subKey;
       if (!code) sub.textContent = w.clock + ' · ' + state;
-      else { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; sub.replaceChildren(w.clock + ' · ', c, ' · ' + state); }
+      else { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; sub.replaceChildren(c, ' · ' + state); } // (the code over the clock: one line in the card)
     }
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
@@ -344,7 +337,9 @@ export class Hud {
     // the sea where you are: chop height (what slows you), and the swell
     { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
       const ftS = (m: number) => (m / 0.3048).toFixed(m < 0.3 ? 1 : 0) + ' ft'; // short enough for the box
-      $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · ${ftS(s.hsS)} swell` : '');
+      // (with a swell the chop's word shortens, so the line fits the card; the full words on hover)
+      const chop = s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop';
+      $('seaSub').textContent = s.hsS >= 0.05 ? (s.hsW < 0.05 ? '' : chop === 'steep chop' ? 'steep · ' : 'chop · ') + `${ftS(s.hsS)} swell` : chop;
       $('seaSub').title = `${s.hsW < 0.05 ? 'Glassy' : `${ft(s.hsW)} of ${s.steep > 0.075 ? 'steep ' : ''}chop`}${s.hsS >= 0.05 ? `, ${ft(s.hsS)} of swell` : ''}`; }
     // (the wind she's in against her own minute's average: the course's wind can be shifting the other way where she is)
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
@@ -359,7 +354,7 @@ export class Hud {
       sl.title = `${ww.kt.toFixed(1)} kt of wind on the water here${why ? ', ' + why : ''}`;
       sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
-    this.situation(w, u); this.lineBox(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
+    this.situation(w, u); this.lineBox(w, u); this.navStrip(w, u); this.strategist(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
   }
 
   /** How each sail is drawing, in words, with what to do about it. */
@@ -438,8 +433,34 @@ export class Hud {
     }
   }
 
-  /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
+  /** The situation as the Strategist card shows it (r298): its headline, one line, beside the rule's chip (R10); the
+   *  whole sentence on a hover. Written only when it changes. */
+  private sFull = ''; private sRule = ''; private sShown = '';
+  /** The line card's last-minute numbers, for the Strategist card's racing line (lineBox). */
+  private startNums: { burn: number | null; toLine: number | null } = { burn: null, toLine: null };
+  /** The C view's strategist's call on her leg, if it has worked the day out (app.ts, from courseView). */
+  legCall: (() => { name: string; best: 'left' | 'right' | 'middle'; certainty: 'clear' | 'likely' | 'open' } | null) | null = null;
+  private rShown = ''; private titleShown = '';
+  /** The card's title and its racing line (r298): Strategist in a race, its line the situation's or, with none, the next
+   *  most pertinent (ui/racingLine.ts); Trim coach cruising, no racing line. */
+  private strategist(w: SimView, u: Boat): void {
+    const title = w.freeSail ? 'Trim coach' : 'Strategist';
+    if (title !== this.titleShown) { this.titleShown = title; $('tpTitle').textContent = title; }
+    const line = w.freeSail || !$('situ').hidden ? null : racingLine({ over: !!u.ocs && w.t >= 0, penalty: u.penalty ?? 0, penaltyDeg: w.penaltyDeg ?? 360,
+      toGun: -w.t, burnS: this.startNums.burn, toLineS: this.startNums.toLine, leg: u.started && !u.finished ? this.legCall?.() ?? null : null });
+    const key = line ? `${line.tag}|${line.text}|${line.kind}` : ''; if (key === this.rShown) return; this.rShown = key;
+    const row = $('tpRace'); row.hidden = !line; if (!line) return;
+    row.className = 'tp-race ' + line.kind; $('tpRaceTag').textContent = line.tag; $('tpRaceMsg').textContent = line.text;
+  }
   private situation(w: SimView, u: Boat): void {
+    this.situationFull(w, u);
+    const el = $('situ'); if (el.hidden) return;
+    const key = this.sFull + '|' + this.sRule; if (key === this.sShown) return; this.sShown = key;
+    $('situMsg').textContent = headline(this.sFull).head; el.title = this.sFull;
+    $('situRule').textContent = this.sRule.replace(/^Rule\s+/, 'R');
+  }
+  /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
+  private situationFull(w: SimView, u: Boat): void {
     let best: { o: Boat; r: ReturnType<SimView['rights']>; c: { t: number; d: number }; d: number; risk: boolean } | null = null, bestScore = -1e9;
     for (const o of w.boats) {
       if (o.isUser) continue;
@@ -455,50 +476,50 @@ export class Hud {
     // Rule 17: whoever got the leeward overlap from astern may not luff above her proper course
     const r17 = w.t > 0 ? w.pairRecord(u, o)?.r17 : null;
     const note17 = r17 === u.id ? ' Rule 17: you came from astern, so sail no higher than your proper course.'
-      : r17 === o.id ? ` ${o.name} came from astern: they may not luff you above their proper course (Rule 17).` : '';
+      : r17 === o.id ? ` ${boatLabel(o)} came from astern: they may not luff you above their proper course (Rule 17).` : '';
     const hail = w.pairRecord(u, o)?.hail;
     if (hail && hail.kind === 'room') {
       // a hail for room to tack trumps everything else
       const key = this.hailKey();
       if (hail.replyAt != null) {
         // (the room passes, not right of way: WS Case 101. So the colour follows who keeps clear, as everywhere else)
-        $('situMsg').textContent = hail.by === o.id ? `You replied "You tack". Give ${o.name} room to tack and pass astern of you.` : `${o.name} replied "You tack". Tack now${kc ? ' and keep clear of them' : ''}: they must give you room to do it.`;
+        this.sFull = hail.by === o.id ? `You replied "You tack". Give ${boatLabel(o)} room to tack and pass astern of you.` : `${boatLabel(o)} replied "You tack". Tack now${kc ? ' and keep clear of them' : ''}: they must give you room to do it.`;
         el.className = kc ? 'kc' : 'row';
       } else if (hail.by === o.id && hail.passedOn) {
         // Rule 20.3: you passed the hail on to the boat to windward of you
         const po = hail.passedOn, nm = w.boats.find(b => b.id === po.to)?.name ?? 'the boat to windward';
         const left = po.respondedAt != null ? Math.max(0, po.respondedAt + HAIL_RESPONSE - w.t) : null;
-        $('situMsg').textContent = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
+        this.sFull = po.failed ? `${nm} didn't respond to your hail, so you can't tack yet. Keep clear of the obstruction.`
           : left == null ? `You passed the hail on to ${nm}. Tack as soon as they respond (Rule 20.3).` : `${nm} has responded. Tack now (Rule 20.3): ${left.toFixed(0)} s.`;
         el.className = left != null ? 'kc alarm' : 'kc';
       } else if (hail.by === o.id) {
         const left = Math.max(0, hail.at + HAIL_RESPONSE - w.t);
         const passTo = !youTackPays(o, u) ? w.canPassOn(u, o) : null, blocked = !!passTo;
-        $('situMsg').textContent = blocked
-          ? `${o.name} hailed "Room to tack!" With ${passTo!.name} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
-          : `${o.name} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
+        this.sFull = blocked
+          ? `${boatLabel(o)} hailed "Room to tack!" With ${boatLabel(passTo!)} to windward you can't tack yet: press ${key} to pass the hail on to them (Rule 20.3): ${left.toFixed(0)} s.`
+          : `${boatLabel(o)} hailed "Room to tack!" Tack now, or press ${key} to reply "You tack" and give them room: ${left.toFixed(0)} s to respond.`;
         el.className = 'kc alarm';
       } else if (hail.passedOn && hail.clearAt == null) {
-        const nm = w.boats.find(b => b.id === hail.passedOn!.to)?.name ?? 'the boat to windward';
-        $('situMsg').textContent = `${o.name} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
+        const nm = (() => { const p = w.boats.find(b => b.id === hail.passedOn!.to); return p ? boatLabel(p) : undefined; })() ?? 'the boat to windward';
+        this.sFull = `${boatLabel(o)} passed your hail on to ${nm} (Rule 20.3), and will tack once they respond. Be ready to tack.`;
         el.className = 'row';
       } else if (hail.clearAt != null) {
         const left = Math.max(0, hail.clearAt + HAIL_RESPONSE - w.t);
         const tacked = (u.headToWindT ?? -Infinity) >= hail.at; // (a gybe isn't the tack rule 20.2(d) asks for)
-        $('situMsg').textContent = tacked ? `You're tacking: ${o.name} is giving you room.` : `${o.name} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
+        this.sFull = tacked ? `You're tacking: ${boatLabel(o)} is giving you room.` : `${boatLabel(o)} is tacking to give you room. Tack now: ${left.toFixed(0)} s.`;
         el.className = tacked ? 'row' : 'kc alarm';
       } else if (hail.respondedAt != null) {
-        $('situMsg').textContent = `${o.name} is tacking to give you room. Tack as soon as she's through the wind.`;
+        this.sFull = `${boatLabel(o)} is tacking to give you room. Tack as soon as she's through the wind.`;
         el.className = 'kc';
       } else {
-        $('situMsg').textContent = `You hailed "Room to tack!" ${o.name} must tack or reply "You tack".`;
+        this.sFull = `You hailed "Room to tack!" ${boatLabel(o)} must tack or reply "You tack".`;
         el.className = 'row';
       }
-      $('situRule').textContent = 'Rule 20'; el.hidden = false;
+      this.sRule = 'Rule 20'; el.hidden = false;
       return;
     }
-    $('situMsg').textContent = situationText(r.rule, kc, o.name) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
-    $('situRule').textContent = 'Rule ' + r.rule;
+    this.sFull = situationText(r.rule, kc, boatLabel(o)) + note17 + (risk && c.t < 8 && c.d < 9 ? ` Collision in ${c.t.toFixed(0)} s.` : '');
+    this.sRule = 'Rule ' + r.rule;
     el.className = (kc ? 'kc' : 'row') + (kc && risk && c.t < 6 && c.d < 8 ? ' alarm' : '');
   }
 
@@ -516,34 +537,77 @@ export class Hud {
    * A line in the card's sketch, seen from below it looking up the course: its two ends (the favoured one starred),
    * and you as a dot (red when you're over it), your arrow toward the line or away from it.
    */
-  private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean): string {
-    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
+  private lineSketch(w: SimView, u: Boat, ends: [string, string], fav: 0 | 1 | -1, over: boolean, toward: boolean, called: 0 | 1 | -1 = -1): string {
+    const T = (x: number, y: number, t: string, c = '#94abb7', a = 'middle') => `<text x="${x}" y="${y}" text-anchor="${a}" fill="${c}" font-size="13" font-weight="700">${t}</text>`;
     // which end is on the left, looking up the course (N): the pin if it's to the left of N
     const left = { x: -w.N.y, y: w.N.x }, pinLeft = dot(sub(w.pin, w.center), left) > 0;
     const [lName, rName] = pinLeft ? ends : [ends[1], ends[0]], lFav = fav === (pinLeft ? 0 : 1), rFav = fav === (pinLeft ? 1 : 0);
+    // (the end called, start practice: ringed till the gun shows which was favored)
+    const lCall = called === (pinLeft ? 0 : 1), rCall = called === (pinLeft ? 1 : 0), ring = '#ffb627';
     const along = clamp(dot(sub(u, w.center), left) / (w.lineLen / 2), -1.3, 1.3); // + toward the left end
     const X = Math.round(75 - along * 61), Y = over ? 4 : 30, col = over ? '#ff5d4c' : '#3fd197', dir = toward === over ? 1 : -1; // (arrow down, away from the line's course side, or up)
     const ly = over ? 18 : 12;
     return `<line x1="14" y1="${ly}" x2="136" y2="${ly}" stroke="#94abb7" stroke-width="2" stroke-dasharray="4 3"/>`
-      + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(14, ly + 18, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7')}`
-      + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(136, ly + 18, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7')}`
+      + (lCall ? `<rect x="5" y="${ly - 9}" width="18" height="18" rx="3" fill="none" stroke="${ring}" stroke-width="1.5"/>` : '') + (rCall ? `<circle cx="136" cy="${ly}" r="8.5" fill="none" stroke="${ring}" stroke-width="1.5"/>` : '')
+      + `<rect x="8" y="${ly - 6}" width="12" height="12" rx="2" fill="${lFav ? '#ffb627' : '#e9f2f5'}"/>${T(1, ly + 21, lName + (lFav ? ' ★' : ''), lFav ? '#ffb627' : '#94abb7', 'start')}`
+      + `<circle cx="136" cy="${ly}" r="5" fill="${rFav ? '#ffb627' : '#e9f2f5'}"/>${T(149, ly + 21, rName + (rFav ? ' ★' : ''), rFav ? '#ffb627' : '#94abb7', 'end')}`
       + `<circle cx="${X}" cy="${Y}" r="4" fill="${col}"/><path d="M${X} ${Y + 3 * dir} v${7 * dir}" stroke="${col}" stroke-width="2"/>`
       + `<path d="M${X - 3.5} ${Y + 7 * dir} l3.5 ${4 * dir} l3.5 ${-4 * dir}" fill="none" stroke="${col}" stroke-width="2"/>`;
   }
-  /** The card's "Which end?" row: the two ends in the sketch's own order (left first, looking up the course), the one
-   *  called lit. Written only when it changes, so a click lands. */
-  private askRow(w: SimView, on: boolean): void {
-    const row = $('ncAsk');
-    const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0;
-    const key = on ? `${pinLeft}|${this.favCall}` : '';
+  /** The sketch's two ends as places to click (the owner, 20 Nov 2026: the call's made on the picture, no buttons):
+   *  each end's area gets its end, looking up the course; off when there's no call to make. Written only on change. */
+  private callEnds(w: SimView, on: boolean): void {
+    const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0, key = on ? String(pinLeft) : '';
     if (key === this.askKey) return; this.askKey = key;
-    row.hidden = !on; if (!on) return;
-    const C = w.C, short = (s: string) => s.replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
-    const ends: ['pin' | 'committee', string][] = [['pin', short(C.pinLabel)], ['committee', short(C.committeeLabel)]];
-    if (!pinLeft) ends.reverse();
-    const [l, r] = row.querySelectorAll<HTMLButtonElement>('button');
-    l.dataset.end = ends[0][0]; l.textContent = `◀ ${ends[0][1]}`; l.setAttribute('aria-pressed', String(this.favCall === ends[0][0]));
-    r.dataset.end = ends[1][0]; r.textContent = `${ends[1][1]} ▶`; r.setAttribute('aria-pressed', String(this.favCall === ends[1][0]));
+    const l = $('ncEndL'), r = $('ncEndR'); l.hidden = r.hidden = !on; if (!on) return;
+    l.dataset.end = pinLeft ? 'pin' : 'committee'; r.dataset.end = pinLeft ? 'committee' : 'pin';
+  }
+  /** What the nav strip last showed (written only when it changes). */
+  private nsKey = '';
+  /**
+   * The nav strip, top right (r272, the owner, 20 Nov 2026): where she's bound and how it lies, in the chartplotter's
+   * terms, one row; only what the instruments don't already show (no speed, heading or clock). Cruising: the destination
+   * (its short name: ui/navNames.ts), BRG, DTW, TTG and VMC (her speed made good toward it, over the ground). Racing: the
+   * race time after the gun, the next mark by its code and the side it's left to, BRG, DTW, and VMG while she has to tack or
+   * jibe to reach it, VMC once she can lay it (by the laylines). No destination, no strip: the inset alone.
+   * Each label's hover says it in full.
+   */
+  private navStrip(w: SimView, u: Boat): void {
+    const el = $('navStrip'), race = !w.cruising;
+    const m = !race ? (w.dest && w.arrivedT == null ? w.dest : null) : u.finished || u.retired ? null : w.nextMark(u);
+    if (!m) { if (!el.hidden) { el.hidden = true; document.body.classList.remove('nav-on'); this.nsKey = ''; this.fitCompass(); } return; }
+    const p = m.p, r = dist(u, p), b = brg(p.x - u.x, p.y - u.y), vmc = (u.vx * (p.x - u.x) + u.vy * (p.y - u.y)) / Math.max(1, r), ttg = vmc > 0.1 ? r / vmc : Infinity;
+    const [n, un] = this.range(r), name = destName(m, race);
+    const side = race ? (m.side === 's' ? ' <span class="s">▶ stbd</span>' : ' <span class="p">◀ port</span>') : '';
+    const ttgS = !isFinite(ttg) ? '--' : ttg < 3600 ? `${Math.round(ttg / 60)}<small>min</small>` : `${(ttg / 3600).toFixed(1)}<small>h</small>`;
+    // racing, VMG (straight up or down the wind) on a beat or a run, VMC (toward the mark) on a reach; cruising, VMC
+    // VMG when she has to tack or jibe to reach the mark, VMC once she can lay it (the owner, 20 Nov 2026), by the
+    // laylines the inset draws; a reach has none, and cruising is always VMC
+    const L = race ? laylinesFor(w, u) : null, from = u.ww.from;
+    const isG = !!L && L.mark.p === p && !canLay(b, from, L.kind, u.tack, [brg(L.tracks[0].x, L.tracks[0].y), brg(L.tracks[1].x, L.tracks[1].y)]);
+    const toWind = V(from), vmg = isG ? (L!.kind === 'up' ? 1 : -1) * (u.vx * toWind.x + u.vy * toWind.y) : vmc;
+    const brgS = `${String(Math.round(b) % 360).padStart(3, '0')}<small>°</small>`, vm = `${(vmg / KT).toFixed(1)}<small>kn</small>`;
+    // racing, after the gun: the race's time first (the owner, 20 Nov: no timer card after the gun)
+    const rt = race && w.t >= 0 ? fmtClock(w.t) : ''; setText($('nsRace'), rt); $('nsRaceC').hidden = !rt;
+    const key = [rt.length, race, name, side, brgS, n, un, ttgS, vm, isG].join('|');
+    if (key === this.nsKey) return; this.nsKey = key;
+    $('nsLab').textContent = race ? 'Next' : 'To'; $('nsName').textContent = name; if (side) $('nsName').insertAdjacentHTML('beforeend', side);
+    $('nsBrgC').title = race ? 'Bearing to the mark' : 'Bearing to the destination';
+    $('nsBrg').innerHTML = brgS; $('nsDtw').innerHTML = `${n}<small>${un}</small>`;
+    $('nsTtgC').hidden = race; $('nsTtg').innerHTML = ttgS;
+    $('nsVmL').textContent = isG ? 'VMG' : 'VMC';
+    $('nsVmC').title = isG ? 'Velocity made good: speed straight upwind (or downwind)' : `Velocity made on course: speed toward ${race ? 'the mark' : 'the destination'}`;
+    $('nsVm').innerHTML = vm; $('nsVm').classList.toggle('good', vmg > 0.15);
+    if (el.hidden) { el.hidden = false; document.body.classList.add('nav-on'); }
+    this.fitCompass();
+  }
+  /** The compass bar one shape at every size (the owner, 20 Nov): 44 px tall, 560 wide, the same degrees to the pixel;
+   *  narrower only when the nav strip (or the inset, with no strip) would otherwise reach it, and then only its width. */
+  fitCompass(): void {
+    const bar = $('compassBar'), s = $('navStrip'), right = (s.hidden ? $('map') : s).getBoundingClientRect().left;
+    const mid = innerWidth / 2, left = $('hud').getBoundingClientRect().right;
+    const half = Math.min(mid - left, right - mid) - 12;
+    bar.style.width = Math.max(240, Math.min(560, Math.floor(2 * half))) + 'px';
   }
   /** Distance in the card's units: metres close in, nautical miles further off. */
   private range(m: number): [string, string] { return m < 0.2 * 1852 ? [m.toFixed(0), 'm'] : [(m / 1852).toFixed(m < 1852 * 10 ? 1 : 0), 'nm']; }
@@ -556,9 +620,8 @@ export class Hud {
    */
   private lineBox(w: SimView, u: Boat): void {
     const el = $('linebox'), C = w.C;
-    if (w.t >= 0 || u.finished) this.askRow(w, false);
+    if (w.t >= 0 || u.finished) this.callEnds(w, false);
     if (u.finished) { $('nextCard').hidden = true; return; }
-    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const vtU = polar(u.ww.kt, u.twa, sailPlan(u)), target = steadySpeed(vtU, v => seaDrag(u.sea, u.h, v), driveCurveFor(u.ww.kt, u.twa, vtU)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
@@ -568,12 +631,9 @@ export class Hud {
       if (d && w.arrivedT == null) {
         // to the destination: range and bearing, your speed made good toward it over the ground (with the current), and how long at that rate
         const rng = dist(u, d.p), b = brg(d.p.x - u.x, d.p.y - u.y), vmc = (u.vx * (d.p.x - u.x) + u.vy * (d.p.y - u.y)) / Math.max(1, rng);
-        const eta = vmc > 0.1 ? rng / vmc : Infinity, [n, un] = this.range(rng);
-        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 55);
-        this.card('', 'Navigator', n, un, `<circle cx="75" cy="36" r="4" fill="#3fd197"/><path d="M75 36 L${mx} 12" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
-          + `<path d="M${mx} 2 v14 M${mx} 2 l9 4 l-9 4" fill="#ffb627" stroke="#ffb627" stroke-width="1.5"/>${isSpot(d.name) ? '' : T(clamp(mx, 40, 110), 46, d.name.toUpperCase().slice(0, 22), '#ffb627')}`); // (a spot on open water: the flag alone, its position not spelled out: the owner, 17 Nov 2026)
-        el.innerHTML = `${String(Math.round(b)).padStart(3, '0')}° · ` + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
-          + `<br><small>${speed}</small>`;
+        // (the nav strip, top right, has it now: r272)
+        void rng; void b; void vmc;
+        if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
         return;
       }
       // no destination, no card (the owner, 13 Nov: it only repeated the boat speed)
@@ -587,21 +647,28 @@ export class Hud {
       this.card('ocs', ab ? 'Racing abandoned' : 'Racing postponed', ab ? 'N' : 'AP', 'over A',
         `<image href="${img(ab ? 'N' : 'AP')}" x="60" y="1" width="31" height="21" preserveAspectRatio="none"/><image href="${img('A')}" x="60" y="24" width="31" height="21" preserveAspectRatio="none"/>`);
       el.innerHTML = 'No more racing today · sail home'; // (the wind that called it off is in the message)
+      $('ncTop').hidden = true;
       return;
     }
     if (w.t < 0 || u.ocs || !u.started) {
       const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;
       // the end closer to the wind on the water is favored
       const k = dot(sub(w.pin, w.committee), V(u.ww.from)) / w.lineLen, deg = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
-      const asking = this.favAsk === 'ask' && w.t < 0; // (start practice: the favored end yours to find, shown at the gun)
+      // (start practice: the favored end yours to find, shown at the gun; racing, shown once you've called it)
+      const asking = w.t < 0 && (this.favAsk === 'ask' || (this.favAsk === 'race' && !this.favCall));
       const favEnd: 0 | 1 | -1 = asking || !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
+      // (the end favored now, kept for the call's verdict: the app reads the last one before the gun, so a shift after it
+      // doesn't change the answer; till the gun the gold follows the end favored now. The owner, 20 Nov)
+      if (w.t < 0) this.favNow = deg < 2 ? 'square' : k > 0 ? 'pin' : 'committee';
       // (one short line on the card, the owner: no degrees; the end's name only)
-      const endName = (k > 0 ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
-      const fav = asking || !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favored</span>`;
       const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
-      this.askRow(w, asking && d <= 0);
+      const callIx: 0 | 1 | -1 = this.favAsk === 'ask' && w.t < 0 && this.favCall ? (this.favCall === 'pin' ? 0 : 1) : -1;
+      // (start practice: the call can change till the gun; racing, it stands once made, the gold showing the end)
+      this.callEnds(w, w.t < 0 && (this.favAsk === 'ask' || (this.favAsk === 'race' && !this.favCall)));
+      // the card's top row: the countdown (before the gun) and the flags flying
+      setText($('ncTimer'), w.t < 0 ? fmtClock(w.t) : ''); $('ncTimerBox').hidden = w.t >= 0; $('ncTop').hidden = w.t >= 0 && !this.flagsUp;
       if (d > 0) {
-        this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
+        this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0, callIx));
         el.innerHTML = w.t < 0 ? `Over by ${d.toFixed(0)} m · get back below the line` : u.roundEnd ? 'I flag: back round an end of the line' : 'OCS · dip back below the line and start';
         return;
       }
@@ -610,24 +677,23 @@ export class Hud {
       const vtL = polar(u.ww.kt, u.twa, sailPlan(u)), tl = uN > 0.15 ? timeToCover(-d, u.v, vtL, uN, cN, 240, driveCurveFor(u.ww.kt, u.twa, vtL)) : Infinity;
       const tStr = isFinite(tl) ? `${tl.toFixed(0)} s to the line` : uN > 0.15 ? 'bear away to sail' : 'sailing away';
       const burn = w.t < 0 && isFinite(tl) ? ` · burn ${Math.max(0, -w.t - tl).toFixed(0)} s` : '';
-      this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0));
+      this.startNums = { burn: w.t < 0 && isFinite(tl) ? Math.max(0, -w.t - tl) : null, toLine: isFinite(tl) ? tl : null };
+      this.card(u.ocs ? 'ocs' : '', u.ocs ? 'Over early' : 'Start line', (-d).toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, false, uN > 0, callIx));
       // in the last minute, the time to burn matters more than which end is favoured
-      el.innerHTML = u.ocs ? 'You were over: now start properly' : w.t > -60 && burn ? tStr + burn : tStr + fav;
+      // (no "sailing away" or favored-end words: the gold marks the end, the strip the way; the owner, 20 Nov)
+      el.innerHTML = u.ocs ? 'You were over: now start properly' : isFinite(tl) ? tStr + (w.t > -60 ? burn : '') : '';
     } else {
       const m = w.nextMark(u), tgt = m ? m.p : w.center;
       const d = dist(u, tgt), b = brg(tgt.x - u.x, tgt.y - u.y), bs = String(Math.round(b)).padStart(3, '0'), [n, un] = this.range(d);
       if (m) {
-        // the mark ahead or abeam, as it bears from her bow; a curl round it the way it's left
-        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 45), side = m.side === 's' ? 1 : -1;
-        const name = m.name.toUpperCase().slice(0, 22);
-        this.card('', 'Next mark', n, un, `<circle cx="${mx}" cy="14" r="6" fill="#ffb627"/>${T(clamp(mx, 45, 105), 44, name, '#ffb627')}`
-          + `<path d="M75 34 C 75 ${24}, ${mx - side * 14} 8, ${mx} 4 C ${mx + side * 12} 2, ${mx + side * 14} 18, ${mx + side * 8} 24" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
-          + `<circle cx="75" cy="34" r="4" fill="#3fd197"/>`);
-        el.innerHTML = `Leave it to ${m.side === 's' ? 'starboard' : 'port'} · bearing ${bs}°`;
+        // (the next mark is the nav strip's now, top right: r272)
+        void d; void bs; void n; void un;
+        if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
       } else {
         const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
         const near = dist(u, w.pin) < dist(u, w.committee) ? 0 : 1;
         this.card('', 'Finish line', n, un, this.lineSketch(w, u, ends, near, false, true));
+        $('ncTop').hidden = true;
         el.innerHTML = `Bearing ${bs}° · the ${near === 0 ? C.pinLabel : C.committeeLabel} end is closer`;
       }
     }
@@ -727,13 +793,14 @@ export class Hud {
     const pal = this.shown(wd).chartPal ?? 'day', [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[pal];
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
-    const avoid = PLACES.filter(pl => scale > 0.12 || !pl.buoy).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
+    const avoid = PLACES.filter(pl => pl.buoy && scale > 0.12).map(pl => { const q = tf(pl.p.x, pl.p.y); return [q[0] - 4, q[1] - 18, ctx.measureText(pl.name).width + 14, 22] as [number, number, number, number]; });
     const me = tf(u.x, u.y); avoid.push([me[0] - 26, me[1] - 26, 52, 52]); // (and clear of your boat)
     this.chartBody(ctx, w, h, wd, u, tf, scale, { x: cx, y: cy }, 0, true, 'chart', avoid);
     // the places, by name
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
     const placed: [number, number, number, number][] = [[me[0] - 26, me[1] - 26, 52, 52]]; // (your boat's spot is kept clear of names)
     for (const pl of PLACES) {
+      if (!pl.buoy) continue; // (the spots, 'Off Crissy Field' and the rest, are no longer on the chart: owner, 20 Nov 2026)
       const q = tf(pl.p.x, pl.p.y); if (q[0] < -50 || q[0] > w + 50 || q[1] < -20 || q[1] > h + 20) continue;
       // (the sim's own places: the racing marks in amber, under the chart's print)
       if (!pl.buoy) { ctx.fillStyle = I.text; ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 6.29); ctx.fill(); }
@@ -749,26 +816,27 @@ export class Hud {
       ctx.strokeStyle = I.pick; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b[0] - 14, b[1]); ctx.lineTo(b[0] + 14, b[1]); ctx.moveTo(b[0], b[1] - 14); ctx.lineTo(b[0], b[1] + 14); ctx.stroke();
     }
-    // the fog layer: what visibility it shows, and whose (or why there's none)
-    const fogLine = this.fogNote(wd, false);
-    if (fogLine) {
+    // the fog layer: what visibility it shows, in one short line under the Layers panel (top left), with whose it is and the
+    // caveats behind a hover (chart.ts reads fogCaption); the wind shadows note below it (the owner, 20 Nov 2026)
+    this.fogCaption = null;
+    let capY = 156;
+    const cap = (text: string, tip: string) => {
       ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-      const fw = ctx.measureText(fogLine).width; ctx.fillStyle = I.halo; ctx.fillRect(10, 8, fw + 12, 18);
-      ctx.fillStyle = I.text; ctx.fillText(fogLine, 16, 21);
-    }
+      const fw = ctx.measureText(text).width; ctx.fillStyle = I.halo; ctx.fillRect(10, capY, fw + 12, 18);
+      ctx.fillStyle = I.text; ctx.fillText(text, 16, capY + 13);
+      if (!this.fogCaption) this.fogCaption = { text, tip, rect: [10, capY, 10 + fw + 12, capY + 18] }; capY += 22;
+    };
+    const fogShort = this.fogNote(wd, true);
+    if (fogShort) cap(fogShort, this.fogNote(wd, false) ?? '');
     // the wind shadows switched on with none in view: say so, so the switch isn't taken for broken
-    if (this.shadowNone.chart) {
-      const t = 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)';
-      ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-      const y = fogLine ? 30 : 8, tw = ctx.measureText(t).width; ctx.fillStyle = I.halo; ctx.fillRect(10, y, tw + 12, 18);
-      ctx.fillStyle = I.text; ctx.fillText(t, 16, y + 13);
-    }
+    if (this.shadowNone.chart) cap('NO WIND SHADOWS HERE', 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)');
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     // (`cornerFree`: the top-right corner left for the setup chart's expand icon, north and the wind just left of it)
-    const nx = opts.cornerFree ? w - 72 : w - 28;
-    ctx.fillText('N', nx, 22); ctx.beginPath(); ctx.moveTo(nx, 28); ctx.lineTo(nx + 5, 42); ctx.lineTo(nx - 5, 42); ctx.closePath(); ctx.fill();
-    const wf = wd.wind.from * D2R, ox = nx, oy = 80;
+    // (the full chart's top-right corner is the field picker's and Day | Dusk: north and the wind go just under them)
+    const nx = opts.cornerFree ? w - 72 : w - 28, dy = opts.cornerFree ? 0 : 56;
+    ctx.fillText('N', nx, 22 + dy); ctx.beginPath(); ctx.moveTo(nx, 28 + dy); ctx.lineTo(nx + 5, 42 + dy); ctx.lineTo(nx - 5, 42 + dy); ctx.closePath(); ctx.fill();
+    const wf = wd.wind.from * D2R, ox = nx, oy = 80 + dy;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
@@ -821,6 +889,8 @@ export class Hud {
     return v;
   }
 
+  /** The chart's fog caption as last drawn (canvas pixels), its source and caveats as the hover's text (ui/chart.ts). */
+  fogCaption: { text: string; tip: string; rect: [number, number, number, number] } | null = null;
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(this.display ? this.shown(wd) : wd.settings as Settings, 'fog')) return null; // (the page's own layers when set; the race's otherwise)
@@ -885,14 +955,18 @@ export class Hud {
     // (the shadows, sampled below: in the key only when there's one in view)
     const shadowsOn = on('shadows');
     this.keyState[detail] = { sim, pal, scale }; // (the shadows add themselves when drawn, below: the key reads this list when asked)
-    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
+    // (the fog and rain set in the conditions replace the record's fog, as the caption says: one veil over the whole chart)
+    const setNow = field === 'fog' && detail === 'chart' ? { fog: wd.settings.fog, rain: rainLevel(wd.settings.rain, wd.clockUtc) } : null, setFog = !!setNow && setFogAlpha(setNow) > 0.02;
+    if (setFog) sim.push('fog');
+    if (setFog) drawSetFog(ctx, w, h, I, setNow!);
+    else if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore),
     // every 10 s of the clock (the chart's paused); the full chart's only
     if (flowHere) this.flowField[kind].draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     // (and the other kinds' fields built while the page is idle, for this view: switched on, they're drawn at once)
     if (detail === 'chart') this.warmFields(tf, w, h, scale, wd, kind);
-    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
+    if (!setFog && fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) {
       drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
       // the navigator's layer (the owner's, 17 Nov 2026): on the full chart, and on the inset in its navigator's view

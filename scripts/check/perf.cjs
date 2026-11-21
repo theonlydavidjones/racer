@@ -154,8 +154,8 @@ const VIEWS = [
     await q.addInitScript(() => { const raf = window.requestAnimationFrame.bind(window); window.__frames = new Map();
       window.requestAnimationFrame = cb => raf(t => { const t0 = performance.now(); cb(t); window.__frames.set(t, (window.__frames.get(t) || 0) + performance.now() - t0); }); });
     await q.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
-    // (a fixed day and passage for the cruises, Alcatraz to Crissy Field in the west wind, as scripts/check/pilot-engage.cjs sails it)
-    await q.addInitScript(c => { localStorage.setItem('fbsim-settings-v2', JSON.stringify(c ? { windDay: 2, traffic: 1, mode: 'sail', sailFrom: 'alcatraz', sailTo: 'crissy', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00' } : { windDay: 2, traffic: 1 })); }, !!V.cruise);
+    // (a fixed day and passage for the cruises, mark 18 Blossom Rock to mark 16 Blackaller in the west wind: marks, which every version has, since r270 sends the old named spots' saves to her slip and so moved the view)
+    await q.addInitScript(c => { localStorage.setItem('fbsim-settings-v2', JSON.stringify(c ? { windDay: 2, traffic: 1, mode: 'sail', sailFrom: 'm-18', sailTo: 'm-16', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00' } : { windDay: 2, traffic: 1 })); }, !!V.cruise);
     // (the race in its worker, as the published page sails it: in the page's thread, ?inproc, the World's own start-up
     // lands in the first frames, which a player's page never does)
     await q.goto((process.env.PERF_URL || 'http://localhost:5173/').replace(/[?&]inproc\b/, '')); await q.waitForTimeout(5000);
