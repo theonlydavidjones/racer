@@ -63,29 +63,77 @@ export class Labels {
     this.markTags.push({ el: mk(C.committeeLabel), p: C.committee, z: C.committeeKind === 'boat' ? 10 : 16, idx: [] });
   }
 
-  private place(el: HTMLElement, camera: THREE.Camera, x: number, y: number, z: number): void {
+  /** Where a point is on the screen (px), or null when it's behind the camera or off the screen. */
+  private project(camera: THREE.Camera, x: number, y: number, z: number): [number, number] | null {
     const v = this.tmp.copy(P3(x, y, z)).project(camera);
+    if (v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return null;
+    return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight];
+  }
+  /** A tag at a screen point (its bottom middle there), `dy` px higher; hidden for null. */
+  private put(el: HTMLElement, at: [number, number] | null, dy = 0): void {
     // (moved by transform, which the page composites without a layout, and each value written only when it changes:
     // a write a frame, even of the same value, has the page restyle every frame)
-    const off = v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1;
+    const off = !at;
     if (el.hidden !== off) el.hidden = off;
     if (off) return;
-    const t = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(1)}px,${((1 - v.y) / 2 * innerHeight).toFixed(1)}px) translate(-50%,-100%)`;
+    const t = `translate(${at[0].toFixed(1)}px,${(at[1] - dy).toFixed(1)}px) translate(-50%,-100%)`;
     if (el.style.transform !== t) el.style.transform = t;
+  }
+  private place(el: HTMLElement, camera: THREE.Camera, x: number, y: number, z: number): void { this.put(el, this.project(camera, x, y, z)); }
+  /** Each tag's size (px), measured when its words or look change, not every frame (a read after the frame's writes
+   *  would make the page lay out again). */
+  private sizes = new WeakMap<HTMLElement, { key: string; w: number; h: number }>();
+  private sizeOf(el: HTMLElement): { w: number; h: number } {
+    const key = el.className + '|' + el.textContent, c = this.sizes.get(el);
+    if (c && c.key === key) return c;
+    const n = { key, w: el.offsetWidth, h: el.offsetHeight }; this.sizes.set(el, n); return n;
+  }
+  /** The inset map and its credit line, which no tag may cover (in-race audit #4), read once a second. */
+  private keepOut: [number, number, number, number][] = []; private keepOutAt = '';
+  private keepOutRects(): [number, number, number, number][] {
+    const k = innerWidth + 'x' + innerHeight + '@' + Math.floor(performance.now() / 1000); // (and once a second: the inset grows when it's zoomed)
+    if (k !== this.keepOutAt) { this.keepOutAt = k; this.keepOut = [];
+      for (const id of ['map', 'mapCredit']) { const e = document.getElementById(id); if (!e) continue; const r = e.getBoundingClientRect(); if (r.width && r.height) this.keepOut.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8]); } }
+    return this.keepOut;
+  }
+  /**
+   * The boats' and the marks' tags, laid out so none covers another (in-race audit #3: where boats bunch, "Green P ·
+   * protest" lay over the X mark's tag and "Blue P") or the inset map: first come first placed, the next mark first,
+   * then the marks, then the boats nearest you; one that would overlap is lifted a tag's height (up to five) or put one below, and
+   * one that still can't be placed is left off for the moment.
+   */
+  private declutter(items: { el: HTMLElement; at: [number, number] | null }[]): void {
+    const placed: [number, number, number, number][] = [...this.keepOutRects()];
+    const hit = (r: [number, number, number, number]) => placed.some(b => r[0] < b[0] + b[2] && r[0] + r[2] > b[0] && r[1] < b[1] + b[3] && r[1] + r[3] > b[1]);
+    for (const it of items) {
+      if (!it.at) { this.put(it.el, null); continue; }
+      if (it.el.hidden) it.el.hidden = false; // (to be measured)
+      const { w, h } = this.sizeOf(it.el); let done = false;
+      for (const k of [0, 1, -1, 2, 3, 4, 5]) { // (up a tag at a time, or one step below its boat, as the inset sits above the horizon)
+        const dy = k * (h + 2), r: [number, number, number, number] = [it.at[0] - w / 2 - 2, it.at[1] - dy - h - 1, w + 4, h + 2];
+        if (hit(r)) continue;
+        placed.push(r); this.put(it.el, it.at, dy); done = true; break;
+      }
+      if (!done) this.put(it.el, null);
+    }
   }
 
   update(w: SimView, camera: THREE.Camera, viewMode: number): void {
     const u = w.user;
+    const boatTags: { el: HTMLElement; at: [number, number] | null; d: number }[] = [];
     w.boats.forEach((b, i) => {
       const el = this.tagEls[i]; if (!el) return;
-      this.place(el, camera, b.x, b.y, viewMode === 2 ? 2 : 10.2);
-      if (el.hidden) return;
+      const at = this.project(camera, b.x, b.y, viewMode === 2 ? 2 : 10.2);
+      boatTags.push({ el, at, d: dist(u, b) });
+      if (!at) return;
       const r = w.rights(u, b), kc = r.kc === u, near = dist(u, b) < 70;
       const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? (b.penaltyDir ? turnsTag(b) : ' · owes turns') : '') + (b.protestFlag ? ' · protest' : '');
       if (el.className !== cls) el.className = cls;
       if (el.lastChild!.textContent !== txt) el.lastChild!.textContent = txt;
     });
-    for (const mt of this.markTags) { this.place(mt.el, camera, mt.p.x, mt.p.y, mt.z); mt.el.classList.toggle('next', mt.idx.includes(u.leg) && w.t > 0); }
+    const markTags = this.markTags.map(mt => { const next = mt.idx.includes(u.leg) && w.t > 0; mt.el.classList.toggle('next', next); return { el: mt.el, at: this.project(camera, mt.p.x, mt.p.y, mt.z), next }; });
+    // (the next mark's tag first, then the other marks, then the boats, nearest you first: in-race audit #3)
+    this.declutter([...markTags.filter(m => m.next), ...markTags.filter(m => !m.next), ...boatTags.sort((a, b) => a.d - b.d)]);
     const de = this.destEl;
     if (de) {
       const d = w.dest;
