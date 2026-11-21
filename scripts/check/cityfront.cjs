@@ -9,6 +9,7 @@
 const { chromium } = require('playwright');
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = 111320 * Math.cos(LAT0 * Math.PI / 180);
 const LL = (lat, lon, z) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT, z];
+const FOV = { fp_300: 14, fp_under: 24 }; // a narrower lens for the fort's two stills (the fort is 50 m wide at 300 m)
 const VIEWS = {
   fortpoint: [LL(37.8150, -122.4725, 5), LL(37.8098, -122.4775, 20)], // Fort Point and the Presidio's shore, from the water east of the bridge's south end
   crissy: [LL(37.8138, -122.4580, 5), LL(37.8070, -122.4600, 25)], // Crissy Field and the Presidio's buildings, from the water off the airfield
@@ -20,6 +21,8 @@ const VIEWS = {
   hyde_w: [LL(37.8110, -122.4262, 5), LL(37.8097, -122.4225, 12)], // the same from the west, across Aquatic Park
   fp_sea: [LL(37.8115, -122.4755, 5), LL(37.8105, -122.4771, 9)], // Fort Point close, from the water to the north-east
   fp_south: [LL(37.8100, -122.4762, 6), LL(37.8105, -122.4771, 9)], // the same from the south-east
+  fp_300: [LL(37.8122, -122.4745, 3), LL(37.8107, -122.4773, 9)], // Fort Point's bay face and the arch, from the water 300 m north-east, at sail height (SCALE=3 then crop: the fort is small at that range)
+  fp_under: [LL(37.8150, -122.4735, 2.6), LL(37.8125, -122.4767, 16)], // from a boat close-hauled on port tack heading out under the bridge (about 225°), the fort on the port bow
   fp_over: [LL(37.8105, -122.4771, 90), LL(37.81051, -122.47710, 0)], // overhead: the fort's roof, courtyard and light
   over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
@@ -29,7 +32,7 @@ const VIEWS = {
 (async () => {
   const out = process.argv[2] || '.', only = process.argv.slice(3), port = process.env.PORT || 5173;
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
-  const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
+  const p = await b.newPage({ viewport: { width: 1280, height: 760 }, deviceScaleFactor: +process.env.SCALE || 1 });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(`http://localhost:${port}/?inproc`); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1200);
@@ -37,7 +40,7 @@ const VIEWS = {
   await p.addStyleTag({ content: 'body *:not(#gl) { visibility: hidden !important; } #gl { visibility: visible !important; }' });
   for (const [name, [pos, tgt]] of Object.entries(VIEWS)) {
     if (only.length && !only.includes(name)) continue;
-    await p.evaluate(([pos, tgt]) => { window.__cam = { pos, at: tgt }; }, [pos, tgt]);
+    await p.evaluate(([pos, tgt, fov]) => { window.__cam = { pos, at: tgt, fov: fov || undefined }; }, [pos, tgt, FOV[name]]);
     await p.waitForTimeout(5000);
     const info = await p.evaluate(() => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => { const i = window.__renderer.info; res({ calls: i.render.calls, tris: i.render.triangles }); }))));
     await p.screenshot({ path: `${out}/${name}.png` });

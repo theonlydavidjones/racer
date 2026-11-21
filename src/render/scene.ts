@@ -1148,10 +1148,11 @@ export class SceneView {
       const up = V(overheadUp(over, w)), cx = u.x + over.off.x, cy = u.y + over.off.y;
       camera.position.copy(P3(cx, cy, over.height)); camera.up.set(up.x, 0, -up.y); camera.lookAt(P3(cx, cy, 0));
     }
-    // dev only: a free camera for checking the scenery (window.__cam = { pos: [x, y, z], at: [x, y, z] }, sim coords)
-    const dc = import.meta.env.DEV ? (window as unknown as { __cam?: { pos: number[]; at: number[] } }).__cam : undefined;
+    // dev only: a free camera for checking the scenery (window.__cam = { pos: [x, y, z], at: [x, y, z], fov?: degrees }, sim coords)
+    const dc = import.meta.env.DEV ? (window as unknown as { __cam?: { pos: number[]; at: number[]; fov?: number } }).__cam : undefined;
     if (dc) { camera.up.set(0, 1, 0); if (Math.hypot(dc.pos[0] - dc.at[0], dc.pos[1] - dc.at[1]) < 1) camera.up.set(0, 0, -1); // straight down: north at the top
-       camera.position.copy(P3(dc.pos[0], dc.pos[1], dc.pos[2])); camera.lookAt(P3(dc.at[0], dc.at[1], dc.at[2])); }
+       camera.position.copy(P3(dc.pos[0], dc.pos[1], dc.pos[2])); camera.lookAt(P3(dc.at[0], dc.at[1], dc.at[2]));
+       if (dc.fov) { camera.fov = dc.fov; camera.updateProjectionMatrix(); } } // (a narrower view, to see a far landmark)
     // the showroom shifts the picture right, clear of the panel on the left; a panel docked beside the view in any view
     // (the flow view, on the right) shifts it the other way
     const shift = (viewMode === 3 ? (look.shift ?? 0) : 0) + (look.panelShift ?? 0), size = this.renderer.getSize(new THREE.Vector2());
