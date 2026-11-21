@@ -14,7 +14,8 @@ const URL = process.argv[2] || 'http://localhost:5173/', OUT = process.argv[3];
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const errs = [], bad = [];
   const p = await b.newPage({ viewport: { width: 1400, height: 860 }, deviceScaleFactor: OUT ? 2 : 1 }); p.on('pageerror', e => errs.push(e.message));
-  await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'alcatraz', sailTo: 'crissy', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00', insetView: 'nav' }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
+  // (off Alcatraz to off Crissy Field, by position: the named spots left the pickers in r270, and a save naming one starts from her slip; chart audit #14)
+  await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'at:37.82250,-122.42200', sailTo: 'at:37.81150,-122.45900', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00', insetView: 'nav' }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
   await p.goto(URL); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(2000);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);

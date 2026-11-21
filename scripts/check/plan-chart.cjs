@@ -12,7 +12,8 @@ const LAT0 = 37.81053, LON0 = -122.44332, M = 111320, MLON = M * Math.cos(LAT0 *
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'cityfront', sailTo: 'alcatraz', mapLayers: { current: true, wind: false } }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
+  // (the Cityfront to off Alcatraz, by position: the named spots left the pickers in r270; chart audit #14)
+  await p.addInitScript(() => { const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(s, { mode: 'sail', sailFrom: 'at:37.81280,-122.44400', sailTo: 'at:37.82250,-122.42200', mapLayers: { current: true, wind: false } }); localStorage.setItem('fbsim-settings-v2', JSON.stringify(s)); });
   await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(2000);
   await p.evaluate(() => document.getElementById('bPlanOpen').click()); await p.waitForTimeout(5000);
@@ -35,7 +36,7 @@ const LAT0 = 37.81053, LON0 = -122.44332, M = 111320, MLON = M * Math.cos(LAT0 *
   await p.mouse.up(); await p.waitForTimeout(2000);
   const f1 = await p.evaluate(() => [sim().user.x, sim().user.y]);
   const sf = await p.evaluate(() => JSON.parse(localStorage.getItem('fbsim-settings-v2')).sailFrom);
-  console.log('start refused on land:', sf === 'cityfront', '(from', sf + ')', 'moved', Math.hypot(f1[0] - f0[0], f1[1] - f0[1]).toFixed(1), 'm');
+  console.log('start refused on land:', sf === 'at:37.81280,-122.44400', '(from', sf + ')', 'moved', Math.hypot(f1[0] - f0[0], f1[1] - f0[1]).toFixed(1), 'm');
   // drag the start out to the water off Crissy Field
   const s1 = await toPx({ x: f1[0], y: f1[1] }), crissy = await toPx(LL(37.8095, -122.4630));
   await p.mouse.move(s1[0], s1[1]); await p.mouse.down(); await p.mouse.move(crissy[0], crissy[1], { steps: 10 }); await p.mouse.up(); await p.waitForTimeout(2500);
