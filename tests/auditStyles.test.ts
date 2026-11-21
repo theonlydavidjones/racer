@@ -35,3 +35,11 @@ describe('audit 8: the nav strip is as tall as the compass bar beside it', () =>
     expect(css18).toMatch(/#navStrip\{[^}]*height:44px/);
   });
 });
+
+describe('audit 5: the chart\'s north and wind readout carry a halo over the chart print', () => {
+  it('hud.ts strokes both before filling them', () => {
+    const h = readFileSync('src/ui/hud.ts', 'utf8') as string;
+    expect(h).toContain("ctx.strokeText('N', nx, 22 + dy)");
+    expect(h).toMatch(/ctx\.strokeText\(`WIND \$\{Math\.round\(wd\.wind\.kt\)\} KT`/);
+  });
+});

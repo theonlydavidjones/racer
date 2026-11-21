@@ -835,12 +835,13 @@ export class Hud {
     // (`cornerFree`: the top-right corner left for the setup chart's expand icon, north and the wind just left of it)
     // (the full chart's top-right corner is the field picker's and Day | Dusk: north and the wind go just under them)
     const nx = opts.cornerFree ? w - 72 : w - 28, dy = opts.cornerFree ? 0 : 56;
+    ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText('N', nx, 22 + dy); ctx.fillStyle = I.text; // (a halo, so they read over the chart's print: the in-race audit)
     ctx.fillText('N', nx, 22 + dy); ctx.beginPath(); ctx.moveTo(nx, 28 + dy); ctx.lineTo(nx + 5, 42 + dy); ctx.lineTo(nx - 5, 42 + dy); ctx.closePath(); ctx.fill();
     const wf = wd.wind.from * D2R, ox = nx, oy = 80 + dy;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
-    ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34);
+    ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34); ctx.fillStyle = '#ffb627'; ctx.fillText(`WIND ${Math.round(wd.wind.kt)} KT`, ox - 6, oy + 34);
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
     ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
     ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
