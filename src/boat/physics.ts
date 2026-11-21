@@ -84,10 +84,15 @@ export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: nu
 /** Whether bearing away 10° below close-hauled can build her the way for a tack (slowTack × 1.15, as the AI asks) in the
  * wind and chop she has. Not always: the chop is the day's wind's (world.ts seaWind), slowTack the wind at her, so in a
  * deep lull or another boat's shadow on a breezy day her footed speed in the chop can stay under it (0.5 m chop and
- * 2 kt at her), and footing for it she never came round (v213 review). Then she wears round instead. */
+ * 2 kt at her), and footing for it she never came round (v213 review). Then she tacks slowly instead, sculled round
+ * (ai.ts, goTack.slow). */
+/** Footing in chop she settles 7–9% under the table's target (the v214 review: AI-steered 10° below close-hauled for
+ * 240 s, 0.428 m/s against 0.464 in 2 kt and 0.4 m, 0.827 against 0.890 in 4 kt and 0.8 m), so the target must clear
+ * the speed she needs by a tenth. */
+const FOOT_MARGIN = 1.1;
 export const footReaches = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): boolean => {
   const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
-  return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15;
+  return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15 * FOOT_MARGIN;
 };
 
 /** The crew's reaction time to a change in apparent wind angle, s. */
@@ -428,7 +433,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      // (but a tack asked slow where footing couldn't build the way (ai.ts goTack.slow), with way on, she takes slowly
+      // through the wind, sculled round onto the new tack's close-hauled course as 42.3(d) allows (SCULL 1, "on either
+      // tack"): 36 s against 97 s wearing in 2.5 kt and 0.5 m chop, 63 against 156 in 1.5 kt and 0.4 m (v213 and v214
+      // reviews). From a dead stop the wear still wins.)
+      const slowAsk = !!ai.goTack?.slow && b.v >= WAY_LOST;
+      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow && !slowAsk ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
