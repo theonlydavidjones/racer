@@ -282,7 +282,7 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
       // (the fleet's places worked out once, when racing's called off, with the course's wind then, and kept: every boat
       // reads hers from the same list)
       const places = w.cancelled ? (w.cancelled.places ??= standOffPlaces(w, at, w.wind.from)) : standOffPlaces(w, at, w.wind.from);
-      const stand = places[w.boats.filter(o => !o.isUser).indexOf(b)] ?? at;
+      const stand = places[standOffOrder(w).indexOf(b)] ?? at;
       job = { cancelled: w.cancelled!, g: routeAroundSteps({ x: b.x, y: b.y }, stand, 120), stand }; homeWork.set(b, job);
     }
     // (the fleet's slices for this step shared out boat by boat, in the order they think: the same race every time)
@@ -363,8 +363,14 @@ function clearRound(p: Vec, r: number): boolean {
  * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
  * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, has the land 150 m to leeward or along her drift, or land, a pier or a breakwater within LIE_OFF); the nearest
  * such, a little upwind of it the better (on a lee shore, well out): the fleet's spot; each boat her own place 80 m apart along the wind's line
- * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
+ * across, so the fleet isn't all on one point. All the fleet's places, in standOffOrder.
  */
+/** The order the stand-off places are shared out in: by which boat she is, never by who's steering. The AI boats, then
+ * the player's own boat last (w.user, by identity): sailed on the AI's skipper (scripts/check/ghost.cjs sets her
+ * isUser false), she takes the spare place at the end; filtered by !isUser, her flag flipping after the places were
+ * kept (w.cancelled.places) shifted every boat's index by one, two boats sharing a place and the last falling back to
+ * the course's middle (FTUE's finding; ui/rivals.ts excludes by identity the same way). */
+export const standOffOrder = (w: World): Boat[] => [...w.boats.filter(o => o !== w.user), w.user];
 function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity && anyShoreDist(p) > 100 && clearRound(p, 100);
   // The fleet's one spot first (open water, the nearer and the more upwind of the entrance the better); then each boat
@@ -380,7 +386,7 @@ function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
     const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2;
     if (q < cost) { cost = q; base = p; }
   }
-  const fleet = w.boats.filter(o => !o.isUser);
+  const fleet = standOffOrder(w);
   if (!base) return fleet.map(() => h);
   // Apart across the wind is what counts: lying to, a boat sags straight to leeward until she's drifted 300 m, so two
   // places one dead to leeward of the other share a lane, the one drifting down through the other's spot and that one
