@@ -227,7 +227,19 @@ What the AI does wrong on top of the physics:
 - `homeCourse` works its route out a slice at a time (`routeAroundSteps`, HOME_SLICES a step, shared by the fleet). Its stand-off places come from `standOffPlaces`.
 - Either could keep the fleet by the line: a route that takes minutes to work out, or stand-off places near it.
 
-**Not yet reproduced.** Next: the repro in a test, a probe of each boat's job and stand, and the same after the gun (an abandonment on leg 2). Then the fix and a test, through Capacity.
+**Probed:**
+- The setup: 5de4d67c, course 2, west 22 kt, seq 1, raceFrom water, seed 1523510690.
+- In my run the committee called it at t +60 (N over A), not at −180. The 2-minute mean needs 240 readings, so the earliest call comes later than in Debrief's report. What the fleet then does doesn't depend on which flag.
+- Every AI boat's distance from the line's middle and from her stand-off spot was logged each minute for 50 minutes.
+
+**What happens:**
+- The nearest harbour exit to course 2's centre is only 227 m from the line's middle (Red's spot: 256, −46; the line's middle: 31, −78).
+- The boats reach their spots in 2–3 minutes and lie to, as homeCourse means them to. They drift up to about 300 m off, then sail back up (ai.ts homeCourse: "lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back").
+- Over the 50 minutes they stayed 13–317 m from the line, cycling between lying to and sailing back.
+
+**Verdict: not a bug.** It's the design, on a course whose harbour mouth is beside the line. "Staying by the line" is standing off the harbour, which the abandon-home test asks for: settled within an hour, clear of the land and each other.
+
+**The open question is a design one: should they go in?** A crew seeing "no more racing today" sails into the harbour and ties up. They don't lie off its mouth for an hour. The AI's berthing (the berth test's slip approach) exists for raceFrom slip, so "sail in and berth" could reuse it. That's a design change for the owner, the Coordinator's call to put. No fix until then.
 
 ## 6. Many tacks on a beat at 12 and 22 kt (M)
 
@@ -244,7 +256,7 @@ What the AI does wrong on top of the physics:
 - the rhumb-line width tack;
 - at the mark, the 9 s lockout (ai.ts:848) with finding 1's aim point.
 
-**Fix (M):** trace Red and Black's tacks by cause first. Finding 1's fix may take care of the tacking at the mark.
+**Fix (M):** trace Red and Black's tacks by cause first. The scatter of finding 1's long final legs (±19 m, from shifts and the set changing under her) is folded in here, the Coordinator's ruling: the trace should say which triggers make it.
 
 ### Proposal 6, for the Coordinator's approval
 
@@ -288,5 +300,5 @@ What the AI does wrong on top of the physics:
 
 1. Done: fix 2 (claude/ai-standoff-identity, 77892ae6). test:fast and fouls-pair pass; perf-pair --ai waits for Capacity.
 2. Withdrawn: fix 1. See the remeasure in finding 1.
-3. Probe 5 (AP over A), then fix it.
+3. Probe 5 (AP over A): done. Not a bug, the stand-off spot is 227 m from course 2's line. Whether they should sail in and berth is a design question.
 4. Proposals 3, 4 and 6 above are for the Coordinator's approval, and 4.3 for the owner's.
