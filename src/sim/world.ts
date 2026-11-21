@@ -2726,7 +2726,7 @@ export class World {
     this.arrivedT = null;
     harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
-    this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
+    this.emit({ type: 'toast', msg: `Heading home to ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
     return true;
   }
 
