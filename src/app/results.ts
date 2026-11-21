@@ -85,7 +85,10 @@ function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) =>
     const V = versus(vsInput(app.w.log!)); if (V) tacShown.boats.add(V.rival);
   }
   // (a fleet goes by sail numbers, the owner, 13 Nov 2026: the chips say "USA 122 Varnish", the chart's tight spots "USA 122")
-  const boats = app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : `${b.no} ${b.name}`.trim(), short: b.isUser ? 'You' : b.no || b.name, color: b.color }));
+  // (her country as the results table writes it: the club's boats are numbered "US 87" on their sails, "USA 87" in print;
+  // the debrief audit, 21 Nov 2026)
+  const no = (b: { no: string }) => b.no.replace(/^US\s+/, 'USA ');
+  const boats = app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : `${no(b)} ${b.name}`.trim(), short: b.isUser ? 'You' : no(b) || b.name, color: b.color }));
   const paint = () => {
     const sc = scores(), me = sc.get(app.w.user.id), place = me?.rank != null ? `${ordinal(me.rank)} of ${app.w.boats.length}` : 'Racing';
     host.innerHTML = (compact ? '' : tacticsTop(T, place, app.w.user.finishT != null ? app.mmss(app.w.user.finishT) : `${app.mmss(app.w.t)} so far`)) + tacticsHtml(T, boats, app.w.user.id, tacShown, { compact });
