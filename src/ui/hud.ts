@@ -47,7 +47,7 @@ import { toast } from './feedback';
 import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
-import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
+import { drawEncNamesAgain, INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { drawCompass } from './compassTape';
@@ -961,6 +961,7 @@ export class Hud {
       if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
     } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
+    if (detail === 'chart') drawEncNamesAgain(ctx, pal); // (NOAA's names over the sim's lines, on a halo: chart audit #4)
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     if (on('ships')) for (const v of wd.vessels) {
       const ty = VESSEL[v.kind], u2 = V(v.h), a = tf(v.x + u2.x * ty.len / 2, v.y + u2.y * ty.len / 2), b2 = tf(v.x - u2.x * ty.len / 2, v.y - u2.y * ty.len / 2);

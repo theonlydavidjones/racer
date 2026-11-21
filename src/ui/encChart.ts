@@ -311,6 +311,20 @@ export function drawEncChart(ctx: CanvasRenderingContext2D, tf: Tf, scale: numbe
   ctx.restore();
 }
 
+/** The names and labels each canvas's chart last printed, for drawEncNamesAgain. */
+const lastPrint = new WeakMap<CanvasRenderingContext2D, { t: string; x: number; y: number; font: string; col: string; align: CanvasTextAlign }[]>();
+/**
+ * The chart's names and labels again, on a halo, over what the sim has drawn since (its course, route and laylines), so
+ * NOAA's print stays legible where a line crosses it: "Alcatraz Shoal", "Presidio Shoal", "Golden Gate Bridge" (chart
+ * audit #4; the Coordinator's ruling: the names stay legible, none moved or dropped). The same names in the same places.
+ */
+export function drawEncNamesAgain(ctx: CanvasRenderingContext2D, pal: ChartPalette): void {
+  const q = lastPrint.get(ctx); if (!q?.length) return;
+  ctx.save(); ctx.lineJoin = 'round'; ctx.strokeStyle = INK[pal].halo; ctx.lineWidth = 3;
+  for (const l of q) { ctx.font = l.font; ctx.textAlign = l.align; ctx.strokeText(l.t, l.x, l.y); ctx.fillStyle = l.col; ctx.fillText(l.t, l.x, l.y); }
+  ctx.restore();
+}
+
 /** Places the chart's print so nothing overlaps: each label takes its box, or is left out if the box is taken. */
 class Placer {
   private boxes: [number, number, number, number][] = [];
@@ -330,7 +344,7 @@ class Placer {
   flush(): void {
     const c = this.ctx;
     for (const q of this.queue) { c.font = q.font; c.fillStyle = q.col; c.textAlign = q.align; c.fillText(q.t, q.x, q.y); }
-    this.queue = [];
+    lastPrint.set(c, this.queue); this.queue = [];
   }
 }
 
