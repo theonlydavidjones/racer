@@ -11,7 +11,7 @@ vi.mock('../src/boat/balance', async orig => {
   return { ...m, sailForces: (...a: Parameters<typeof SF>) => { const out = m.sailForces(...a); calls.push({ args: a, out }); return out; } };
 });
 const { testBoat, sail, courseHeading } = await import('./helpers/testBoat');
-const { sailForces, RIG } = await import('../src/boat/balance');
+const { sailForces, RIG, rigSpanHeight } = await import('../src/boat/balance');
 const { hoistDraw } = await import('../src/boat/controls');
 type Boat = import('../src/boat/boat').Boat;
 
@@ -42,7 +42,7 @@ describe('the physics on one sail (balance.ts sailForces, weighted by each sail\
   });
   it('both up: the jib is in the air, both at full weight', () => {
     const { step } = onRig();
-    expect(step.args[3]).not.toBeNull(); expect(step.args[5]).toEqual({ main: 1, jib: 1 });
+    expect(step.args[3]).not.toBeNull(); expect(step.args[5]).toEqual({ main: 1, jib: 1, wMain: 1, wJib: 1 });
   });
   it('the heeling moment changes smoothly as the jib goes up, 0 to 1 (no step at any hoist)', () => {
     const { step } = onRig(), [aws, awa, main, jib, luff] = step.args;
@@ -54,5 +54,28 @@ describe('the physics on one sail (balance.ts sailForces, weighted by each sail\
       last = M;
     }
     expect(worst).toBeLessThan(0.01); // (each half-percent of hoist moves the moment under 1%)
+  });
+  it("the rig's span is the hoisted rig's: on the jib alone 7.15 m (IG + HBI), not the 10.4 m mast (the v215 review)", () => {
+    expect(rigSpanHeight({ main: 0, jib: 1 })).toBeCloseTo(RIG.IG + RIG.hbi, 6); expect(RIG.IG + RIG.hbi).toBeCloseTo(7.15, 2);
+    expect(rigSpanHeight({ main: 1, jib: 1 })).toBeCloseTo(RIG.P + RIG.BAS + RIG.hbi, 6);
+    expect(rigSpanHeight({ main: 1, jib: 0 }, false)).toBeCloseTo(10.4, 2);
+    // the step under jib alone: the jib's shorter span, so more induced drag than the whole mast's would give it (the
+    // review: about 4 N of drive in 150 N at 16 kt apparent)
+    const { step } = onRig({ main: 0, jib: 1, mainUp: false, jibUp: true }), [aws, awa, main, jib, luff, up] = step.args;
+    expect(up!.main).toBe(0); expect(up!.wMain).toBe(0); expect(up!.wJib).toBeGreaterThan(0.9);
+    const mast = sailForces(aws, awa, main, jib, luff, { ...up!, main: 1 }); // (the span as if the mast were all rig: as before)
+    expect(step.out.jib.drive).toBeLessThan(mast.jib.drive);
+  });
+  for (const which of ['main', 'jib'] as const) it(`the forces and the arm change smoothly as the ${which} goes up, 0 to 1, weighted as physics.ts weights them`, () => {
+    const { step } = onRig(), [aws, awa, main, jib, luff] = step.args;
+    let last: number[] = [], worst = 0;
+    for (let i = 0; i <= 400; i++) {
+      const h = i / 400, d = h * hoistDraw(h, which), up = which === 'main' ? { main: h, jib: 1, wMain: d, wJib: 1 } : { main: 1, jib: h, wMain: 1, wJib: d };
+      const sf = sailForces(aws, awa, main, jib, luff, up), k = which === 'main' ? [d, 1] : [1, d];
+      const now = [sf.main.heel * k[0] + sf.jib.heel * k[1], sf.main.drive * k[0] + sf.jib.drive * k[1], sf.ceh];
+      if (i) now.forEach((v, j) => { worst = Math.max(worst, Math.abs(v - last[j]) / Math.max(1, Math.abs(last[j]))); });
+      last = now;
+    }
+    expect(worst).toBeLessThan(0.02); // (each quarter-percent of hoist moves the heel, drive and arm under 2%)
   });
 });

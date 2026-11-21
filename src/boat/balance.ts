@@ -245,17 +245,24 @@ function oneSail(q: number, a: number, ce: number, luffing: boolean, area: numbe
   return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
 }
 
-const FULL_UP = { main: 1, jib: 1 };
+/** How much of each sail is hoisted (0..1 of its luff, physics.ts sailUp), and how much of its area draws (the hoist ×
+ * controls.ts hoistDraw, as its force is scaled; the hoist when not given). */
+export interface SailsUp { main: number; jib: number; wMain?: number; wJib?: number }
+const FULL_UP: SailsUp = { main: 1, jib: 1 };
+/** The rig's height for its induced drag (m, eq. 5.45's, before the effective-span factor): the hoisted rig's top above
+ * the hull's centre of pressure (the main's head P + BAS up, or the jib's IG, as far up as each is hoisted). */
+export const rigSpanHeight = (up: SailsUp, jib = true) => Math.max((RIG.P + RIG.BAS) * up.main, jib ? RIG.IG * up.jib : 0) + RIG.hbi;
 
 /** Heeling force (N, across the mast), drive (N) from both sails, and the height of their centre of effort above the hull's centre of pressure (m, `ceh`), for the apparent wind at the sails `aws` (m/s) at `awa` (deg).
  * `up` is how much of each sail is hoisted (0..1 of its luff, physics.ts sailUp): the rig's area, its induced drag, its
  * centre of effort and its flatness are each sail's weighted by it, so on one sail the rig is that sail's (r037, the owner,
  * 15 Nov 2026: "sailing on just jib or just main"), and it changes smoothly as a sail goes up or comes down. Each sail's
  * own force is for its whole area: the caller scales it by its hoist (physics.ts step). */
-export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean, up: { main: number; jib: number } = FULL_UP): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
+export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean, up: SailsUp = FULL_UP): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
   const q = 0.5 * RHO_AIR * aws * aws, b = clamp(Math.abs(awa), 0, 180), a = b * D2R;
-  // (the rig's areas as hoisted; a hair of each kept, so with both struck the sums stay defined: no force then anyway)
-  const Am = AREA.main * Math.max(1e-3, up.main), Aj = jib ? AREA.jib * Math.max(1e-3, up.jib) : 0, Aref = Am + Aj;
+  // (the rig's areas as they draw: each sail's hoisted share times how well a part-hoisted sail draws, as its force is
+  // scaled in physics.ts step; a hair of each kept, so with both struck the sums stay defined: no force then anyway)
+  const Am = AREA.main * Math.max(1e-3, up.wMain ?? up.main), Aj = jib ? AREA.jib * Math.max(1e-3, up.wJib ?? up.jib) : 0, Aref = Am + Aj;
   // each sail's maximum lift and parasitic drag at this wind angle (the jib blanketed by the main on a run, §5.6.2)
   const fj = (AREA.jib - Math.min(AREA.jib, RIG.IG * RIG.J / 2)) / AREA.jib, bkJ = b <= 135 ? 1 : 1 - fj * (b - 135) / 45;
   const clM = (tab(MAIN_C.b, MAIN_C.clLo, b) + tab(MAIN_C.b, MAIN_C.clHi, b)) / 2 - tab(MAIN_C.b, MAIN_C.dcl, b);
@@ -264,7 +271,9 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   // the rig's efficiency: quadratic parasitic drag (eq. 5.41) and induced drag from its effective height (eqs. 5.45–5.46)
   const clMax = (clM * Am + clJ * Aj) / Aref;
   const kpp = clMax > 0.05 ? (MAIN_C.kpp * clM * clM * Am + JIB_C.kpp * clJ * clJ * Aj) / (Aref * clMax * clMax) : MAIN_C.kpp;
-  const heff = EFF_SPAN * kheff(b) * (RIG.P + RIG.BAS + RIG.hbi);
+  // (its height: the hoisted rig's, the main's head P + BAS up or the jib's IG, whichever is higher, as far up as each is
+  // hoisted: on the jib alone a 7.15 m rig, not the 10.4 m mast, eq. 5.45's height)
+  const heff = EFF_SPAN * kheff(b) * rigSpanHeight(up, !!jib);
   const ce = kpp + Aref / (Math.PI * heff * heff);
   // how much lift each sail makes: its depth against its fullest (flat), its trim, a worn sail's lost lift
   const fM = flatOf(main.shape, RIG.fullDepth.main), fJ = jib ? flatOf(jib.shape, RIG.fullDepth.jib) : 1;

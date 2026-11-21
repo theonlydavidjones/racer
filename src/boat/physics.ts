@@ -510,7 +510,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
   // (how much of each sail is up: the rig's area, induced drag and centre of effort are weighted by it inside the force
   // model, balance.ts sailForces, so on one sail the rig is that sail's; its force is scaled by it below. r037)
-  const hm = sailUp(b, 'main'), hj = sailUp(b, 'jib'), up = { main: hm, jib: hj };
+  const hm = sailUp(b, 'main'), hj = sailUp(b, 'jib'), dm = hm * hoistDraw(hm, 'main'), dj = hj * hoistDraw(hj, 'jib'), up = { main: hm, jib: hj, wMain: dm, wJib: dj };
   const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff, up);
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
@@ -524,7 +524,6 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // how much of each sail is up: its force goes with its hoisted area (after the wear is worked out, sail for sail, so
   // a part-hoisted sail isn't counted as worn: the hoist has its own speed term below)
   // (and a part-hoisted sail draws worse than its area: controls.ts hoistDraw)
-  const dm = hm * hoistDraw(hm, 'main'), dj = hj * hoistDraw(hj, 'jib');
   if (hm < 1 || hj < 1) { sf.main.heel *= dm; sf.main.drive *= dm; sf.jib.heel *= dj; sf.jib.drive *= dj; }
   // the crew: where they'd put their weight to hold her at the heel they want (a little heel in light air, about 16°
   // upwind, flat downwind), then where they actually are (they move at a human pace, and go where their jobs are)
