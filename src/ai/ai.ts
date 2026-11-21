@@ -212,6 +212,14 @@ const CLEAR_HOLD_S = 0.5;
 /** How long she foots for the way to tack before asking it anyway, s: an ESTIMATE, a sailor's patience; footing she
  * gains what she will in about her speed's time constant, and in chop she can settle short of it (the v214 review). */
 const FOOT_FOR_S = 30;
+/** The longest a planned tack is held for the slow tack or wear round it began, s: past the 200 s the slowest wear
+ * took (in 2 kt and 0.5 m of chop, the v214 review), a turn that long has gone wrong, and she plans afresh. */
+const HOLD_MAX_S = 240;
+/** Whether her planned tack is still being turned for: the helm's commitment to its slow tack or wear round
+ * (goTack.turn), unchanged, and not past HOLD_MAX_S. */
+export function turnHeld(g: { turn?: number; turnAt?: number }, turnCommit: number, t: number): boolean {
+  return g.turn != null && turnCommit === g.turn && t - (g.turnAt ?? t) < HOLD_MAX_S;
+}
 /** One think's footing for the way to tack: whether she foots, and her time at it. It counts only while she still wants
  * the tack and is short of the way for it: when the reason goes (a tack for clear air or the rhumb line that lapses, a
  * header's one think) it starts again from nothing, so a later slow tack gets its own FOOT_FOR_S, not what's left of an
@@ -839,11 +847,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const relC = Math.abs(wrap(ww.from - crab));
     ai.running = b.started && !b.ocs && (ai.running ? relC > ra - 8 : relC > ra - 2);
     const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
-    // (the 20 s lapse not while she's in the turn a slow tack began, which takes 30-200 s (the v214 review); but only
-    // that one: held past 20 s for every tack while her helm was committed, the fleet's races changed and more boats met
-    // a boat doing her turns (tests/ai-berth-turns: 29 21.2 calls against a bound of 28, 27 with the lapse as before;
-    // v215. Why, not traced: likely a held tack's course keeping her from the berth ai.ts pastCircle gives))
-    if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || (w.t - ai.goTack.at > 20 && !(ai.goTack.slow && ai.turnCommit !== 0)) || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
+    // (the 20 s lapse not while she's in the slow tack or the wear round her helm committed to for it (goTack.turn,
+    // physics.ts), which takes 30-200 s (the v214 review); only that very commitment, the same way round, and for no
+    // more than HOLD_MAX_S. Held past 20 s for any commitment at all (v215, 02c0b625), a boat beside another doing her
+    // turns had her commitment end and re-made the other way nearly every second as the berth (pastCircle) swung her
+    // want either side of it, so the plan never lapsed and she sat by the circle: Red in the berth test, 12 kt, seed
+    // 27, 35 s, 10-14 m off, called under 21.2 (the v215 review's trace))
+    const g = ai.goTack;
+    if (g && (b.tack === g.to && !b.tacking || (w.t - g.at > 20 && !turnHeld(g, ai.turnCommit, w.t)) || g.mode !== mode || g.leg !== b.leg)) ai.goTack = null;
     if (mode !== 'beat' || ai.goTack) ai.footT = 0;
     let headedNow = false;
     if (mode === 'beat' && ai.goTack) { beating = true; desired = ai.goTack.to === 'S' ? csS : csP; planned = desired; } // (the planned tack, held on later thinks)

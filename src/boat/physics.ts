@@ -332,6 +332,9 @@ function countPenalty(b: Boat, dh: number, emit: Emit): void {
 /** Her sideways slip to leeward, m/s (hove to). */
 export const leeDrift = (b: Boat) => -(b.sway ?? 0) * (wrap(b.ww.from - b.h) >= 0 ? 1 : -1);
 
+/** The tack a heading puts her on in this wind: starboard with the wind on her right (as ai.ts and tackStep read it);
+ * within 4° of dead downwind she's still on the one she's on. */
+const tackFor = (from: number, h: number, now: Tack): Tack => { const r = wrap(from - h); return Math.abs(r) > 176 ? now : r >= 0 ? 'S' : 'P'; };
 export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   if (b.lashed != null && (b.docked || b.pushing)) b.lashed = null; // made fast in her slip: the lashing comes off
   if (b.isUser && b.lashed != null) { b.tiller = b.lashed; b.steer = 0; b.turnTarget = null; } // lashed: hands off
@@ -436,8 +439,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack"): 36 s against 97 s wearing in 2.5 kt and 0.5 m chop, 63 against 156 in 1.5 kt and 0.4 m (v213 and v214
       // reviews). From a dead stop the wear still wins.)
       const slowAsk = !!ai.goTack?.slow && b.v >= WAY_LOST;
-      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow && !slowAsk ? -Math.sign(err) : Math.sign(err);
+      const wear = throughWind && b.v < slowTack(b) && !ai.tackNow && !slowAsk;
+      ai.turnCommit = wear ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
+      // (the turn for her planned tack (ai.ts goTack), when it's a slow one, sculled through the wind, or a wear round,
+      // whatever the tack was asked as: the lull may come in the moments between the asking and the helm's turn. Its
+      // plan is held as long as this commitment is, ai.ts: the v215 review)
+      const g = ai.goTack;
+      if (g && (slowAsk || wear) && tackFor(b.ww.from, b.desired, b.tack) === g.to) { g.turn = ai.turnCommit; g.turnAt = t; }
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;

@@ -3,7 +3,7 @@ import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { wrap } from '../src/core/math';
 import { footReaches, slowTack } from '../src/boat/physics';
-import { footStep } from '../src/ai/ai';
+import { footStep, turnHeld } from '../src/ai/ai';
 import type { Boat } from '../src/boat/boat';
 import { FLAT_SEA } from '../src/environment/sea';
 
@@ -122,5 +122,39 @@ describe('Footing for the way to tack (ai.ts footStep)', () => {
   it('footing she asks the tack after 30 s', () => {
     const r = run(0, [[true, 40]]);
     expect(r.asked).toBeGreaterThanOrEqual(29.9); expect(r.asked).toBeLessThan(30.2);
+  });
+});
+
+describe('A planned tack held while its slow turn lasts (ai.ts turnHeld; the v215 review)', () => {
+  it('a tack asked with way on that turns into a wear in a lull is held as the wear (the helm marks it)', () => {
+    // (asked as an ordinary tack, goTack.slow unset; by the helm's turn she's under slowTack, so she wears round, which
+    // takes far more than the plan's 20 s: the helm marks the wear on the plan, so it isn't dropped mid-wear)
+    const a = beatAngle(2), b = testBoat({ heading: 360 - a, kt: 1, windKt: 2 });
+    b.sea = { ...FLAT_SEA, hsW: 0.5, tpW: 2.8 }; sail(b, 90);
+    b.isUser = false; b.ai = { turnCommit: 0, commitFor: 0, goTack: { to: 'P', at: 0, mode: 'beat', leg: 0 } } as unknown as NonNullable<Boat['ai']>;
+    b.desired = a;
+    sail(b, 2);
+    const g = b.ai.goTack!;
+    expect(b.ai.turnCommit, 'committed').not.toBe(0);
+    expect(g.turn, 'the wear marked on the plan').toBe(b.ai.turnCommit);
+    expect(turnHeld(g, b.ai.turnCommit, 30), 'held at 30 s').toBe(true);
+  });
+  it('an ordinary tack with way on isn\'t marked: its plan lapses at 20 s as before', () => {
+    const a = beatAngle(8), b = testBoat({ heading: 360 - a, kt: 2.5, windKt: 8 });
+    sail(b, 60);
+    b.isUser = false; b.ai = { turnCommit: 0, commitFor: 0, goTack: { to: 'P', at: 0, mode: 'beat', leg: 0 } } as unknown as NonNullable<Boat['ai']>;
+    b.desired = a;
+    sail(b, 1);
+    expect(b.ai.goTack!.turn, 'not marked').toBeUndefined();
+  });
+  it('not held for a commitment made the other way, nor past four minutes', () => {
+    // (Red, 12 kt, seed 27 of the berth test: her commitment ended and was re-made the other way nearly every second
+    // beside a boat doing her turns, and the plan never lapsed)
+    const g = { turn: 1, turnAt: 0 };
+    expect(turnHeld(g, 1, 100)).toBe(true);
+    expect(turnHeld(g, -1, 100), 'the other way').toBe(false);
+    expect(turnHeld(g, 0, 100), 'ended').toBe(false);
+    expect(turnHeld(g, 1, 240), 'past the cap').toBe(false);
+    expect(turnHeld({}, 1, 30), 'never marked').toBe(false);
   });
 });
