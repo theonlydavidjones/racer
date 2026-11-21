@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * The city front's buildings, phase 1 (r296): Fort Point to the Marina's east end, from OpenStreetMap's building footprints
+ * The city front's buildings, phases 1 and 2 (r296): Fort Point to the Marina's east end, then on past Fort Mason and Aquatic Park to Hyde Street Pier, from OpenStreetMap's building footprints
  * (ODbL; heights are OSM's) stood on the USGS 3DEP 1 m DEM's ground (public domain), in place of the grid of random boxes there.
  *
- *   node scripts/make-cityfront.mjs x54y419.tif [--cache dir]
+ *   node scripts/make-cityfront.mjs x54y419.tif x55y419.tif [--cache dir]
  *
- * The DEM is USGS_1M_10_x54y419_CA_SanFrancisco_B23.tif (E 539,994–550,006, N 4,180,006–4,190,006, UTM 10N, NAVD88 m, 111,944,984 bytes):
+ * The DEMs are USGS_1M_10_x54y419_CA_SanFrancisco_B23.tif (E 539,994–550,006, N 4,180,006–4,190,006, UTM 10N, NAVD88 m, 111,944,984 bytes) and
+ * x55y419 (E 549,994–560,006, 86,461,076 bytes), each a window of it where it is wanted:
  *   https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_SanFrancisco_B23/TIFF/
  * The sim draws its water as a flat plane at mean sea level, 0.969 m above NAVD88 (NOAA 9414290: MSL 2.773 m, NAVD88 1.804 m above
  * station datum), so a building's ground is its DEM height less 0.969 m (scripts/make-alcatraz.mjs). The OSM pull is the strip's two
@@ -15,7 +16,7 @@
  *
  * A building's height is, in order: OSM's `height` (flag 2), `building:levels` × 3.3 m (flag 1), or a default by the `building` value
  * (flag 0, marked: no height is published for it where we could reach). A footprint with no ground in the DEM (a building on a pier over the
- * water) stands on a 2.5 m deck (flag bit 4), the Wharf's deck height (render/wharf.ts).
+ * water) stands on a 3 m deck (flag bit 4), the piers' deck height (render/wharf.ts).
  *
  * Output src/render/data/cityfront.json: every footprint packed (ground cm, height dm, flags, the first vertex in dm and the rest as dm steps;
  * course coordinates, the sim's LAT0/LON0 frame), little-endian, deflated, base64.
@@ -27,9 +28,10 @@ import { openGeoTiff } from './lib/geotiff-f32.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const CACHE = arg('--cache', '');
-const STRIP = { s: 37.8000, n: 37.8150, w: -122.4900, e: -122.4318 }; // (to Laguna Street: the Marina's east end, Fort Mason's west edge)
-const BOXES = [[-122.4900, 37.8000, -122.4600, 37.8150], [-122.4600, 37.8000, -122.4435, 37.8150], [-122.4435, 37.8000, -122.4318, 37.8150]];
-const MSL_NAVD88 = 0.969, DECK = 2.5;
+const STRIP = { s: 37.7975, n: 37.8150, w: -122.4900, e: -122.4180 }; // (Fort Point to Hyde Street Pier; its south edge, 37.7975, is Lombard Street's, where the Marina's houses end)
+const COLS = [-122.4900, -122.4600, -122.4435, -122.4318, -122.4250, -122.4180];
+const BOXES = COLS.slice(1).map((e, i) => [COLS[i], STRIP.s, e, STRIP.n]);
+const MSL_NAVD88 = 0.969, DECK = 3; // (a pier's deck: about 3 m over the water, render/wharf.ts)
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = MLAT * Math.cos(LAT0 * Math.PI / 180);
 const sim = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];
 // landmarks drawn by hand in render/landscape.ts: [lat, lon, radius m]
@@ -81,13 +83,20 @@ function utm(lat, lon) {
   return [500000 + k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120),
     k0 * (M + N * (s / c) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720))];
 }
-const dem = openGeoTiff(process.argv[2]), TX = dem.tiepoint[3], TY = dem.tiepoint[4];
 // (a check: Alcatraz's highest point, E 550,804.5 N 4,186,695.5, is at about 37.82626, −122.42271)
 { const [e, n] = utm(37.82626, -122.42271); if (Math.hypot(e - 550804.5, n - 4186695.5) > 30) throw new Error(`UTM forward is off: ${e} ${n}`); }
-const lo = utm(STRIP.s - 0.0005, STRIP.w - 0.0005), hi = utm(STRIP.n + 0.0005, STRIP.e + 0.0005);
-const X0 = Math.floor(Math.min(lo[0], hi[0]) - TX) - 5, X1 = Math.ceil(Math.max(lo[0], hi[0]) - TX) + 5, Y0 = Math.floor(TY - Math.max(lo[1], hi[1])) - 5, Y1 = Math.ceil(TY - Math.min(lo[1], hi[1])) + 5;
-const WW = X1 - X0, WH = Y1 - Y0, win = dem.window(X0, Y0, WW, WH);
-const demAt = (lat, lon) => { const [e, n] = utm(lat, lon), i = Math.floor(e - TX) - X0, j = Math.floor(TY - n) - Y0; if (i < 0 || j < 0 || i >= WW || j >= WH) return null; const v = win[j * WW + i]; return v > -1000 ? v : null; };
+const lo = utm(STRIP.s - 0.0005, STRIP.w - 0.0005), hi = utm(STRIP.n + 0.0005, STRIP.e + 0.0005), UE0 = Math.min(lo[0], hi[0]), UE1 = Math.max(lo[0], hi[0]), UN0 = Math.min(lo[1], hi[1]), UN1 = Math.max(lo[1], hi[1]);
+const tifs = process.argv.slice(2).filter(a => a.endsWith('.tif')).map(f => {
+  const dem = openGeoTiff(f), TX = dem.tiepoint[3], TY = dem.tiepoint[4];
+  const e0 = Math.max(UE0, TX), e1 = Math.min(UE1, TX + dem.width), n1 = Math.min(UN1, TY), n0 = Math.max(UN0, TY - dem.height);
+  const X0 = Math.floor(e0 - TX) - 3, X1 = Math.ceil(e1 - TX) + 3, Y0 = Math.floor(TY - n1) - 3, Y1 = Math.ceil(TY - n0) + 3, WW = X1 - X0, WH = Y1 - Y0;
+  return { TX, TY, X0, Y0, WW, WH, win: dem.window(Math.max(0, X0), Math.max(0, Y0), Math.min(dem.width, X1) - Math.max(0, X0), Math.min(dem.height, Y1) - Math.max(0, Y0)), ox: Math.max(0, X0), oy: Math.max(0, Y0), w: Math.min(dem.width, X1) - Math.max(0, X0), h: Math.min(dem.height, Y1) - Math.max(0, Y0) };
+});
+const demAt = (lat, lon) => {
+  const [e, n] = utm(lat, lon);
+  for (const t of tifs) { const i = Math.floor(e - t.TX) - t.ox, j = Math.floor(t.TY - n) - t.oy; if (i < 0 || j < 0 || i >= t.w || j >= t.h) continue; const v = t.win[j * t.w + i]; return v > -1000 ? v : null; }
+  return null;
+};
 
 // ---- the buildings
 const inClear = (lat, lon) => CLEAR.some(([a, b, r]) => Math.hypot((lat - a) * MLAT, (lon - b) * MLON) < r);
@@ -134,7 +143,7 @@ const packed = deflateSync(buf, { level: 9 });
 await writeFile(new URL('../src/render/data/cityfront.json', import.meta.url), JSON.stringify({
   source: 'OpenStreetMap contributors (ODbL), api.openstreetmap.org: building ways in the strip; ground from the USGS 3DEP 1 m DEM, CA_SanFrancisco_B23 tile x54y419 (public domain).',
   made: 'scripts/make-cityfront.mjs', fetched: new Date().toISOString().slice(0, 10), strip: STRIP,
-  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 2.5 m deck',
+  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 3 m deck',
   count: out.length, mesh: packed.toString('base64'),
 }) + '\n');
 console.log(`${out.length} buildings (${stat.h2} OSM heights, ${stat.h1} from levels, ${stat.h0} default; ${stat.deck} on a deck); skipped: ${stat.cleared} in landmarks' ground, ${stat.outside} outside the strip, ${stat.tiny} under 8 m²; ${relations} relations seen, ${relBuildings} multipolygon buildings (${relChained} outer ways not closed on their own, skipped)`);

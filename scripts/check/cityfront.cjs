@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The city front from the water and from above (r296): Fort Point, Crissy Field, the Presidio shore, the Marina Green and
- * the Marina's houses; and each view's draw calls and triangles. Needs the dev server (npm run dev) on :5173 (or the port in
+ * the Marina's houses, then Fort Mason, Aquatic Park and Hyde Street Pier; and each view's draw calls and triangles. Needs the dev server (npm run dev) on :5173 (or the port in
  * the PORT variable) and uses the dev-only free camera (window.__cam, render/scene.ts), as scenery.cjs does.
  *
  *   node scripts/check/cityfront.cjs <out-dir> [name ...]   → out-dir/<name>.png
@@ -14,6 +14,10 @@ const VIEWS = {
   crissy: [LL(37.8138, -122.4580, 5), LL(37.8070, -122.4600, 25)], // Crissy Field and the Presidio's buildings, from the water off the airfield
   marina: [LL(37.8130, -122.4400, 5), LL(37.8040, -122.4400, 25)], // the Marina Green and the Marina's houses, from the water off the harbor mouth
   marina_low: [LL(37.8100, -122.4480, 2.5), LL(37.8050, -122.4400, 12)], // the same from a boat's deck, near the shore
+  fortmason: [LL(37.8150, -122.4300, 5), LL(37.8070, -122.4300, 20)], // Fort Mason's piers and the Great Meadow, from the water off Gashouse Cove
+  aquatic: [LL(37.8140, -122.4255, 5), LL(37.8070, -122.4230, 25)], // Aquatic Park, Hyde Street Pier and Ghirardelli, from the water north of Municipal Pier
+  hyde: [LL(37.8125, -122.4200, 3), LL(37.8090, -122.4225, 8)], // Hyde Street Pier and the ships, close
+  over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
   over_west: [LL(37.8080, -122.4720, 900), LL(37.8080, -122.47201, 0)], // overhead: Fort Point, the Presidio and Crissy Field
   over_marina: [LL(37.8055, -122.4400, 1000), LL(37.8055, -122.44001, 0)], // overhead: the Marina
 };
