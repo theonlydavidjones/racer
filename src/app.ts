@@ -1805,7 +1805,10 @@ function realRaceRows(): void {
     const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!);
     const won = fin[0];
     return `<div class="pastrow"><div><b>${esc(raceDisplayName(r.event))} · race ${r.raceNo} · course ${r.courseNo} (${r.distanceNm} nm)</b>`
-      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${r.courseFrom ? ` · <span title="${esc('The course from ' + r.courseFrom)}">course from a sailor in the race (a last-minute change)</span>` : ''}${r.uncertain ? ` · <span class="warn" title="${esc(r.uncertain)}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(r.doubt)}">the published distance disagrees with the course sheet</span>` : ''}</small></div>`
+      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${(() => { // (its caveats in a word each, the reason on hover: the first-hour audit #20, a row ran to three lines)
+          const notes = [r.courseFrom ? 'The course from ' + r.courseFrom + ': a last-minute change' : '', r.uncertain ?? '', r.doubt ? 'The published distance disagrees with the course sheet: ' + r.doubt : ''].filter(Boolean);
+          return notes.length ? ` · <span class="${r.uncertain || r.doubt ? 'warn' : ''}" title="${esc(notes.join(' · '))}">${r.uncertain || r.doubt ? 'course uncertain ⓘ' : 'course changed ⓘ'}</span>` : '';
+        })()}</small></div>`
       + `<button type="button" class="ghost sm" data-real="${esc(r.id)}">Sail it</button></div>`;
   }).join('') : '';
 }
