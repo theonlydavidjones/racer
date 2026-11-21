@@ -176,7 +176,7 @@ const jcar = (side: Side) => {
  * JUMPER (-0.6 deg of twist a turn); the vang, the guide's "never use the kickingstrap upwind in less than 18 knots"
  * (controls.ts guideLimits); the outhaul and Cunningham, the guide's 5 and 12 kt ranges; the rest, lines.ts LINE_ENDS and
  * LINE_WHAT (the model's own effects). The jib car's in-out lead says only what the sim does (a wider lead, the clew outboard, a fuller
- * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in the Keys screen's "How to sail her".
+ * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in Keys (ui/keys.ts).
  */
 export const BAND_TIPS = {
   jumpers: "On closes the main's top leech: medium air. Off in light air and a breeze. Left arrow on.",
@@ -298,7 +298,7 @@ export class SailBand {
     el.addEventListener('pointerdown', e => { const h = (e.target as HTMLElement).closest<HTMLElement>('[data-help]'); if (h) { this.helpLast = h; this.helpLastT = performance.now(); } }, true);
     // what each control does and why, one line each, in the Coach card for the control under the mouse or the one last
     // touched (the owner: hover titles popped up over the controls you were reaching for; 18 Nov: "no one will read
-    // this", so BAND_TIPS holds one line of what to do and why; the clicks and scrolls are in Keys' "How to sail her")
+    // this", so BAND_TIPS holds one line of what to do and why; the clicks and scrolls are in Keys, ui/keys.ts)
     el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = bandHelp(d.dataset.line as keyof typeof BAND_TIPS); });
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
       d.dataset.help = bandHelp('jumpers'); // (in the Coach card, as every control's help: no hover titles)
