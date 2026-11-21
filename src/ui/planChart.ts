@@ -1,3 +1,4 @@
+import { keepOnChart } from './encChart';
 import type { Hud } from './hud';
 import { navRoute } from './hud';
 import { $ } from './dom';
@@ -188,6 +189,7 @@ export class PlanChart {
 
   draw(): void {
     if (!this.isOpen) return;
+    { const r = this.c.getBoundingClientRect(), v = { cx: this.cx, cy: this.cy, scale: this.scale }; keepOnChart(v, r.width, r.height); this.cx = v.cx; this.cy = v.cy; this.scale = v.scale; } // (on NOAA's chart, never past it: chart audit #6)
     this.hud.drawChart(this.c, this.picks.world(), this.cx, this.cy, this.scale, null);
   }
 

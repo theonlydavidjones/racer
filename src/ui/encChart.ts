@@ -26,6 +26,18 @@ interface ChartData {
   islets: [number, number][]; soundings: number[]; areas: Area[]; aids: Aid[]; hazards: Hazard[]; names: Name[];
 }
 export const ENC = chart as unknown as ChartData;
+/**
+ * Keep a chart's view on NOAA's chart (chart audit #6; the Coordinator's ruling: no fields drawn where there's no
+ * chart): zoomed out no further than the ENC cells' box fills the canvas, and panned no further than its edges.
+ * `w`, `h`: the canvas in px; the view's scale in px per metre, its center in metres. Changes the view in place.
+ */
+export function keepOnChart(v: { cx: number; cy: number; scale: number }, w: number, h: number): void {
+  if (!(w > 0 && h > 0)) return;
+  const b = ENC.box, sw = LL(b.south, b.west), ne = LL(b.north, b.east);
+  v.scale = Math.max(v.scale, w / (ne.x - sw.x), h / (ne.y - sw.y));
+  const hw = w / 2 / v.scale, hh = h / 2 / v.scale;
+  v.cx = Math.min(ne.x - hw, Math.max(sw.x + hw, v.cx)); v.cy = Math.min(ne.y - hh, Math.max(sw.y + hh, v.cy));
+}
 
 export type ChartPalette = 'day' | 'dusk';
 /** Colours for the chart and for what the sim draws over it. */

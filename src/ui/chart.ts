@@ -1,3 +1,4 @@
+import { keepOnChart } from './encChart';
 import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
@@ -151,6 +152,7 @@ export class Chart {
   draw(): void {
     if (!this.w || !this.isOpen) return;
     this.navRev = this.hud.navRev;
+    { const r = this.c.getBoundingClientRect(), v = { cx: this.cx, cy: this.cy, scale: this.scale }; keepOnChart(v, r.width, r.height); this.cx = v.cx; this.cy = v.cy; this.scale = v.scale; } // (on NOAA's chart, never past it: chart audit #6)
     this.hud.drawChart(this.c, this.w, this.cx, this.cy, this.scale, this.pick?.p ?? null);
     // (the passage in one line at the chart's top, the plan in words behind its link: the navigator's layer, the owner's)
     const line = this.hud.navLine(this.w), el = $('chartPlan');
