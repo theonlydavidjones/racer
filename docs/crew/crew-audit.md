@@ -75,14 +75,16 @@ Sizes: **S** is under 1 h with its test; **M** is 2–4 h.
 - **Cause:** the crossing order kept between the two (`src/render/crew.ts:1780–1795`, by `slotOf`). The forward one doesn't set off until the other is past.
 - **Fix:** they pass each other, one forward of the other, as crews do.
 
-### 5. Climbing out to leeward: a moment in mid-air with the knees folded back (S–M)
+### 5. By the cabin's end: the knees folded back for a moment (M)
 
 `lee-climb-midair_*.jpg`.
 
-- **What it looks like:** as the crew go out to the leeward side deck (the `lee` pose), the hips come up over the side deck. For 0.1–0.25 s the knees bend backward with the feet off the deck: 20 runs in one race at 20 kt, up to 0.35 m behind the line.
+- **What it looks like:** turning about on the side deck by the cabin's after end with a foot planted, as the forward hand goes back to the leeward bench (the `lee` pose), a knee bends backward. For 0.1–0.25 s the hips are high and the feet look off the deck: 20 runs in one race at 20 kt, up to 0.35 m behind the line.
 - **Knee speed:** the knees snap round at up to 15–17 m/s (56 runs at 20 kt), which reads as a flicker.
-- **Cause (to confirm):** the climb's step over the coaming (`src/render/crew.ts:804–810`, then `ik()`'s knee hint). It is likely the hint flipping sides for a frame.
-- **Size:** S if so, M if it's the climb's path.
+- **Cause (confirmed):** `clearLegs` (`src/render/crew.ts:1374`, the v210 sprint's). A knee into the cabin's end is tried in five other ways with the bend's memory cleared (`:1408–1412`). The one that goes least into the boat is taken in a single frame, even when it's bent backward. In the 20 kt replay that was 0.31 m behind the leg, across in a frame (38 m/s).
+- **Why it isn't S:** refusing the backward ways (tried) fixes this replay on both tacks, but four of the sprint's replay tests then fail. They are the side deck at 8 kt, the cabin's edge at 20 kt twice, and the foredeck at 8 kt. Each was cleared only by a knee 7–38 cm backward, so the sprint traded a shin through the cabin for a backward knee.
+- **Fix:** the foot moved, not the knee reversed. When a leg can't clear the cabin's end with its knee the right way, the foot steps (or the hip comes off it) until it can.
+- **Size:** M. Its replay is kept for the test (`scripts/check/crewaudit/replays/lee-climb-20kt.json`: the 20 kt race, Red, 690.5 to 697.6 s, the knee back at 696.42 s; tests/helpers/crewReplay format).
 
 ### 6. Sat at the companionway, hands short of the line (M)
 
