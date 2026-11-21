@@ -63,6 +63,7 @@ import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { FIELD_LAYERS, fieldLayer, keyMenu, layersMenu, withLayer, type LayerKey } from './ui/layers';
+import { shortTip } from './ui/hoverText';
 import { dockHint } from './ui/dockHint';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
@@ -1268,7 +1269,7 @@ function renderLog(): void {
   $('msgLog').classList.toggle('rest', !recent.length);
   // one line each on screen, the headline (feedback.ts headline); the whole message on hover and in the log (All, or a tap)
   $('msgRecent').innerHTML = recent.map(m => { const { head, cut } = headline(m.msg);
-    return `<li${cut ? ' class="cut"' : ''} title="${esc(m.msg).replace(/"/g, '&quot;')}">${stamp(m.t)}${esc(head)}</li>`; }).join('');
+    return `<li${cut ? ' class="cut"' : ''} title="${esc(shortTip(m.msg)).replace(/"/g, '&quot;')}">${stamp(m.t)}${esc(head)}</li>`; }).join('');
   if (!$('logView').hidden) $('logList').innerHTML = messageLog.slice().reverse().map(m =>
     m.msg.startsWith('— ') ? `<li class="sep">${esc(m.msg.slice(2))}</li>` : `<li>${stamp(m.t)}${esc(m.msg)}</li>`).join('');
 }

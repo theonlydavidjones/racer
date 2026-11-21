@@ -13,6 +13,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { placeLabel } from '../ui/placeNames';
+import { shortTip } from '../ui/hoverText';
 import { asTheClubRunsIt, coursePicker, drillSeq, hostOf, practiceSeq } from '../club/practice';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -452,7 +453,7 @@ function courseThumb(W: number, H: number): string {
 function condStrip(st: Strip, rows: [string, string][]): void {
   const say = (k: string) => (rows.find(r => r[0] === k)?.[1] ?? '').replace(/<[^>]*>/g, '').replace(/"/g, '&quot;');
   const arrow = (to: number | undefined, col: string) => to == null ? '' : `<svg viewBox="-12 -12 24 24" width="22" height="22" aria-hidden="true"><circle r="11" fill="none" stroke="#2e4a5e"/><g transform="rotate(${Math.round(to)})"><line y1="7" y2="-5" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/><path d="M0 -9 L4 -3 L-4 -3 Z" fill="${col}"/></g></svg>`;
-  const cell = (title: string, pic: string, big: string, small: string, cls = '') => `<div title="${title}"${cls ? ` class="${cls}"` : ''}>${pic}<span><b>${big}</b><small>${small}</small></span></div>`;
+  const cell = (title: string, pic: string, big: string, small: string, cls = '') => `<div title="${shortTip(title)}"${cls ? ` class="${cls}"` : ''}>${pic}<span><b>${big}</b><small>${small}</small></span></div>`;
   morph($('condStrip'), [
     st.windWait ? cell('No observations or forecast for this day yet: the graph\'s dashed line is the month\'s records', '', 'Wind', st.windWait, 'wait') : st.windKt != null ? cell(say('Wind'), arrow(st.windAll ? undefined : ((st.windFrom ?? 0) + 180) % 360, '#7ee0a5'), `${st.windKt} kt`, st.windAll ? 'all over' : `from ${compassPoint(st.windFrom ?? 0)}`) : '',
     st.curKt != null ? cell(say('Current'), arrow(st.curKind === 'slack' ? undefined : st.curSet, '#6fb7ff'), `${st.curKt.toFixed(1)} kt`, st.curKind ?? '') : cell(say('Current'), '', 'Current', say('Current')),
