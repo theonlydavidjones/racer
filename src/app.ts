@@ -74,7 +74,7 @@ import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
 import { canEnterSeason } from './club/membership';
-import { startPageQuiet, startPageReady } from './app/firstRun';
+import { startPageQuiet, startPageReady, watchMenus } from './app/firstRun';
 import { seasonRaceFor } from './club/practice';
 import { mountBoatLesson } from './app/boatLesson';
 import { mountDrills } from './app/drills';
@@ -2015,3 +2015,4 @@ requestAnimationFrame(frame);
 
 installDevHandles(ctx); // (src/app/devHandles.ts)
 startPageReady(); // (the start page's cards light up: src/app/firstRun.ts)
+watchMenus(); // (the game's displays hidden behind the menus: src/app/firstRun.ts)

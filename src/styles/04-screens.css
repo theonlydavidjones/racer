@@ -139,6 +139,8 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 /* the start page: only the scene behind it, quiet (app/firstRun.ts startPageQuiet): the game's own displays hidden,
    kept at their size (the inset map goes on drawing) */
 body.atHome>:not(#gl):not(.overlay),body.atHome>:not(#gl):not(.overlay) *{visibility:hidden!important}
+/* and behind the pages between it and the water (app/firstRun.ts watchMenus) */
+body.atMenu>:not(#gl):not(.overlay),body.atMenu>:not(#gl):not(.overlay) *{visibility:hidden!important}
 @keyframes homeload{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
 @media (prefers-reduced-motion:reduce){.homeload i{animation:none;width:100%;opacity:.5}}
 .panel .linkbtn.back{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;cursor:pointer}

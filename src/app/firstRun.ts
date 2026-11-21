@@ -18,3 +18,20 @@ export function startPageReady(): void {
 export function startPageQuiet(on: boolean, view: { quiet(on: boolean): void }): void {
   document.body.classList.toggle('atHome', on); view.quiet(on);
 }
+
+/** The pages between the start page and the water (the Race page, Practice and the drills' setups, Past races, the season,
+ * the Yacht Club's lists). */
+const MENUS = ['raceChoose', 'pastView', 'setup', 'drillView', 'seasonView', 'fleet'];
+/**
+ * The game's displays hidden behind those pages, as behind the start page (the first-hour audit, 21 Nov 2026: a stopped
+ * race clock, the start line and the coach showed behind them). Kept by watching the pages themselves, so every way in
+ * and out is covered; not in the showroom (her page and the editor have their own bar), nor once she's sailing.
+ */
+export function watchMenus(): void {
+  const els = MENUS.map(id => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
+  const set = () => document.body.classList.toggle('atMenu', els.some(e => !e.hidden) && !document.body.classList.contains('showroom'));
+  const mo = new MutationObserver(set);
+  for (const e of els) mo.observe(e, { attributes: true, attributeFilter: ['hidden'] });
+  mo.observe(document.body, { attributes: true, attributeFilter: ['class'] }); // (the showroom coming and going)
+  set();
+}
