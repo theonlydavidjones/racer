@@ -95,6 +95,58 @@ console.log(`${nodes.length} nodes, ${seen} points read, ${used} inside a footpr
 const pct = (a, p) => a[Math.min(a.length - 1, Math.floor(p * a.length))];
 const unmerc = (x, y) => [(2 * Math.atan(Math.exp(y / 6378137)) - Math.PI / 2) * 180 / Math.PI, x / 20037508.342789244 * 180];
 const r1 = v => Math.round(v * 10) / 10;
+
+/**
+ * A pitched roof from the points: the footprint's smallest enclosing rectangle (its long axis the ridge's direction), the heights
+ * binned across its width. A gable or hip is higher in the middle than at both edges (by over 0.8 m); then the eave is the median
+ * height of the outer fifth each side and the ridge the 95th percentile of the middle fifth. Flat otherwise. Mercator is conformal,
+ * so angles and ratios in its plane are the ground's (distances there are 1.27 times long: lengths are scaled back).
+ */
+const PROFILE_NAMES = ['cellhouse', 'Dining Hall', 'Building 64', 'Model Industries Building', 'Administration Block', 'Quartermaster'];
+function fitRoof(it) {
+  const pts = it.m, SCALE = Math.cos(37.8265 * Math.PI / 180); // (metres on the ground per metre in the plane)
+  let best = null;
+  for (let a = 0; a < 180; a += 1) {
+    const c = Math.cos(a * Math.PI / 180), s = Math.sin(a * Math.PI / 180); let x0 = 1e18, x1 = -1e18, y0 = 1e18, y1 = -1e18;
+    for (const [x, y] of pts) { const u = x * c + y * s, v = -x * s + y * c; x0 = Math.min(x0, u); x1 = Math.max(x1, u); y0 = Math.min(y0, v); y1 = Math.max(y1, v); }
+    if (!best || (x1 - x0) * (y1 - y0) < best.area) best = { a, area: (x1 - x0) * (y1 - y0), x0, x1, y0, y1 };
+  }
+  const area = polyArea(pts); if (area / best.area < 0.8) return null; // (an L or a courtyard: a rectangle would roof the wrong ground)
+  let { a, x0, x1, y0, y1 } = best; if (x1 - x0 < y1 - y0) { a = (a + 90) % 180; [x0, x1, y0, y1] = [y0, y1, -x1, -x0]; } // (the long side along u)
+  const c = Math.cos(a * Math.PI / 180), s = Math.sin(a * Math.PI / 180), vm = (y0 + y1) / 2, hw = (y1 - y0) / 2, L = (x1 - x0) * SCALE, W = (y1 - y0) * SCALE;
+  if (W < 6) return null;
+  const mid = [], edge = [], e1 = [], e2 = [];
+  for (let i = 0; i < it.z.length; i++) {
+    const x = it.xy[i * 2], y = it.xy[i * 2 + 1], v = (-x * s + y * c - vm) / hw, h = it.z[i] - it.ground;
+    if (Math.abs(v) < 0.2) mid.push(h); else if (v < -0.8) { edge.push(h); e1.push(h); } else if (v > 0.8) { edge.push(h); e2.push(h); }
+  }
+  if (process.env.PROFILE && PROFILE_NAMES.includes(it.name)) { const bins = Array.from({ length: 9 }, () => []); for (let i = 0; i < it.z.length; i++) { const v = (-it.xy[i * 2] * s + it.xy[i * 2 + 1] * c - vm) / hw; bins[Math.min(8, Math.max(0, Math.floor((v + 1) / 2 * 9)))].push(it.z[i] - it.ground); } console.log(it.name, 'across (bin medians/p95):', bins.map(b => { const q = b.sort((p, o) => p - o); return q.length ? `${q[q.length >> 1].toFixed(1)}/${q[Math.floor(q.length * 0.95)].toFixed(1)}` : '-'; }).join('  ')); }
+  if (mid.length < 40 || e1.length < 40 || e2.length < 40) return null;
+  const med = r => { const q = [...r].sort((p, o) => p - o); return q[Math.floor(q.length / 2)]; };
+  const ridge = [...mid].sort((p, o) => p - o)[Math.floor(0.95 * mid.length)], m1 = med(e1), m2 = med(e2), eave = (m1 + m2) / 2;
+  if (ridge - Math.max(m1, m2) < 0.8) return null; // flat, or a shed roof (high on one side only)
+  if (ridge - eave > 6 || it.tag.ruin) return null; // (a rise of over 6 m on a building this size is something standing beside it, a stack or a cliff behind; a ruin has no roof)
+  // the ridge's middle, back in lat/lon, and its heading (a is the angle of the long axis from the plane's x axis (east); a bearing is from north)
+  const um = (x0 + x1) / 2, mx = um * c - vm * s, my = um * s + vm * c, [la, lo] = unmerc(mx, my);
+  return { type: 'gable', eave: r1(eave), ridge: r1(ridge), bearing: Math.round(((90 - a) % 180 + 180) % 180), length: r1(L), width: r1(W), at: [Math.round(la * 1e6) / 1e6, Math.round(lo * 1e6) / 1e6], source: 'ridge and eave from the footprint\'s class-1 lidar points: heights across the width, middle fifth 95th percentile and outer fifths median' };
+}
+
+/** The roof's outline from the points themselves where OSM's polygon is off: the rectangle (any heading) with the smallest area holding the middle 98% of the points over 11 m, as { at, bearing, length, width }. */
+function refitRect(it) {
+  const hi = []; for (let i = 0; i < it.z.length; i++) if (it.z[i] - it.ground > 11) hi.push([it.xy[i * 2], it.xy[i * 2 + 1]]);
+  if (hi.length < 1000) return null;
+  const q = (a, f) => { const t = Float64Array.from(a).sort(); return t[Math.floor(f * (t.length - 1))]; };
+  let best = null;
+  for (let a = 0; a < 180; a += 1) {
+    const c = Math.cos(a * Math.PI / 180), s = Math.sin(a * Math.PI / 180), us = hi.map(([x, y]) => x * c + y * s), vs = hi.map(([x, y]) => -x * s + y * c);
+    const u0 = q(us, 0.01), u1 = q(us, 0.99), v0 = q(vs, 0.01), v1 = q(vs, 0.99), area = (u1 - u0) * (v1 - v0);
+    if (!best || area < best.area) best = { a, area, u0, u1, v0, v1 };
+  }
+  let { a, u0, u1, v0, v1 } = best; if (u1 - u0 < v1 - v0) { a = (a + 90) % 180; [u0, u1, v0, v1] = [v0, v1, -u1, -u0]; }
+  const c = Math.cos(a * Math.PI / 180), s = Math.sin(a * Math.PI / 180), um = (u0 + u1) / 2, vm = (v0 + v1) / 2, [la, lo] = unmerc(um * c - vm * s, um * s + vm * c), K = Math.cos(37.8265 * Math.PI / 180);
+  return { at: [Math.round(la * 1e6) / 1e6, Math.round(lo * 1e6) / 1e6], bearing: Math.round(((90 - a) % 180 + 180) % 180), length: r1((u1 - u0) * K), width: r1((v1 - v0) * K) };
+}
+function polyArea(p) { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]); return Math.abs(a / 2); }
 for (const it of items) {
   const n = it.z.length;
   if (n < 30) { console.log(`${it.name.padEnd(30)} ${String(n).padStart(6)} points: too few, kept as it was`); delete it.tag.lidar; continue; }
@@ -113,6 +165,9 @@ for (const it of items) {
   }
   const z = it.z.sort((a, b) => a - b), roof = pct(z, 0.9), h = r1(roof - it.ground);
   it.tag.lidar = { n, p50: r1(pct(z, 0.5) - it.ground), p90: r1(roof - it.ground), p98: r1(pct(z, 0.98) - it.ground), max: r1(z[n - 1] - it.ground), height: h };
+  if (it.key === 'cellhouse') { const rr = refitRect(it); if (rr) { it.tag.lidar.outline = rr; console.log('cellhouse roof outline from the points:', JSON.stringify(rr), 'OSM/NHL:', JSON.stringify({ at: it.tag.at, bearing: it.tag.bearing, length: it.tag.length, width: it.tag.width })); } }
+  const roof2 = fitRoof(it); if (roof2) it.tag.lidar.roof = roof2;
+  console.log(`${it.name.padEnd(30)} ${roof2 ? `GABLE eave ${roof2.eave} ridge ${roof2.ridge} bearing ${roof2.bearing} (${roof2.length} x ${roof2.width} m)` : 'flat'}`);
   console.log(`${it.name.padEnd(30)} ${String(n).padStart(6)} points, ground ${it.ground.toFixed(1)} m, p50 ${it.tag.lidar.p50} p90 ${it.tag.lidar.p90} p98 ${it.tag.lidar.p98} max ${it.tag.lidar.max} → ${h} m`);
 }
 B.lidar = 'USGS 3DEP lidar, CA_SanFrancisco_1_B23 (flown 2023-04-20; public domain), EPT on AWS: the non-ground points inside each footprint, the 90th (98th for the chimney, lighthouse and water tower) percentile height less the DEM ground; scripts/make-alcatraz-heights.mjs';

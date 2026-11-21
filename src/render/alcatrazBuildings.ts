@@ -6,7 +6,8 @@ import data from './data/alcatraz-buildings.json';
 import type { Alcatraz } from './alcatraz';
 
 /** The lidar's height for a footprint or a tower (m over the DEM ground), its top (m NAVD88) and where it stands, where the lidar has it. */
-interface Lidar { height: number; top?: number; at?: [number, number] }
+interface Roof { eave: number; ridge: number; bearing: number; length: number; width: number; at: [number, number] }
+interface Lidar { height: number; top?: number; at?: [number, number]; roof?: Roof; outline?: { at: [number, number]; bearing: number; length: number; width: number } }
 const lidarOf = (o: object): Lidar | undefined => (o as { lidar?: Lidar }).lidar;
 
 /**
@@ -28,7 +29,7 @@ export function addAlcatrazBuildings(grp: THREE.Group, alc: Alcatraz): void {
   const ground = (lat: number, lon: number) => { const p = sim(lat, lon); return Math.max(0, alc.heightAt(p.x, p.y) ?? 0); };
 
   // the minor buildings: each footprint extruded from just under its lowest ground to its roof
-  const walls: THREE.BufferGeometry[] = [], ruins: THREE.BufferGeometry[] = [];
+  const walls: THREE.BufferGeometry[] = [], ruins: THREE.BufferGeometry[] = [], roofs: THREE.BufferGeometry[] = [];
   const CHIMNEY = 1056707165;
   for (const b of data.buildings) {
     if (b.osm === CHIMNEY) { // the powerhouse's chimney: a round stack, from the lidar's top down to the ground at its foot
@@ -40,11 +41,20 @@ export function addAlcatrazBuildings(grp: THREE.Group, alc: Alcatraz): void {
     const lo = Math.min(...gs), mean = gs.reduce((a, v) => a + v, 0) / gs.length, h = lidarOf(b)?.height ?? b.height ?? (b.ruin ? 3 : 7);
     const shape = new THREE.Shape(); pts.forEach((p, i) => i ? shape.lineTo(p.x, p.y) : shape.moveTo(p.x, p.y));
     const roof = mean + h, base = lo - 1; // (a building on a slope is let into it)
-    const g = new THREE.ExtrudeGeometry(shape, { depth: roof - base, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, base, 0);
+    const pitched = lidarOf(b)?.roof; // (a gable's walls go to its eave, its roof a triangular prism along the ridge)
+    const top = pitched ? mean + pitched.eave : roof;
+    const g = new THREE.ExtrudeGeometry(shape, { depth: top - base, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, base, 0);
     (b.ruin ? ruins : walls).push(g);
+    if (pitched) {
+      const hw = pitched.width / 2 + 0.3, hl = pitched.length / 2 + 0.3, rh = pitched.ridge - pitched.eave, p = sim(pitched.at[0], pitched.at[1]), a = pitched.bearing * Math.PI / 180;
+      const V = [[-hw, 0, -hl], [hw, 0, -hl], [0, rh, -hl], [-hw, 0, hl], [hw, 0, hl], [0, rh, hl]], f = [[0, 2, 1], [3, 4, 5], [0, 3, 5], [0, 5, 2], [1, 2, 5], [1, 5, 4]]; // (ends, then the two slopes; the eave's underside is hidden by the walls)
+      const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(f.flatMap(t => t.flatMap(i => V[i])), 3)); rg.computeVertexNormals();
+      rg.rotateY(-a); rg.translate(p.x, top, -p.y); roofs.push(rg);
+    }
   }
   grp.add(new THREE.Mesh(mergeGeometries(walls), WALL));
   if (ruins.length) grp.add(new THREE.Mesh(mergeGeometries(ruins), RUIN));
+  if (roofs.length) grp.add(new THREE.Mesh(mergeGeometries(roofs), lam(0x7e756a))); // (slate and tar paper, grey-brown)
 
   const put = (o: THREE.Object3D, at: number[], bearing: number, y: number) => {
     const p = sim(at[0], at[1]); o.position.set(p.x, y, -p.y); o.rotation.y = -bearing * Math.PI / 180; grp.add(o);
@@ -53,13 +63,13 @@ export function addAlcatrazBuildings(grp: THREE.Group, alc: Alcatraz): void {
 
   // the cellhouse: 465 × 165 ft along the island's crest, two stories on the Citadel's base, a low roof
   // (the roof is 12 m over the mean)
-  const c = data.cellhouse, cp = sim(c.at[0], c.at[1]), br = c.bearing * Math.PI / 180, gs: number[] = [];
+  const c0 = data.cellhouse, out = lidarOf(c0)?.outline, c = out ? { ...c0, ...out } : c0, cp = sim(c.at[0], c.at[1]), br = c.bearing * Math.PI / 180, gs: number[] = [];
   for (let u = -1; u <= 1; u += 0.5) for (let v = -1; v <= 1; v += 0.5) {
     const a = u * c.width / 2, d = v * c.length / 2; // across and along the heading (east = sin, north = cos)
     gs.push(Math.max(0, alc.heightAt(cp.x + a * Math.cos(br) + d * Math.sin(br), cp.y - a * Math.sin(br) + d * Math.cos(br)) ?? 0));
   }
   const cMean = gs.reduce((a, v) => a + v, 0) / gs.length, cLow = Math.min(...gs) - 0.5; // (its walls go down to the ground under its lowest side, as the Citadel's masonry base does on the terrace's edge: no gap to see under it)
-  const cH = lidarOf(c)?.height ?? 12; // (the roof over the mean ground: the lidar's 90th percentile; two stories, 12 m, if it has none)
+  const cH = lidarOf(c0)?.height ?? 12; // (the roof over the mean ground: the lidar's 90th percentile; two stories, 12 m, if it has none)
   const cell = new THREE.Group(); cell.add(box(c.width, c.length, cMean + cH - cLow + 0.5, WALL, -0.5), box(c.width * 0.9, c.length * 0.9, 0.6, RUIN, cMean + cH - cLow));
   put(cell, c.at, c.bearing, cLow);
 
