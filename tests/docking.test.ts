@@ -22,11 +22,15 @@ const approach = (w: World, s: Slip, back: number, v: number) => {
 const free = slipsIn('west-harbor').filter(s => s.kind === 'bow-in' && !slipTaken(s) && s.id !== home.id);
 
 describe('docking', () => {
-  it('there are free slips to come in to, and Lines ready picks the nearest', () => {
+  it('there are free slips to come in to, and Lines ready picks the nearest (her own slip first, within its reach: r239)', () => {
     expect(free.length).toBeGreaterThan(5);
     const w = cruise(); for (let i = 0; i < 30; i++) w.step(DT);
-    approach(w, free[0], 9, 0.4);
-    expect(w.linesReady()).toBe(true); expect(w.user.mooring?.berth).toBe(free[0].id);
+    const away = free.find(s => Math.hypot(s.p.x - home.p.x, s.p.y - home.p.y) > 60)!; // (her own slip out of reach)
+    approach(w, away, 9, 0.4);
+    expect(w.linesReady()).toBe(true); expect(w.user.mooring?.berth).toBe(away.id);
+    expect(w.linesReady()).toBe(true); // (stood down)
+    approach(w, free[0], 9, 0.4); // (beside her own: her own)
+    expect(w.linesReady()).toBe(true); expect(w.user.mooring?.berth).toBe(Math.hypot(free[0].p.x - home.p.x, free[0].p.y - home.p.y) < 50 ? home.id : free[0].id);
     expect(w.linesReady()).toBe(true); expect(w.user.mooring).toBeUndefined(); // (again: stood down)
   });
   it('crewed, at a slow walk into a free slip: the crew steps off, the line stops her in her berth, and she\'s made fast there', () => {
