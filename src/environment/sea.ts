@@ -202,8 +202,10 @@ export function swellFor(date: string, day: SwellDay): Swell {
 export const swellShare = (hs: number) => clamp(0.71 + 0.048 * hs, 0.55, 0.92);
 
 const BRIDGE = LL(37.81972, -122.47861), OUTSIDE = LL(37.8125, -122.53);
-/** The channel's direction into the bay from the bridge (toward Alcatraz and Berkeley), deg. */
-const INTO_BAY = 78;
+/** The strait's axis into the Bay (deg): the line from outside the Gate to the bridge, these two points, 79.9° (w047;
+ * from the bridge on to Alcatraz, where the channel opens out, is 80.9°). It was a bare 78, with 80 where the swell is
+ * turned onto it crossing the bar. */
+const INTO_BAY = brg(BRIDGE.x - OUTSIDE.x, BRIDGE.y - OUTSIDE.y);
 /**
  * How much of the ocean swell reaches a point (0..1), and which way it's travelling there. Outside the
  * bridge it eases off toward the Gate; inside, it fans out from the bridge (diffraction) and dies away over
@@ -216,13 +218,13 @@ export function swellReach(p: Vec, shadow = true, from = 270): { k: number; towa
   // furthest, "ultra-refracted" round into the strait by the ebb-tidal delta (Hanes & Erikson, Estuarine Coastal Shelf
   // Sci. 133, 2013, abstract: the Bay "is vulnerable to ultra-refracted ocean waves, particularly southwest incident
   // swell"; Hanes, Ward & Erikson, Cont. Shelf Res. 31, 2011: more open to long swell "from the south or southwest than
-  // the more common ocean waves coming from the northwest"). So from the south-west round to the strait's axis (258° out
-  // from the bridge) it gets in whole; from north of the axis, past Point Bonita, with height ∝ √cos of its angle off it
+  // the more common ocean waves coming from the northwest"). So from the south-west round to the strait's axis (260° out
+  // from the bridge, INTO_BAY + 180) it gets in whole; from north of the axis, past Point Bonita, with height ∝ √cos of its angle off it
   // (the size of that is a judgement: neither paper's numbers could be reached)
   const own = n360(from + 180), north = clamp(wrap(from - (INTO_BAY + 180)), 0, 85), dirK = Math.sqrt(Math.cos(north * D2R));
   if (p.x < OUTSIDE.x) return { k: 1, toward: own };
   const dx = p.x - BRIDGE.x, dy = p.y - BRIDGE.y, d = hypot(dx, dy);
-  if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: (1 - 0.45 * t) * (1 - t + t * dirK), toward: n360(own + wrap(80 - own) * t) }; }
+  if (p.x < BRIDGE.x) { const t = (p.x - OUTSIDE.x) / (BRIDGE.x - OUTSIDE.x); return { k: (1 - 0.45 * t) * (1 - t + t * dirK), toward: n360(own + wrap(INTO_BAY - own) * t) }; }
   if (d < 1) return { k: 0.55 * dirK, toward: INTO_BAY };
   // right by the bridge the swell is still all around; further in, it spreads out along the channel
   const toward = brg(dx, dy), spread = Math.min(90, Math.abs(wrap(toward - INTO_BAY))) * clamp(d / 1500, 0, 1);
