@@ -279,7 +279,8 @@ export class RaceLog {
       const late = Math.max(0, (this.startDelay ?? 60) - 2), g = this.gun;
       const atFav = (g.favored === w.C.pinLabel ? g.frac < 0.33 : g.frac > 0.67);
       out.push({ key: 'start', title: 'The start', lost: late,
-                detail: this.startDelay == null ? 'No clean start.' : `You crossed ${this.startDelay.toFixed(1)} s after the gun${g.d < -1 ? `, ${Math.round(-g.d)} m back from the line at the gun` : ''}, going ${g.kt.toFixed(1)} kt at the gun.${g.favDeg >= 3 ? ` The ${g.favored} end was favored by ${Math.round(g.favDeg)}°${atFav ? ', and you started there.' : '; you started away from it.'}` : ' The line was about square.'}`,
+                // (in figures, one line: the gun, how far back and how fast at it, and the favored end; the debrief audit, 21 Nov 2026)
+        detail: this.startDelay == null ? 'No clean start.' : `Gun +${this.startDelay.toFixed(1)} s${g.d < -1 ? ` · ${Math.round(-g.d)} m back` : ''} · ${g.kt.toFixed(1)} kt · ${g.favDeg >= 3 ? `${g.favored} end favored ${Math.round(g.favDeg)}°, ${atFav ? 'you started there' : 'you started away'}` : 'line about square'}.`,
         tip: late > 6 ? 'Time your run in: know how long it takes to reach the line from your spot, and leave with a few seconds to spare, building speed. Be on the line at full speed at the gun.' : g.favDeg >= 3 && !atFav ? `Start nearer the favored end: ${Math.round(g.favDeg)}° of bias is worth a boat length or more in a short line.` : 'A good start.' });
     }
     if (this.header.lost > 0.5 || this.header.liftTacks > 0) out.push({ key: 'shifts', title: 'Wind shifts', lost: this.header.lost + this.header.liftTacks * 3,
@@ -305,7 +306,7 @@ export class RaceLog {
       detail: `${mmss(this.lee.t)} in the wind shadow of an island or headland.`,
       tip: 'Keep out of the lee of Angel Island, Alcatraz and the Marin hills when you can: the wind there is a fraction of the breeze outside it.' });
     if (this.down.lost + this.pole.lost > 0.5) out.push({ key: 'downwind', title: 'Downwind', lost: this.down.lost + this.pole.lost,
-      detail: `${mmss(this.down.t)} sailing too high or too low for the best speed downwind${this.pole.t > 1 ? `; ${mmss(this.pole.t)} sailing deep without the pole set` : ''}.`,
+      detail: `${mmss(this.down.t)} off the best downwind angle${this.pole.t > 1 ? `; ${mmss(this.pole.t)} deep without the pole` : ''}.`,
       tip: 'Downwind, sail the best angle for the wind (the downwind laylines show it): heat up a little in the lulls, sail lower in the puffs. Running deep, pole the jib out to windward.' });
     if (this.heel.lost > 0.5) out.push({ key: 'heel', title: 'Heel', lost: this.heel.lost,
       detail: `${mmss(this.heel.t)} heeled past about 22°.`,

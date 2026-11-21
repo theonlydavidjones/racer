@@ -78,7 +78,7 @@ describe('the tactics debrief', () => {
     const w = new World(TRAIN, settings({ fleet: 2, seq: 1 }), 3);
     while (w.t < 5) w.step(DT);
     const start = w.log!.findings(w).find(f => f.key === 'start')!;
-    expect(start.detail).toMatch(/at the gun|No clean start/);
+    expect(start.detail).toMatch(/^Gun \+\d+\.\d s · .* kt · |No clean start/);
   });
 
   it('the race replay\'s moments: each loss is a moment with its time, place and cost, matching the findings', () => {
