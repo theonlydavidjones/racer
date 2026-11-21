@@ -1,4 +1,6 @@
-# r297: the bottom-left Coach card, options (no code shipped)
+# r298: the bottom-left Coach card, options (no code shipped)
+
+(r298, ROADMAP 8s19. An earlier commit here said r297 in error; r297 is crew mistakes under load.)
 
 The owner: "why does it say Coach at the top and Trim Coach at the bottom?" Their brief:
 - drop the TRIM COACH button, and make the whole card the way in;
