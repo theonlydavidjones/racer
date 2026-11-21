@@ -499,7 +499,7 @@ function paintDrillPage(): void {
 const DRILL_FLAGS: PrepFlag[] = ['P', 'I', 'Z', 'U', 'black'];
 function paintDrillFlags(): void {
   const cur = app.S.drillFlag ?? 'P';
-  morph($('drillFlagPick'), DRILL_FLAGS.map(f => `<button type="button" role="radio" data-flag="${f}" aria-checked="${f === cur}" title="${app.esc(PREP_MEANING[f])}"><img src="${flagUrl(f)}" alt="${f === 'black' ? 'Black flag' : f}"></button>`).join(''));
+  morph($('drillFlagPick'), DRILL_FLAGS.map(f => `<button type="button" role="radio" data-flag="${f}" aria-checked="${f === cur}" title="${app.esc(shortTip(PREP_MEANING[f]))}"><img src="${flagUrl(f)}" alt="${f === 'black' ? 'Black flag' : f}"></button>`).join(''));
 }
 const flagUrls = new Map<PrepFlag, string>();
 const flagUrl = (f: PrepFlag): string => { let u = flagUrls.get(f); if (u == null) { try { u = flagCanvas(f).toDataURL(); } catch { u = ''; } flagUrls.set(f, u); } return u; };
