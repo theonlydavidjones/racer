@@ -14,7 +14,7 @@ export type Place =
   | { k: 'season'; id: string; no?: number }
   | { k: 'setup' }
   | { k: 'club'; tab?: 'boats' | 'members' }
-  | { k: 'boat'; id: string };
+  | { k: 'boat'; id: string; tab?: 'care' };
 
 const same = (a: Place, b: Place) => a.k === b.k && (a.k !== 'boat' || a.id === (b as { id: string }).id);
 

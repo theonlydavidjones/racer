@@ -13,6 +13,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { placeLabel } from '../ui/placeNames';
+import { bottomNow, bottomWords, careAtSail } from '../boat/care';
 import { asTheClubRunsIt, coursePicker, drillSeq, hostOf, practiceSeq } from '../club/practice';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -351,12 +352,15 @@ function crewRows(): void {
   // (anyone who crews; someone in the other seat can be brought across: the two swap)
   const crewers = app.MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
   const you = app.MEMBERS.find(m => m.id === YOU);
+  // (her bottom foul on your clock, unless Mike's booked: one line, her Care tab a click away; r294)
+  const bn = bottomNow(boat), foul = bn.foul && !boat.diverBooked;
   const seatTiles = (i: number) => crewers.map(m => tile(initials(m.name), m.name, CLUB_TILE, { round: true, on: seats[i] === m.id, dim: seats[i] !== m.id && seats.includes(m.id), data: { seat: String(i), id: m.id }, title: seats[i] === m.id ? `${m.name}, ${i ? 'forward: jib and pole' : 'middle: the main'}` : seats.includes(m.id) ? `${m.name} (in the other seat: tap to swap)` : m.name })).join('')
     + emptyTile('Nobody', false, { round: true, on: !seats[i], data: { seat: String(i), id: '' }, title: 'Nobody in this seat' });
   morph(rows, `<div class="t-pickrow"><span class="t-lab">Helm</span><span class="t-group">${tile(initials(you?.name ?? 'You'), you?.name ?? 'You', '#ffb627', { round: true, on: true })}</span></div>
     <div class="t-pickrow"><span class="t-lab">Main</span><span class="t-group">${seatTiles(0)}</span></div>
     <div class="t-pickrow"><span class="t-lab">Jib · pole</span><span class="t-group">${seatTiles(1)}</span></div>
-    <div class="t-pickrow"><span></span><span class="t-links">${seats.length === 2 ? '<button type="button" class="ghost sm" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>' : ''}<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></span></div>`);
+    <div class="t-pickrow"><span></span><span class="t-links">${seats.length === 2 ? '<button type="button" class="ghost sm" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>' : ''}<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></span></div>${foul ? `
+    <div class="t-pickrow"><span></span><span class="t-links"><small>Her bottom's foul: ${bottomWords(bn)}</small><button type="button" class="linkbtn" data-crew="care">Care</button></span></div>` : ''}`);
   setupHeads();
 }
 // (one listener on the crew rows, which are redrawn in place: a seat's tile, the swap, the Yacht Club)
@@ -364,6 +368,7 @@ $('crewRows').addEventListener('click', e => {
   const t = e.target as HTMLElement, boat = app.S.boats.find(b => b.id === app.S.boatId) ?? app.S.boat;
   const changed = () => { pullCrew(app.S, app.MEMBERS); saveMembers(app.MEMBERS); saveSettings(app.S); crewRows(); setupChanged(courseCard); };
   if (t.closest('[data-crew="club"]')) { app.nav.go({ k: 'club', tab: 'members' }); return; }
+  if (t.closest('[data-crew="care"]')) { app.nav.go({ k: 'boat', id: boat.id, tab: 'care' }); return; }
   if (t.closest('[data-crew="swap"]')) { const ids = boat.crewIds ?? []; if (ids.length === 2) { boat.crewIds = [ids[1], ids[0]]; changed(); } return; }
   const b = t.closest<HTMLElement>('[data-seat]'); if (!b) return;
   const i = Number(b.dataset.seat), id = b.dataset.id ?? '', ids = [...(boat.crewIds ?? [])];
@@ -520,6 +525,8 @@ function beginRace(seed?: number): void { app.results.settleLog(() => beginRaceN
 function beginRaceNow(seed?: number): void {
   // laid up for repairs after a wreck or damage (docs/WRECK-PROPOSAL.md): she can't be taken out until then
   { const until = app.S.boat.laidUpUntil; if (laidUp(app.S.boat)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
+  // (her bottom on your clock, as she sets off: Mike's booked cleaning done, and her weeks since it, for the sim; r294)
+  careAtSail(app.S.boat);
   // (the pause menu's and the results' Back to setup: the setup you sailed from, or the Drill page for a drill)
   const drilling = app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings', sp = app.S.mode === 'race' ? app.seasonPick : null;
   app.nav.reset(...(drilling ? [{ k: 'drill' } as const] : sp ? [{ k: 'race' } as const, { k: 'season', id: sp.series.id } as const, { k: 'setup' } as const] : [{ k: 'setup' } as const]));

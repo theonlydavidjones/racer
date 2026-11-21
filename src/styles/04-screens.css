@@ -272,3 +272,9 @@ body.atHome>:not(#gl):not(.overlay),body.atHome>:not(#gl):not(.overlay) *{visibi
 .ychead{display:flex;align-items:center;gap:14px}
 .ychead .ycburgee{height:44px;width:auto;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
 .ychead .ycjoin{margin-left:6px;align-self:flex-end;margin-bottom:6px;background:var(--btn);border:1px solid var(--rule);border-radius:6px;color:var(--text);padding:5px 8px;font:inherit;max-width:220px}
+/* her Care tab (r294): her bottom's tile */
+.caretile{display:flex;gap:16px;align-items:center}
+.carebottom{width:244px;height:80px;flex:none;background:#1d4f6e;border-radius:6px}
+.caretile .careword{margin:0 0 4px}
+.caretile button,.caretile .carenote{margin-top:8px}
+.carenote{color:var(--muted);font-size:13px}

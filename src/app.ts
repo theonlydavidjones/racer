@@ -1736,7 +1736,7 @@ function showPlace(p: Place): void {
   else if (p.k === 'setup') { setup.prepare(); setup.openSetup(); }
   else if (p.k === 'drill') { if (S.mode === 'sail') S.mode = 'race'; setup.prepare(); setup.openSetup('drill'); }
   else if (p.k === 'club') { if (p.tab === 'members') fleet.openMembers(); else fleet.openList(); }
-  else fleet.openBoat(p.id);
+  else fleet.openBoat(p.id, p.tab ?? 'particulars');
 }
 function openHome(): void { results.settleLog(openHomeNow); }
 function openHomeNow(): void {

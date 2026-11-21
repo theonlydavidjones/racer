@@ -11,6 +11,7 @@ import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
 import { applyMemberInput, askSaveHtml, memberPage, membersGrid } from './members';
 import { morph } from './morph';
+import { bottomNow, bottomWords } from '../boat/care';
 
 /**
  * The Fleet: your boats, as a grid of cards (her profile, name and number) or a table of her particulars (name,
@@ -47,6 +48,8 @@ export class Fleet {
   private page = document.getElementById('fleetBoat')!;
   private view: 'grid' | 'list' = 'grid';
   private boatId = '';
+  /** Her page's tab: her particulars and record, or her Care (r294: the owner's Care tab, docs/BOAT-CARE-PROPOSAL.md). */
+  private boatTab: 'particulars' | 'care' = 'particulars';
   private confirmDelete = false;
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
   private tab: 'boats' | 'members' | 'season' = 'boats';
@@ -127,9 +130,9 @@ export class Fleet {
     this.page.hidden = true; this.hooks.showroom(null);
     this.drawList(); this.list.hidden = false;
   }
-  openBoat(id: string): void {
+  openBoat(id: string, tab: 'particulars' | 'care' = 'particulars'): void {
     const b = this.S.boats.find(x => x.id === id); if (!b) { this.openList(); return; }
-    this.boatId = id; this.confirmDelete = false; this.seatDraft = null; this.skipperDraft = null; this.leaving = null;
+    this.boatId = id; this.boatTab = tab; this.confirmDelete = false; this.seatDraft = null; this.skipperDraft = null; this.leaving = null;
     this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
@@ -171,6 +174,9 @@ export class Fleet {
         if (this.S.boatId === gone) { this.S.boat = this.S.boats[0]; this.S.boatId = this.S.boat.id; }
         this.hooks.changed(); this.hooks.back(); return;
       }
+      case 'btab': this.boatTab = v === 'care' ? 'care' : 'particulars'; this.drawBoat(); return;
+      // (Mike the diver booked: her bottom's clean by her next sail, boat/care.ts careAtSail)
+      case 'mike': { const b = this.cur; if (b) { b.diverBooked = true; this.hooks.changed(); this.drawBoat(); } return; }
       case 'tab': this.guard(() => { this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); }); return;
       case 'season': { const [id, no] = v.split('|'); this.close(); this.hooks.sailSeason(id, Number(no)); return; }
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
@@ -272,7 +278,8 @@ export class Fleet {
         <div class="gbtns">${this.seatsDirty ? '<button type="button" class="cta" data-f="bsave">Save</button>' : ''}${this.flash ? `<span class="gsaved on">${this.flash}</span>` : ''}<button type="button" class="${this.seatsDirty ? 'ghost' : 'cta'}" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
         ${this.leaving ? askSaveHtml : ''}${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
       </div>
-      <div class="bpbody">
+      <div class="yctabs"><button type="button" data-f="btab" data-v="particulars" aria-pressed="${this.boatTab === 'particulars'}">Particulars</button><button type="button" data-f="btab" data-v="care" aria-pressed="${this.boatTab === 'care'}">Care</button></div>
+      <div class="bpbody">${this.boatTab === 'care' ? careHtml(b) : `
       <section><h3>Particulars</h3><table class="ftab">
         ${row('Sail number', esc(sailNo(b)))}${laidUp(b) ? row('Laid up', `for repairs, until ${esc(b.laidUpUntil!)}`) : ''}
         ${row('Country', esc(countryName(b.sails.country) || '—'))}
@@ -285,7 +292,7 @@ export class Fleet {
       <section><h3>The boat</h3><table class="ftab">
         ${row('Hull', b.hull.material === 'wood' ? 'Wood' : 'Fiberglass')}
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
-        ${row('Bottom', bottomLine(colour(BOTTOM_COLORS, b.hull.lower), p.cleanedWeeks))}
+        ${row('Bottom', bottomLine(colour(BOTTOM_COLORS, b.hull.lower), bottomNow(b).weeks))}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
         ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
@@ -298,10 +305,30 @@ export class Fleet {
           : '<small>No races yet. Sail her in a race, or race against her, and her results go here.</small>'}</section>
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
-          : '<small>Nobody has sailed her yet.</small>'}</section>
+          : '<small>Nobody has sailed her yet.</small>'}</section>`}
       </div>`);
   }
 
+}
+
+/* ---------- her Care tab (r294, phase 1: her bottom) ---------- */
+/**
+ * Her bottom as it is on your clock (boat/care.ts): a picture of her underside, fouled as the sim has it (a green film for
+ * the slime, darker with the weeks; the barnacles as specks), what it is in words, and Mike the diver to clean it, done by
+ * her next sail (the owner, 20 Nov 2026: a brush or Mike, never a haul-out). The brush at the dock comes in phase 3.
+ */
+function careHtml(b: BoatSpec): string {
+  const n = bottomNow(b), slime = Math.min(1, n.slime / 400e-6), calc = Math.min(1, n.calc / 4e-3);
+  // (her underside from below: the hull's run, the long keel and rudder; the specks placed the same each time)
+  const specks = Array.from({ length: Math.round(calc * 60) }, (_, i) => { const t = ((i * 97) % 89) / 89, s = ((i * 53) % 37) / 37 - 0.5;
+    return `<circle cx="${(18 + t * 204).toFixed(1)}" cy="${(40 + s * 34 * Math.sin(Math.PI * t)).toFixed(1)}" r="${(1.1 + (i % 3) * 0.5).toFixed(1)}" fill="#d9d2bf" opacity=".85"/>`; }).join('');
+  const hull = 'M12 40 C40 12 150 6 228 30 L232 40 L228 50 C150 74 40 68 12 40 Z';
+  const pic = `<svg class="carebottom" viewBox="0 0 244 80" role="img" aria-label="Her bottom: ${esc(bottomWords(n))}">
+    <path d="${hull}" fill="${esc(b.hull.lower)}" stroke="rgba(0,0,0,.35)"/>
+    <path d="${hull}" fill="#4f6b2a" opacity="${(slime * 0.75).toFixed(2)}"/>
+    <rect x="70" y="36" width="120" height="8" rx="4" fill="rgba(0,0,0,.28)"/><rect x="214" y="37" width="14" height="6" rx="2" fill="rgba(0,0,0,.28)"/>${specks}</svg>`;
+  const act = b.diverBooked ? `<p class="carenote">Mike's booked: clean by your next sail.</p>` : `<button type="button" class="ghost" data-f="mike">Have Mike clean her</button>`;
+  return `<section class="care"><h3>Bottom</h3><div class="caretile">${pic}<div><p class="careword"><b>${esc(bottomWords(n))}</b></p>${b.cleanedOn ? `<small>Cleaned ${new Date(b.cleanedOn + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>` : ''}${act}</div></div></section>`;
 }
 
 /* ---------- helpers ---------- */

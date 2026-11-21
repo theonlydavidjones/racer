@@ -15,6 +15,10 @@ export interface BoatSpec {
   id: string; // stable, for your list of boats
   /** Laid up for repairs until this day (YYYY-MM-DD, your clock), after a wreck or damage (docs/WRECK-PROPOSAL.md). */
   laidUpUntil?: string;
+  /** The day her bottom was last cleaned (YYYY-MM-DD, your clock: boat/care.ts); perf.cleanedWeeks follows it as she sets off. */
+  cleanedOn?: string;
+  /** Mike the diver's booked to clean her bottom at her slip: done by her next sail (boat/care.ts). */
+  diverBooked?: true;
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
@@ -210,6 +214,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // (her crew's seats, from the Yacht Club's members: at most two, ids only)
     ...(typeof x.laidUpUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.laidUpUntil) ? { laidUpUntil: x.laidUpUntil } : {}), // (laid up for repairs: WRECK-PROPOSAL)
+    ...(typeof x.cleanedOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.cleanedOn) ? { cleanedOn: x.cleanedOn } : {}), // (her bottom's last cleaning: boat/care.ts)
+    ...(x.diverBooked === true ? { diverBooked: true as const } : {}),
     ...(Array.isArray(x.crewIds) ? { crewIds: x.crewIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2) } : {}),
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
