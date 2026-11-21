@@ -28,9 +28,13 @@ import { openGeoTiff } from './lib/geotiff-f32.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const CACHE = arg('--cache', '');
-const STRIP = { s: 37.7975, n: 37.8150, w: -122.4900, e: -122.4180 }; // (Fort Point to Hyde Street Pier; its south edge, 37.7975, is Lombard Street's, where the Marina's houses end)
+const STRIP = { s: 37.7920, n: 37.8150, w: -122.4900, e: -122.4070 }; // (Fort Point to Pier 39 and Telegraph Hill's west slope, and south to Pacific Heights and Cow Hollow: the old random boxes' seam is now inland and out of the sailing views)
 const COLS = [-122.4900, -122.4600, -122.4435, -122.4318, -122.4250, -122.4180];
-const BOXES = COLS.slice(1).map((e, i) => [COLS[i], STRIP.s, e, STRIP.n]);
+// (OSM's map call allows 50,000 nodes a box, so the dense parts are cut small. Boxes 0 to 4 are phase 1's and 2's, in the same order, so a cache from them still holds.)
+const box = (cols, s, n) => cols.slice(1).map((e, i) => [cols[i], s, e, n]);
+const BOXES = [...box(COLS.slice(0, 6), 37.7975, STRIP.n),
+  ...box([-122.4900, -122.4700, -122.4520, -122.4400, -122.4320, -122.4250, -122.4180, -122.4125, -122.4070], STRIP.s, 37.7975), // the south band
+  ...box([-122.4180, -122.4125, -122.4070], 37.7975, 37.8062), ...box([-122.4180, -122.4125, -122.4070], 37.8062, STRIP.n)]; // the east end
 const MSL_NAVD88 = 0.969, DECK = 3; // (a pier's deck: about 3 m over the water, render/wharf.ts)
 const LAT0 = 37.81053, LON0 = -122.44332, MLAT = 111320, MLON = MLAT * Math.cos(LAT0 * Math.PI / 180);
 const sim = (lat, lon) => [(lon - LON0) * MLON, (lat - LAT0) * MLAT];

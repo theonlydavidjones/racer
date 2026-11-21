@@ -23,6 +23,8 @@ const VIEWS = {
   fp_south: [LL(37.8100, -122.4762, 6), LL(37.8105, -122.4771, 9)], // the same from the south-east
   fp_300: [LL(37.8122, -122.4745, 3), LL(37.8107, -122.4773, 9)], // Fort Point's bay face and the arch, from the water 300 m north-east, at sail height (SCALE=3 then crop: the fort is small at that range)
   fp_under: [LL(37.8150, -122.4735, 2.6), LL(37.8125, -122.4767, 16)], // from a boat close-hauled on port tack heading out under the bridge (about 225°), the fort on the port bow
+  pier39: [LL(37.8150, -122.4125, 6), LL(37.8070, -122.4110, 25)], // Pier 39 and Telegraph Hill's west slope, from the water north of the pier
+  over_ne: [LL(37.8030, -122.4150, 1100), LL(37.8030, -122.41501, 0)], // overhead: North Beach, Telegraph Hill, Cow Hollow's east end: the strip's east and south edges
   fp_over: [LL(37.8105, -122.4771, 90), LL(37.81051, -122.47710, 0)], // overhead: the fort's roof, courtyard and light
   over_hyde: [LL(37.8097, -122.4225, 160), LL(37.8097, -122.42251, 0)], // overhead: the ships at their berths
   over_east: [LL(37.8070, -122.4260, 1000), LL(37.8070, -122.42601, 0)], // overhead: Fort Mason, Aquatic Park, Russian Hill
