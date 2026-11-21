@@ -27,3 +27,11 @@ describe('audit 7: the bottom-left helm buttons are as tall as the bottom-right 
     expect(rule(css('05-setup.css'), '#viewBar .ib.meta')).toContain('height:40px');
   });
 });
+
+describe('audit 8: the nav strip is as tall as the compass bar beside it', () => {
+  it('44 px', () => {
+    const css18 = css('18-layout-d.css');
+    expect(css18).toMatch(/#compassBar\{[^}]*height:44px/);
+    expect(css18).toMatch(/#navStrip\{[^}]*height:44px/);
+  });
+});

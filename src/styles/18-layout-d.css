@@ -13,7 +13,7 @@ body:has(.overlay:not([hidden])) #compassBar{visibility:hidden}
 #compassBar #compassTape{position:static;transform:none;display:block;width:100%;height:100%;background:none;border:0;border-radius:0}
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* the nav strip: the pods' look, one row */
-#navStrip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:stretch;
+#navStrip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:max(16px,env(safe-area-inset-right,0px));height:44px;box-sizing:border-box;display:flex;align-items:stretch;
   background:linear-gradient(#0d1216,#070a0d);border:2px solid #2a3137;box-shadow:inset 0 0 0 1px #000,0 1px 3px rgba(0,0,0,.4);border-radius:5px;z-index:4;pointer-events:auto;font-family:var(--f-inst)}
 #navStrip[hidden]{display:none}
 #navStrip > div{display:flex;flex-direction:column;justify-content:center;padding:5px 11px;border-left:1px solid #2a3137;flex:none;cursor:default}
