@@ -32,7 +32,20 @@ The stills are in `audit/`. Line numbers are on 5de4d67c.
 | 12 | **Wordy hover: the Wind shadows layer.** 164 characters: "Where the wind is lighter for what stands upwind: the lee of the land, boats' dirty air, ships, the committee boat and the bridge piers, as the sails feel it". | — | src/ui/layers.ts:15 | S |
 | 13 | **Wordy hovers: the Wind and Current pickers** (90 and 137 characters). | — | index.html (planField, chartField) | done (fc4a70b3, w037) |
 | 14 | **Two chart checks are stale since r270.** `nav-layer.cjs` and `plan-chart.cjs` start from and sail to the removed named spots (alcatraz, crissy). On v215 they open with no destination: nav-layer fails, and plan-chart throws. | — | scripts/check/nav-layer.cjs:17; scripts/check/plan-chart.cjs | S |
-| 15 | **UK spelling.** None in what the player reads on the charts. `spelling.cjs` finds 3, all in docs/marinas drafts. A few code comments in encChart.ts and hud.ts say "colours"/"grey"; they're not shown. | — | — | — |
+| 15 | **UK spelling.** None in what the player reads on the charts. `spelling.cjs` finds 3, all in docs/marinas drafts. A few code comments in encChart.ts and hud.ts use the British spellings of color and gray; they're not shown. | — | — | — |
 | 16 | **Chart features against NOAA's ENC.** Not compared feature by feature: that needs the ENC's own data beside the drawing, a research task of its own. Nothing looked wrong or missing in the area sailed. | — | — | — |
 
-The S items fixed on `claude/leaderboard-b`: 1, 2, 3, 7, 8, 10, 12 and 14. Each commit cites "chart audit #n".
+The S items fixed on `claude/leaderboard-b`, one commit each, citing "chart audit #n":
+
+| # | Commit |
+|---|--------|
+| 1 | f9a20998 |
+| 2 | 6fd71d32 |
+| 3 | 1242adba |
+| 7 | 56771428 |
+| 8 | 5435d94b |
+| 10 | 525f75c8 |
+| 12 | 657352fa |
+| 14 | 40e2722f |
+
+#1 doesn't cover the ENC's own names running off the left edge ("Golden Gate Bridge"); that's still open.
