@@ -2383,3 +2383,5 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Phone and tablet layout (on hold: desktop first).
 
 8s19. **Strategist / Trim Coach card** (owner, 21 November 2026; feature; now, v215; Debrief; r298): a Strategist/Trim Coach card at the bottom-left of the game surface. The owner picked Option A (one card, two lines) and "treat both as the strategist": the card and the C view are one strategist. Debrief is building it (~3 h). Debrief first called it r297, but r297 is crew mistakes under load (8s18). Commits name r298. One card, no new buttons.
+
+8s20. **The mast-bend model** (owner, 21 November 2026; feature; later, build after Tuesday 24 November 06:00 PT; Rigging; r299): "build the mast-bend model after Tuesday." Until then, research only: the Folkboat mast section's EI or a measured bend, and each sail plan's luff round. The plan goes in docs/rig/jumpers.md: spreaders, jumpers, backstay and forestay under load; the tests to write first; and what is an estimate. Science is prime: the stiffness needs a source or a stated assumption. Commits name r299.
