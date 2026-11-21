@@ -6,8 +6,15 @@
 // - Waiting, set back: stemming a spring ebb into the Gate in 4 kt (25 Nov 14:30), the front is carried backward from
 //   the start and gets through on the turn at 168.1 minutes (Deep Physics' review: given up on the stall and the retreat
 //   alone, it couldn't get there).
-// - Waiting, holding on: from Coyote Point to the Gate at 07:30 in 14 kt, the front lay 500-700 m from the Gate for 70
-//   minutes against the flood and got through at 168.2 (given up on the stall and a dead way alone, it couldn't either).
+// - Waiting, holding on: from the Corte Madera Channel light "2" to the Gate leaving 08:30 in 14 kt (14 Nov), asked to
+//   give up, the front makes no gain for 90 minutes against the flood, and from minute 125 on for 60 of them the way of
+//   its last gain is pruned out of it, yet it falls back only 0.07 of what would give it up: it is kept, and gets there at
+//   188, as it does not asked (measured with the router instrumented, 21 Nov; the same on the tree before the Long Wharf
+//   was cleared). Given up on the stall and the dead way alone, it would have been cut at minute 125.
+//   (This case replaced "Coyote Point to the Gate at 07:30", which started at the same light: through the passage, with
+//   no turns in its route, it was never asked to give up, so it only pinned a time; and once the phantom wall along
+//   Richmond's Long Wharf was water (docs/bay-east/phantom-land.md), the currents and wind it changed moved that
+//   departure's arrival so the front no longer waited on the flood: 111.0 minutes where it had been 168.2.)
 // - And the give-up is the passage's direct try's alone (it then goes stretch by stretch): asked of the router in general,
 //   it cut a long wait on the foul tide in Raccoon Strait (Belvedere Point to Ayala Cove against the ebb in 5 kt, 25 Nov
 //   15:00), given up at 218 min where it arrives at 327.5 (Deep Physics' second review; 326.5 since beat-chop read the drive table between its rows; 326.6 since the beat in a light chop lost its lean toward the wind, beat-smooth). Not asked, the router gets there.
@@ -21,6 +28,7 @@ import { dist } from '../src/core/math';
 import { outlookFor } from '../src/sim/outlook';
 import { routeLeg, routeLegSteps } from '../src/sim/router';
 import { passageNow } from '../src/sim/navigator';
+import { PLACES } from '../src/sim/places';
 
 const sail = (o: Partial<Settings>) => ({ ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: '', current: 'real', traffic: 0, fleet: 0, opponents: [], windKind: 'west', ...o } as Settings);
 
@@ -50,10 +58,14 @@ describe('a front that has lost the way is given up; one that is waiting is kept
     expect(pn.ok).toBe(true); expect(pn.minutes).toBeCloseTo(168.114, 2);
   }, 300_000);
 
-  it('Coyote Point to the Gate at 07:30 in 14 kt: the front waiting on the flood is kept, and gets there at 168 minutes', () => {
-    const w = new World(COURSES[0], sail({ windKt: 14, sailFrom: 'm-CM2', sailTo: 'gate', tideDate: '2026-11-14', tideTime: '07:30' }), 7, { freeSail: true });
-    const pn = passageNow(w as never)!;
-    expect(pn.ok).toBe(true); expect(pn.minutes).toBeCloseTo(168.154, 2);
+  it('the Corte Madera Channel light to the Gate leaving 08:30 in 14 kt: the front waiting on the flood is kept, and gets there at 188 minutes', () => {
+    const w = new World(COURSES[0], sail({ windKt: 14, tideDate: '2026-11-14', tideTime: '08:30' }), 7, { freeSail: true });
+    w.step(DT);
+    const P = (id: string) => PLACES.find(p => p.id === id)!.p;
+    const run = (giveUp: boolean) => { const g = routeLegSteps(outlookFor(w as never), P('m-CM2'), P('gate'), w.clockUtc, 30, 360, undefined, Infinity, giveUp); let r = g.next(); while (!r.done) r = g.next(); return r.value; };
+    const kept = run(true), not = run(false);
+    expect(kept.ok).toBe(true); expect(kept.minutes).toBeCloseTo(188.0, 2);
+    expect(kept.minutes, 'the same as not asked to give up').toBe(not.minutes);
   }, 300_000);
 
   it('Raccoon Strait eastbound against the ebb in 5 kt: the router, not asked to give up, waits it out and gets there at 326.5 minutes', () => {

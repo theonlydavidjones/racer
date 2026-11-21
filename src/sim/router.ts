@@ -205,10 +205,10 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   // three runs in four). A front that is waiting is kept, however it's set back: stemming a spring ebb into the Gate in
   // 4 kt (25 Nov, 14:30) the front is carried backward from the start and gets through on the turn at 168 minutes; its
   // last gain is the start, and every point descends from that: given up on the stall and the retreat alone (Deep
-  // Physics' review), that passage couldn't get there. And one waiting without falling back: from Coyote Point to the
-  // Gate at 07:30 in 14 kt the front lay 500-700 m off the Gate for 70 minutes against the flood, the way of its last
-  // gain pruned out of the front meanwhile, and got through at 168: given up on the stall and the dead way alone, it
-  // couldn't either. Each test alone cut a real passage; the two together cut neither. But a long foul tide can still
+  // Physics' review), that passage couldn't get there. And one waiting without falling back: from the Corte Madera
+  // Channel light to the Gate leaving 08:30 in 14 kt (14 Nov) the front made no gain for 90 minutes against the flood,
+  // the way of its last gain pruned out of the front for 60 of them, and got through at 188: given up on the stall and
+  // the dead way alone, it would have been cut at minute 125 (tests/router-giveup.test.ts). Each test alone cut a real passage; the two together cut neither. But a long foul tide can still
   // make both hold for a front that is waiting (Raccoon Strait eastbound against the ebb in 5 kt, 25 Nov 15:00: given up
   // at 218 min where it arrives at 328: the review's second pass): so it's asked only where the passage tries again
   // stretch by stretch after, and a front cut wrongly costs a little time, not the answer. GIVE_UP and the half are
