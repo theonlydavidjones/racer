@@ -698,7 +698,10 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   { const u = V(b.h), st = V(b.h + 90), hull = [bow(b), stern(b), ...[1, -1].flatMap(sg => [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + st.x * sg * 1.1, y: b.y + u.y * a + st.y * sg * 1.1 })))];
     const set = !b.docked && !b.handled && !b.pushing ? setOntoPier(hull, b.vx ?? 0, b.vy ?? 0) : null;
     if (set) return { ...base, kind: 'info', head: `Being set onto ${set.pier.name}: ${Math.max(1, Math.round(set.s))} s to the piles. Get way on and steer off.`, why: '', look: 'the pier\'s piles against the water: is the gap closing?' }; }
-  if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
+  // (a sail going up or coming down: the coach waits. A sail struck and left down is set as it is: say that, not that it's
+  // moving; the marina audit, coming in under bare poles)
+  if (b.rig && ((b.rig.mainUp ? b.rig.main < 1 : b.rig.main > 0) || (b.rig.jibUp ? b.rig.jib < 1 : b.rig.jib > 0))) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
+  if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: b.rig.main < 1 && b.rig.jib < 1 ? 'Sails down.' : b.rig.main < 1 ? 'Main down: the coach waits until both sails are up.' : 'Jib down: the coach waits until both sails are up.', why: '', look: '' };
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };
   if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the jibe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the jib\'s luff telltales, windward and leeward, streaming once she\'s settled on the new tack' : 'the boom: duck' };
   if (ctx.preStart) return { ...base, kind: 'info', head: `Pre-start: trim's set. ${s.speedKt.toFixed(1)} kt; ease to slow, trim to go.`, why: '', look: 'the line and the clock' };
