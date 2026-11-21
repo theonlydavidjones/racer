@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Leaderboard, placesGained, raceOrder, sailOf, shortRows, toGo, type LbBoat } from '../src/ui/leaderboard';
+import { Leaderboard, gapText, placesGained, raceOrder, sailOf, shortRows, toGo, type LbBoat } from '../src/ui/leaderboard';
 
 const boat = (id: number, x: number, y: number, leg: number, o: Partial<LbBoat> = {}): LbBoat =>
   ({ id, isUser: false, name: `B${id}`, leg, x, y, finished: false, finishT: null, ...o });
@@ -40,5 +40,15 @@ describe('the leaderboard (r288)', () => {
     lb.toggle(); lb.update(w(400, 1), true, race); expect(el.hidden).toBe(false);
     lb.toggle(); lb.update(w(401, 1), true, race); expect(el.hidden).toBe(true);
     lb.toggle(); lb.update(w(402, 1), false, race); expect(el.hidden).toBe(true); // (not racing: never)
+  });
+  // the owner's stress cases (r288): long sail numbers come out whole, and the gaps with a thousands comma. (Whether
+  // they fit the 104 px board is a layout question: measured in the browser, on the stills sheet, not here.)
+  it('long sail numbers come out whole', () => {
+    const spec = (country: string, number: string) => ({ sails: { country, number } }) as unknown as LbBoat['spec'];
+    for (const [c, n] of [['USA', '12345'], ['GBR', '1234'], ['DEN', '1234'], ['SWE', '12345'], ['NZL', '9999'], ['USA', '111']])
+      expect(sailOf(boat(1, 0, 0, 0, { spec: spec(c, n), name: 'Kestrel of the Golden Gate' }))).toBe(`${c} ${n}`);
+  });
+  it('the gap to the leader: whole meters, a comma from 1,000', () => {
+    expect([gapText(37.4), gapText(412), gapText(1240.2), gapText(12405)]).toEqual(['+37', '+412', '+1,240', '+12,405']);
   });
 });

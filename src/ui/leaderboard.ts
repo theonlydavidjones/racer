@@ -53,6 +53,9 @@ export const sailOf = (b: LbBoat): string => b.spec ? sailNo(b.spec) : b.isUser 
 const ord = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
+/** Meters behind the leader, whole, with a thousands comma ("+1,240"). */
+export const gapText = (m: number): string => '+' + Math.round(m).toLocaleString('en-US');
+
 /** Shown this long after each of her roundings, s (the owner). */
 export const LB_SHOW_S = 12;
 
@@ -95,13 +98,14 @@ export class Leaderboard {
     // (▲/▼: at a rounding, the leg just sailed (the order at the mark before against now); between marks, since the last)
     const gained = placesGained(f.map(x => x.b.id), (t < this.until ? this.ref : null) ?? this.atMark);
     const head = `<div class="lb-h"><span>${esc(this.mark || 'Race')}</span><span class="lb-pos">${ord(me + 1)}/${n}</span></div>`;
-    const label = (b: LbBoat) => { const no = sailOf(b); // (the number whole, always; the name may be cut, hers dropped)
-      return `<span class="lb-n${b.isUser ? ' you' : ''}">${no ? `<b>${esc(no)}</b>` : ''}${b.isUser ? '<i>You</i>' : `<i>${esc(b.name)}</i>`}</span>`; };
+    // (the number its own column, whole, always; the name gives way, cut with an ellipsis; her "You" dropped whole)
+    const label = (b: LbBoat) => { const no = sailOf(b);
+      return `<b>${esc(no)}</b>${b.isUser ? '<i class="lb-n you"><s>&#8203;</s><span>You</span></i>' : `<i class="lb-n">${esc(b.name)}</i>`}`; };
     let html = head;
     if (!this.expanded) {
       for (const i of shortRows(n, me)) {
         if (i == null) { html += '<div class="lb-gap">⋯</div>'; continue; }
-        const x = f[i], gap = x.b.finished ? 'fin' : x.b.retired ? 'ret' : i === 0 ? '' : `+${Math.round(x.g - lead)}`;
+        const x = f[i], gap = x.b.finished ? 'fin' : x.b.retired ? 'ret' : i === 0 ? '' : gapText(x.g - lead);
         html += `<div class="lb-r${x.b.isUser ? ' me' : ''}"><span class="lb-p">${i + 1}</span>${label(x.b)}<span class="lb-g">${gap}</span></div>`;
       }
     } else {

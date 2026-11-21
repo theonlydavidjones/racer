@@ -66,16 +66,14 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #lb[hidden]{display:none}
 #lb .lb-h{display:flex;justify-content:space-between;font:600 9.5px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 #lb .lb-pos{color:var(--accent)}
-#lb .lb-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px;align-items:baseline;font:600 11px/1.6 var(--f-inst);font-variant-numeric:tabular-nums}
-#lb .lb-p{color:var(--muted);min-width:8px}
-#lb .lb-n{display:flex;gap:3px;min-width:0;white-space:nowrap}
-#lb .lb-n b{flex:none;color:#e9f2f5;font-weight:700}
-#lb .lb-n i{font-style:normal;color:#a9bcc6;min-width:0;overflow:hidden;text-overflow:ellipsis}
-#lb .lb-n.you{flex-wrap:wrap;height:1.6em;overflow:hidden}
-#lb .lb-n.you i{flex:none}
+#lb .lb-r{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:baseline;font:600 11px/1.6 var(--f-inst);font-variant-numeric:tabular-nums;white-space:nowrap}
+#lb .lb-p{color:var(--muted);min-width:8px;margin-right:4px}
+#lb .lb-r b{color:#e9f2f5;font-weight:700} #lb .lb-r b:not(:empty){margin-right:3px} /* (a sail number is never cut) */
+#lb .lb-n{font-style:normal;color:#a9bcc6;min-width:0;overflow:hidden;text-overflow:ellipsis;margin-right:4px}
+#lb .lb-n.you{display:flex;flex-wrap:wrap;height:1.6em;text-overflow:clip} #lb .lb-n.you s{width:0;text-decoration:none} /* ("You" wraps out of sight, whole, where it won't fit) */
 #lb .lb-g{color:#a9bcc6;font-size:10px}
 #lb .me{background:rgba(255,182,39,.14);border-radius:4px;margin:0 -3px;padding:0 3px}
-#lb .me .lb-p,#lb .me .lb-n i{color:var(--accent)}
+#lb .me .lb-p,#lb .me .lb-n{color:var(--accent)}
 #lb .lb-gap{color:var(--muted);text-align:center;line-height:.9}
 #lb .lb-all{display:flex;flex-direction:column;gap:2px}
 #lb .lb-chip{border:1px solid var(--rule);border-radius:4px;padding:0 4px}
