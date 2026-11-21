@@ -1,10 +1,11 @@
 /** Shared units, constants and 2D vector helpers.
  * Local frame: metres, x east, y north. Headings and bearings are compass degrees (0 = north, clockwise). */
 
-export const KT = 0.5144; // m/s per knot
-export const LOA = 7.64; // Folkboat length overall, m
+export const KT = 0.5144; // m/s per knot (the international nautical mile, 1852 m, an hour: 0.51444)
+export const LOA = 7.64; // Folkboat length overall, m (the hull's length on deck, render/hull.ts L; the class rules and ORC give 7.68
+// overall: docs/CONSTANTS.md, the estimates audit, and ABOARD-JOSEPHINE 1.5)
 export const HALF = LOA / 2;
-export const ZONE = 3 * LOA; // RRS zone: three hull lengths
+export const ZONE = 3 * LOA; // RRS zone: three hull lengths (RRS 2025–2028, Definitions, Zone: of the boat nearer the mark)
 export const D2R = Math.PI / 180;
 
 export interface Vec { x: number; y: number }

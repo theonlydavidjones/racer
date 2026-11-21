@@ -855,3 +855,13 @@ OFF_LOOK_HELD, OFF_HELD_S, ASTERN_WIND_FAR/SET_FAR/STEP (SET_PER_KT is the sim's
 to 1% against the exact wind); world.ts waveRef's one depth (ENC band middles); shadows.ts LAND_FROM; debrief.ts's
 seconds lost (the sim's own physics). No published seamanship figure for a passing distance off a shore or a pier was
 looked for in depth: if one turns up, SHORE and WHARF_CLEAR are the rows it would move.
+
+### src/core (the same audit, 21 Nov 2026)
+
+src/core (compass.ts, math.ts, rng.ts) has no constant commented estimate, uncited or a guess. Its three numbers:
+
+| Constant | Value | Outcome |
+|---|---:|---|
+| KT | 0.5144 | cited: 1852 m an hour (the international nautical mile) is 0.51444 m/s |
+| ZONE | 3 × LOA | cited: RRS 2025–2028, Definitions, Zone: three hull lengths of the boat nearer the mark |
+| LOA | 7.64 m | **flag**: render/hull.ts's own note says the class rules and ORC give 7.68 overall, and 7.64 is the length on deck, unconfirmed (ABOARD-JOSEPHINE 1.5 asks it). 7.68 would be 0.5% longer: the zone 23.0 m, not 22.9, and every threshold in boat lengths (helmPlan, world.ts offPier, ai.ts) by the same 0.5%. Not changed |
