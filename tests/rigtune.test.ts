@@ -120,7 +120,8 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     const b = testBoat({ heading: 42, kt: 5, windKt: 18 }); b.tune = { ...TUNE_PRESETS.light };
     sail(b, 30);
     const l = lessons(b).list.find(x => x.id === 'rig:soft');
-    expect(l).toBeTruthy(); expect(l!.head).toMatch(/set for less wind than this/);
+    expect(l).toBeTruthy(); expect(l!.head).toBe('Rig set for less wind: backstay on hard.'); // (one short line: the in-race audit)
+    expect(l!.why).toMatch(/^It costs her about \d+\.\d% of her speed upwind\. /); // (the figure on its hover)
     const ok = testBoat({ heading: 42, kt: 5, windKt: 18 }); ok.tune = { ...TUNE_PRESETS.strong }; sail(ok, 30);
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
     // (racing it cites the class rules that fix the rig; cruising there are none to cite: the Coordinator, 19 Nov 2026)

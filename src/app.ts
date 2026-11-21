@@ -823,6 +823,7 @@ function coachTick(): void {
   const head = (t: string) => w.freeSail ? t : t.replace(/^Pre-start:\s*/i, '').replace(/^./, c => c.toUpperCase());
   $('tpHint').innerHTML = r.done ? ce(head(r.done)) : fix ? `<span class="tp-n">1</span>${ce(head(top.head).replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(head(top.head));
   $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : top.kind);
+  { const t = r.done ? '' : top.why ?? ''; if ($('tpHint').title !== t) $('tpHint').title = t; } // (the line's figure and reason, on its hover)
   $('tpSub').innerHTML = fix ? `${top.now ? ce(top.now) + '. ' : ''}${ce(top.short ?? '')}<button type="button" class="tp-all">All notes ›</button>` : '';
   $('tpHold').hidden = !fix; ($('tpHold').firstElementChild as HTMLElement).style.width = `${Math.round((1 - r.held) * 100)}%`;
   band.cue(fix && top.line ? top.line : null, fix ? top.to ?? null : null);

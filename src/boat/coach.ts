@@ -678,9 +678,10 @@ function rigLessons(b: Boat, s: Situation, cruising = false): Lesson[] {
   // (racing the class rules fix them (CR 7.40, 6.1.5); cruising nobody retunes under way, so no rule to cite)
   const atDock = cruising ? 'The forestay, shrouds and mast foot are set at the dock' : 'The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5)';
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
-    head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind. Backstay on hard.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Backstay off, and sail a little lower.`,
-    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. ${atDock}; the backstay is free.`
-      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. ${atDock}.`,
+    // (one short line for the card, the owner's rule: what it costs and why on its hover, the in-race audit 21 Nov 2026)
+    head: soft ? 'Rig set for less wind: backstay on hard.' : 'Rig set for more wind: backstay off, sail a little lower.',
+    why: `It costs her about ${pct} of her speed upwind. ` + (soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. ${atDock}; the backstay is free.`
+      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. ${atDock}.`),
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];
 }
 
