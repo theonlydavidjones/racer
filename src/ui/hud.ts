@@ -913,7 +913,7 @@ export class Hud {
     const sim: SimKey[] = ['you'];
     if (wd.boats.length > 1) sim.push('boats');
     if (!wd.freeSail) { sim.push('start', 'marks'); if (u.leg < wd.C.marks.length) sim.push('next'); }
-    else if (wd.dest) sim.push('dest', 'destline', ...(wd.running ? [] : ['track' as const]));
+    else if (wd.dest) sim.push('dest', 'destline', ...(plan && plan.track.length > 1 ? ['track' as const] : [])); // (her course, listed whenever it's drawn: under way too, once the plan's in; chart audit #8)
     if (on('laylines') && L) sim.push('laylines');
     if (on('ships') && wd.vessels.length) sim.push('ships');
     // (the field layers, the wind's and the current's colours and streaks, the sea state, the fog, are on the full chart
