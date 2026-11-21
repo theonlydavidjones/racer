@@ -65,3 +65,7 @@ describe('copy sweep G: the tiller-lashed toasts are one short line each', () =>
     expect(seg).not.toContain('right-click or double-click lashes it again.');
   });
 });
+
+describe('copy sweep I: the results\' debrief takes carry a one-line hover', () => {
+  it('the tip goes through shortTip', () => { expect(read('src/app/results.ts')).toContain('app.esc(shortTip(f.tip))'); });
+});

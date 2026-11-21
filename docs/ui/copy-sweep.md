@@ -7,7 +7,7 @@ How: `docs/ui/copy-sweep/sweep.cjs` visits each page and menu at 1280×720 and l
 element holds itself) over 90 characters and every hover over 110 (`docs/ui/copy-sweep/sweep.json`; stills beside it). It
 reaches: the start page, Race (choose, practice setup), Cruise setup, Drills, Past races, Season, the Yacht Club (Boats,
 Members, Season), Settings (Training aids, Keys), Tools, the pause screen, Lessons. Not reached by the capture: the boat
-editor (the first run did not open it), and the results (the AI's skipper did not finish in time). Those, and every state
+editor (the first run did not open it). The results were reached on the second run (`after/results.png`, `after/sweep.json`). Those, and every state
 the page only builds in play (toasts, the coach, the incident replay), were found by reading the source for strings over
 115 characters (`src/app/results.ts`, `src/app/setup.ts`, `src/ui/*`, `src/app.ts`). Closed "More about…" disclosures are
 not counted: they are the rule's own "behind one link".
@@ -34,3 +34,15 @@ Found, and left for others or for the owner:
 - **Results sentences** (`src/app/results.ts:130, 204, 366`): data written as a sentence ("you'd have placed 3rd of 5: 1:12 ahead of…"); not copy blocks. Left.
 - **Start-of-race log text** (`src/app/setup.ts:532-554`, up to 575): goes to the messages log, not a screen of its own.
 - **Closed disclosures**: the drills' "How it's scored" (now a disclosure, audit 10), the tactics view's measure note, the setup's note.
+
+## After the cuts (docs/ui/copy-sweep/after/)
+
+A to H are cut (one commit each, tests/copySweep.test.ts); the capture again lists no block over 90 characters on any page
+it reaches but the results, and these hovers: the Keys rows for push off and weather helm (the detail, by design), the
+Season footer's source note (115). I (added on the second run): the results page's debrief takes carried hovers of 161–332
+characters; now one line (`src/app/results.ts:155`).
+
+Left on the results page, the Debrief session's: the debrief's per-leg verdict sentences ("You 16:40, Green 10:15. You sailed
+242 m further (about 410 s lost) and were faster over the ground (about 24 s). Green's line…", 92–233 characters each, nine
+legs), the start summary (198) and the rig and pace notes (107–121). They are the race's own numbers written as sentences
+(`src/sim/startDebrief.ts`, `src/ui/tacticsView.ts`), not canned copy; shortening them is a design call for the debrief.

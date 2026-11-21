@@ -2,6 +2,7 @@
  * The end of a race and the pause screen: the Pause button and its menu, the debriefs (the comparison with the winner, the tactical debrief and its chart, the race replay, a real past race's line), the boats' logbooks, the scores and the results screen.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { shortTip } from '../ui/hoverText';
 import { placeLabel } from '../ui/placeNames';
 import { keepGhost, setupKey, trackOf } from '../replay/ghost';
 import { addLog, type LogEntry, type RaceSetup } from '../boat/logbook';
@@ -152,7 +153,7 @@ function debriefHtml(title: string): string {
   const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
   const fs = log.findings(app.w), pl = log.places().filter(p => p.place != null);
   // (the tip on hover: the owner, 13 Nov 2026, one line on the screen)
-  const items = fs.map(f => `<li title="${app.esc(f.tip).replace(/"/g, '&quot;')}"><div class="dbHead"><b>${app.esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${app.esc(f.detail)}${f.key === 'start' && app.favLine ? ` ${app.esc(app.favLine)}` : ''}</p></li>`).join('');
+  const items = fs.map(f => `<li title="${app.esc(shortTip(f.tip)).replace(/"/g, '&quot;')}"><div class="dbHead"><b>${app.esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${app.esc(f.detail)}${f.key === 'start' && app.favLine ? ` ${app.esc(app.favLine)}` : ''}</p></li>`).join('');
   const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${app.esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
   const total = fs.reduce((a, f) => a + f.lost, 0);
   return `<div class="eyebrow">${title}</div><div class="tacHost" data-tac></div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
