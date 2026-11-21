@@ -41,7 +41,7 @@ Treat the mast as a beam, held at the deck and the foot, with the forestay and s
 - **The result:** a beam pushed aft in the middle and pulled forward near both ends. The mast bows with its middle aft between 2.25 m and 8.6 m. Against the deck and the foot below 2.25 m, that curves the lower mast.
 - This is the guide's "too tight: the mast will curve too much in the bottom and be too straight in the top" (North, quoted at rigTune.ts:24).
 
-**The backstay** pulls the masthead aft. The forestay holds the hounds forward, so the top 4.25 m above the hounds is a cantilever bent aft by the backstay's load. How far it bends depends on the topmast's stiffness, and the jumpers add to it: the stay from 8.6 m over the strut stops the top bending aft without stretching the stay.
+**The backstay** pulls the masthead aft. The forestay holds the hounds forward, so the top 3.25 m above the hounds (5.5 m above the lower band, the masthead's band at 8.75 m: CR 6.1.12, the rig's P) is a cantilever bent aft by the backstay's load. How far it bends depends on the topmast's stiffness, and the jumpers add to it: the stay from 8.6 m over the strut stops the top bending aft without stretching the stay.
 - **Tight jumpers:** the top stays straight. The backstay's pull goes to the masthead and from there, through a stiff topmast, into tension at the hounds against the forestay. So the forestay is straighter and the jib flatter, and the main's top stays fuller with its leech closed.
 - **Loose jumpers:** the top bends aft. That uses up the backstay's travel in bending, so the forestay gets less tension for the same pull. The main's upper luff is pulled forward of its luff round, which flattens the upper main and lets the head twist open.
 - This is the general fractional-rig statement the researcher found: jumpers "limit the amount that the upper portion of the mast can bend and thereby enable tension to be effectively transferred from the backstay to the forestay" (a search-result summary; the page couldn't be opened).
@@ -63,15 +63,79 @@ What it doesn't model:
 3. **Overbend.** No main in the sim inverts. A mast bent past the luff round costs nothing, so tightening the jumpers in a breeze (Heikkilä) can never pay.
 4. **The lower mast's curve.** Tight jumpers pre-bend the lower mast, adding to the foot's pre-bend (PREBEND_DEPTH_PER_MM) and flattening the lower main. The sim's −0.08% of camber per turn stands in for it, but isn't tied to the foot's own pre-bend.
 
-## What would model it, if the owner wants it
+## The plan: a mast-bend model (the owner, 21 Nov 2026: build it after Tue 24 Nov)
 
-1. **The topmast as a cantilever,** its stiffness raised by the jumpers' tension. A share of the backstay's effect goes to masthead bend (main flatter, twist open) and the rest to forestay tension (the jib's sag), split by the jumpers' turns and scaled by the load ((aws/14)², as mainShape's mast bend already is).
-2. **The main's luff round as a sail property:** North's cut or Heikkilä's, with the inversion when the mast's bend exceeds it (a fast loss of lift and more drag in the upper sail). This is the only way the sim can say which guide is right for which sail.
-3. **Data needed first:** the Folkboat mast section's stiffness (EI) and the topmast's bend per turn. These come from a spar maker (Seldén or Proctor sections for the Folkboat) or a measurement aboard: the masthead's bend under a known backstay load, with the jumpers at 0 and at 3 turns.
+### What the sources give
+
+The researcher's search, 21 Nov 2026:
+- **The class rules** give the aluminum section's outside size and weight, not its wall or stiffness (NFIA class rules 2025–2028, March 2026 update, 6.2):
+  - 100–112 mm both ways from the heel to 600 mm above the lower band; 100–112 by 115–130 mm fore and aft at the boom band; 60–94 by 65–100 mm at the top band;
+  - at least 3.10 kg/m untapered (6.2.2); the taper starts 5.5–7.0 m above the lower band (6.2.3);
+  - the section is "drawing No. 12", which isn't in the text. The Swedish rules may carry it, but their host is blocked here.
+- **No spar maker's EI** and no measured masthead bend were found (Seldén, Proctor and others list nothing Folkboat-specific).
+- **Luff round:** North cuts two mains by the mast: "LM-5A Mainsail - To be used for J.M Aluminum mast"; "LM-5 Mainsail - To be used for B.M Aluminum mast and most wooden mast" (Theis Palm, North Sails, Finnish Folkboat association talk, 26 Apr 2023). No figures in mm. Heikkilä's main is cut for "very little or no" pre-bend (rigTune.ts:206). Nothing was found from Hjortø, Elvstrøm or Ullman.
+- **No spreaders:** she has none (CR 7.10: main shrouds, forestay, jumper stays and backstay). The model's supports are the deck partner, the foot, the hounds and the jumper struts.
+
+### The stiffness, estimated
+
+A thin-walled ellipse 106 × 120 mm of 6061-type alloy (E 70 GPa, 2700 kg/m³) at the class minimum 3.10 kg/m:
+- area 1150 mm², wall about 3.2 mm;
+- I about 2.0 × 10⁶ mm⁴ fore and aft and 1.7 × 10⁶ athwartships;
+- EI about 140 kN·m² fore and aft and 116 kN·m² athwartships, ±30% (no luff groove, no internal webs, no taper).
+
+Check: the 3.25 m topmast as a uniform cantilever bends 25 mm at the masthead under 300 N aft and 80 mm under 1000 N (PL³/3EI). The taper makes it bendier: I scales about with the cube of the depth, so the top band's 65–100 mm leaves about a third of the base's.
+
+### What's modeled
+
+The mast is a beam in the fore-and-aft plane, about 20 elements from the heel to the masthead, solved for each tune and wind:
+- **Supports:**
+  - the foot, pressed aft by the tune's footAft;
+  - the deck partner, 1.1 m up;
+  - the hounds, held aft by the shrouds (280–360 mm aft, CR 7.20) against the forestay;
+  - the jumper stays: elastic ties from 8.5–8.75 m to 2.25 m over 0.45 m struts (CR 6.1.12, 7.60), their tension set by the turns.
+- **Loads:**
+  - the backstay at the masthead;
+  - the forestay's pull from the jib's load (the same tension forestaySag uses now);
+  - the main's luff load along the mast, from its force at the apparent wind, scaled (aws/14)² as mainShape's bend is now.
+- **Outputs:**
+  - the masthead's bend aft;
+  - the lower mast's bow;
+  - the forestay's tension, into forestaySag (replacing the backstay's fixed share);
+  - the mast's curve against the main's luff round: the main's depth and twist from the difference, and inversion where the bend passes the round (the upper main's lift falls and its drag rises).
+- **The main's luff round** becomes a sail property: North LM-5, North LM-5A and Heikkilä, each with a round curve (estimates until measured).
+- **The cost:** solved once when the tune changes and tabulated by aws, backstay and jumper turns; never per step (CLAUDE.md, World.step).
+- **What it replaces:** the fixed JUMPER nudge (rigTune.ts:219), the backstay's fixed mast bend in mainShape (controls.ts:232), and PREBEND_DEPTH_PER_MM, which becomes the beam's own answer.
+
+### The tests, written first (each fails today)
+
+1. **Beam statics:** a uniform cantilever's tip under P matches PL³/3EI within 1%. The foot pressed aft bows the span about 0.97 mm per mm, the three-moment figure at rigTune.ts:203.
+2. **The jumpers and the backstay:** with the same backstay, tighter jumpers bend the masthead less and tension the forestay more (less sag).
+3. **The lower mast:** tighter jumpers bow the lower mast more and leave the top straighter (North: "too much curve in the bottom and ... too straight in the top").
+4. **The load:** the jumpers' effect on the main is near zero at 4 kt and grows with the breeze. Today it is the same 0.6° of twist a turn at any speed.
+5. **Overbend:** a mast bent past the main's luff round costs the upper main lift.
+6. **Which guide:** in 20 kt, loose jumpers make the better VMG with North's main (full round), and tight jumpers with Heikkilä's (little round). In medium air, both are best tightened.
+7. **North's tune:** North's own light, medium and strong settings are the best VMG of a sweep with North's main.
+8. **The gates:** perf-pair (tabulated, so the step's cost is unchanged), plus perf-pair --ai and fouls-pair, since it changes how boats sail.
+
+### What's an estimate
+
+- EI: from the class's minimum weight and outside size, not drawing No. 12; ±30%.
+- The taper's shape and wall.
+- Each main's luff round in mm.
+- The stays' stretch (1×19 wire at the class minimum, 5 mm jumpers and 7 mm forestay, CR 7.10), and the struts' stiffness.
+- How the main's load is spread along the luff.
+
+### What would settle it (for docs/ABOARD-JOSEPHINE.md)
+
+- **Josephine's mast:** the maker, and its section's depth, width and wall, measured at a hatch or the heel.
+- **Her main:** the maker and its luff round. Lay it flat, run a string from tack to head, and read the offsets at the quarter heights.
+- **The bend:** the masthead's bend under a known backstay pull (a spring balance on the tail, or so many turns), with the jumpers at 0 and at 3 turns. Read it as the main halyard's offset from the luff groove at the boom.
+- **An outside source:** the NFIA or the Danish association for drawing No. 12, or J.M. (Jens Mortensen, not confirmed) and Børresen for the section's EI.
 
 ## Sources
 
-- **Read (primary):** the NFIA class rules, March 2026 update (6.1.12, 7.40, 7.60, 7.70).
+- **Read (primary):** the NFIA class rules, March 2026 update (6.1.12, 6.2, 7.10, 7.20, 7.40, 7.60, 7.70): https://folkboat.com/wp-content/uploads/2026/03/NORDIC-FOLKBOAT-CLASS-RULES-2025-2028-Update-March-2026.pdf
+- **Read:** Theis Palm (North Sails), slides for the Finnish Folkboat association, 26 Apr 2023: https://asiakas.kotisivukone.com/files/folkkariliitto.kotisivukone.com/TheisPalm26042023.pdf
 - **Quoted in rigTune.ts:** North Sails' Nordic Folkboat tuning guide, and Heikkilä Sailmaker's "Kansanveneen trimmiohje" (2021).
 - **Generic, through search summaries:** Seldén's rig-tuning booklet, and a statement on fractional rigs' jumpers.
 - **Not reached:** Larsson & Eliasson, Marchaj, Dedekam, Claughton, Skene's. No rig textbook's figures are used here. The mechanics above is beam statics on the class's geometry, and the per-stay forces are worked out here from it.
