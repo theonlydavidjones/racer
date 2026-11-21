@@ -14,7 +14,7 @@ import { tacticsHtml, tacticsTop, type TacShown } from '../ui/tacticsView';
 import { planLegs } from '../sim/strategist';
 import { outlookFor } from '../sim/outlook';
 import { beatAngle } from '../boat/polar';
-import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from '../replay/versus';
+import { bigMoments, gapWords, legLine, legWords, rivalWho, versus, type VsInput } from '../replay/versus';
 import { V, brg, dist, wrap } from '../core/math';
 import { RULES, hearings, ptsText, raceScores, scoreOrder, type Decision, type ScoreOut } from '../rules';
 import { ReplayView } from '../replay/replayView';
@@ -176,7 +176,7 @@ function vsDebriefHtml(log: NonNullable<typeof app.w.log>): string {
   const kindW: Record<string, string> = { beat: 'a beat', reach: 'a reach', run: 'a run' };
   const legs = V.legs.map(L => {
     const mark = L.moments.find(m => m.kind === 'mark');
-    return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${app.esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p>${app.esc(legWords(L, V.rivalName))}${mark ? ` ${app.esc(mark.text)}` : ''}</p></li>`;
+    return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${app.esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p class="dbLine" title="${app.esc(legWords(L, V.rivalName) + (mark ? ` ${mark.text}` : '')).replace(/"/g, '&quot;')}">${app.esc(legLine(L))}</p></li>`;
   }).join('');
   const big = bigMoments(V);
   const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${app.esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';

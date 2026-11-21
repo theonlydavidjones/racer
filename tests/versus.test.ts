@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '../src/replay/recorder';
-import { legWords, rivalOf, versus, type VsInput } from '../src/replay/versus';
+import { legLine, legWords, rivalOf, versus, type VsInput } from '../src/replay/versus';
 
 /** Two boats sailing one leg due north (y up), 1000 m from (0,0) to (0,1000), once a second. */
 function race(you: (t: number) => [number, number] | null, them: (t: number) => [number, number] | null, T: number): Frame[] {
@@ -158,5 +158,18 @@ describe('your race against the winner', () => {
     const F = you.map((p, t) => ({ t, b: [p, her[t]] })) as Frame[];
     const V = versus(input(F, 600, 590, { marks: [[100], [160]], legs: [{ name: 'A', to: { x: 300, y: 0 }, kind: 'reach' }, { name: 'the finish', to: { x: 300, y: 2000 }, kind: 'beat' }] }))!;
     expect(V.moments.filter(m => m.leg === 2 && m.kind === 'tack').filter(m => Math.abs(m.lostM) > 8)).toEqual([]);
+  });
+});
+
+describe('legLine: a leg in one short line (the copy sweep, 21 Nov 2026)', () => {
+  const L = (o: Partial<import('../src/replay/versus').LegVs>) => ({ i: 1, name: 'Blackaller', kind: 'beat', you: 1000, them: 615, lost: 385, fromDist: 410, fromSpeed: -24, youM: 3242, themM: 3000, t0: 0, t1: 0, apartM: 60, apartDir: 'west', moments: [], ...o }) as import('../src/replay/versus').LegVs;
+  it('the times, then each cause as metres and seconds, then where her line lay, and short', () => {
+    const s = legLine(L({}));
+    expect(s).toBe('16:40 vs 10:15 · 242 m further −410 s · faster +24 s · her line 60 m west');
+    expect(s.length).toBeLessThanOrEqual(80);
+  });
+  it('small causes and a near line left out; the start as the gun', () => {
+    expect(legLine(L({ fromDist: 1, fromSpeed: 1, apartM: 10 }))).toBe('16:40 vs 10:15');
+    expect(legLine(L({ i: 0, kind: 'start', you: 3.4, them: 1.2, lost: 2.2 }))).toBe('Gun +3.4 s vs +1.2 s');
   });
 });

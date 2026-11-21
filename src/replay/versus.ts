@@ -327,6 +327,20 @@ export function legWords(L: LegVs, rival: string): string {
   return txt;
 }
 
+/** A leg's comparison in one short line, the numbers in place of the sentence (Coordinator 2's copy sweep, 21 Nov 2026):
+ *  "16:40 vs 10:15 · 242 m further −410 s · slower −24 s · her line 60 m west". Lost reads −, gained +, as the
+ *  debrief's own figures do; `legWords` is the same said in full, for the hover. */
+export function legLine(L: LegVs): string {
+  const sg = (x: number) => `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
+  const mm = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
+  if (L.kind === 'start') return Math.abs(L.lost) < 1 ? `Together, gun +${L.you.toFixed(1)} s` : `Gun +${L.you.toFixed(1)} s vs +${L.them.toFixed(1)} s`;
+  const parts = [`${mm(L.you)} vs ${mm(L.them)}`], dm = L.youM - L.themM;
+  if (Math.abs(L.fromDist) >= 2) parts.push(`${Math.round(Math.abs(dm))} m ${dm > 0 ? 'further' : 'less'} ${sg(L.fromDist)}`);
+  if (Math.abs(L.fromSpeed) >= 2) parts.push(`${L.fromSpeed > 0 ? 'slower' : 'faster'} ${sg(L.fromSpeed)}`);
+  if (L.apartM >= 40) parts.push(`her line ${Math.round(L.apartM)} m ${L.apartDir}`);
+  return parts.join(' · ');
+}
+
 /** How to name her: "who won", "who came second", … ("Against Blue, who won"). `rivalFinished`: she's crossed the line. */
 export function rivalWho(V: Versus, rivalFinished: boolean): string {
   return V.tie ? 'who tied with you on points' : V.won ? 'who won' : V.youWon ? (rivalFinished ? 'who came second' : 'the next boat')

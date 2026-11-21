@@ -4,7 +4,7 @@ import type { SimView } from '../sim/host';
 import { drawCourse, drawHull, drawLand, fitCanvas, hexA, makeTf } from '../ui/draw2d';
 import type { BoatSnap, Frame } from './recorder';
 import { ReplayView, type ReplayClip } from './replayView';
-import { gapWords, legWords, rivalWho, type LegVs, type Versus, type VsMoment } from './versus';
+import { gapWords, legLine, legWords, rivalWho, type LegVs, type Versus, type VsMoment } from './versus';
 
 /**
  * The race replay: your whole race from overhead (wind up), with the debrief on it. Each thing the debrief says cost
@@ -59,6 +59,7 @@ const SPEEDS = [10, 30, 60];
 const STRIP_Y = 50;
 const mmss = (t: number) => `${t < 0 ? '−' : '+'}${Math.floor(Math.abs(t) / 60)}:${String(Math.floor(Math.abs(t) % 60)).padStart(2, '0')}`;
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const escA = (t: string) => esc(t).replace(/"/g, '&quot;');
 
 /** A boat's place between two 1-s frames (heading the short way round). */
 function lerpSnap(a: BoatSnap, b: BoatSnap, f: number): BoatSnap {
@@ -166,7 +167,7 @@ export class RaceReplay {
     const mom = (L: LegVs) => L.moments.length ? `<ul class="rrMoments">${L.moments.map(m => `<li class="rrPick rrVsm" data-vsm="${V.moments.indexOf(m)}" tabindex="0"><span class="dbLost">${m.kind === 'mark' ? '⚑' : `${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m`}</span> ${esc(m.text)}</li>`).join('')}</ul>` : '';
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
-      <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
+      <p class="dbLine" title="${escA(legWords(L, V.rivalName))}">${esc(legLine(L))}</p>${mom(L)}</li>`).join('');
     return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
@@ -291,7 +292,7 @@ export class RaceReplay {
     }
     if (L && V) {
       const sgn = Math.abs(L.lost) < 0.5 ? '±0 s' : `${L.lost > 0 ? '−' : '+'}${Math.round(Math.abs(L.lost))} s`;
-      el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> ${esc(legWords(L, V.rivalName))}</span>`;
+      el.innerHTML = `<span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span><span><b>${L.i ? `To ${esc(L.name)}` : 'The start'}</b> <span class="dbLost">${sgn}</span> <span title="${escA(legWords(L, V.rivalName))}">${esc(legLine(L))}</span></span>`;
       return;
     }
     if (!m) { el.innerHTML = '<span class="lede">Pick a finding, a tick on the timeline, or ◀ ▶ to go from one moment to the next. Your track is colored where it cost you time.</span>'; return; }
