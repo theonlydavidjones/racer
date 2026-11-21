@@ -11,7 +11,7 @@ import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
-import { destName, placeLabel } from '../ui/placeNames';
+import { placeLabel } from '../ui/placeNames';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
@@ -526,7 +526,7 @@ function beginRaceNow(seed?: number): void {
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
-  logMessage(startHead(app.S.mode, { from: app.S.sailFrom === 'slip' ? 'her slip' : placeLabel(app.S.sailFrom), dest: app.w.dest ? destName(app.w.dest) : undefined, course: app.w.C.title }));
+  logMessage(startHead(app.S.mode, { from: app.S.sailFrom === 'slip' ? 'her slip' : placeLabel(app.S.sailFrom), dest: app.w.dest ? app.w.dest.name : undefined, course: app.w.C.title }));
   app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false });
   app.word('bFast', 'Speed 1×');
   horn(1.0);
@@ -544,7 +544,7 @@ function beginRaceNow(seed?: number): void {
     return;
   }
   toast(app.S.mode === 'sail'
-    ? `Cruising${app.w.dest ? ` to ${destName(app.w.dest)}` : ''}: no race. ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Sea: ${describeSea(app.w.seaHere(app.w.user))}.`
+    ? `Cruising${app.w.dest ? ` to ${app.w.dest.name}` : ''}: no race. ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Sea: ${describeSea(app.w.seaHere(app.w.user))}.`
     : app.S.mode === 'drill'
     ? `Start practice${app.w.boats.length === 1 ? ', alone' : ''}: ${app.w.startAt / 60 === 1 ? 'one minute' : `${app.w.startAt / 60} minutes`} to the gun. Current: ${app.w.cur.label}.`
     : `${app.S.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);

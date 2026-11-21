@@ -1,5 +1,5 @@
 import { LL, toLL } from '../geo/geo';
-import type { Vec } from '../core/math';
+import { dist, type Vec } from '../core/math';
 import type { CourseMark, MarkShape } from '../courses/course';
 
 /**
@@ -105,13 +105,34 @@ export const PLACES: Place[] = [
   P('m-IYC3', 'Sandbar YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
 ];
 
+/** Features to name a side of the course or a stretch of a route by (the places you can sail to, by their short names). */
+const FEATURES: { name: string; p: Vec }[] = [
+  ['cityfront', 'the yacht clubs'], ['crissy', 'Crissy Field'], ['gate', 'the Golden Gate'], ['sausalito', 'Sausalito'],
+  ['belvedere', 'Belvedere Point'], ['raccoon', 'Raccoon Strait'], ['ayala', 'Angel Island'], ['alcatraz', 'Alcatraz'],
+  ['pier39', 'Pier 39'], ['baybridge', 'the Bay Bridge'], ['clipper', 'Treasure Island'], ['ti-north', 'Treasure Island'],
+  ['m-16', 'Blackaller'], ['m-15', 'Yellow Bluff'], ['m-17', 'Harding Rock'], ['m-4', 'Angel Island'], ['m-18', 'Blossom Rock'], ['m-6', 'Fort Mason']
+].flatMap(([id, name]) => { const pl = PLACES.find(p => p.id === id); return pl ? [{ name, p: pl.p }] : []; });
+
+/** The nearest named feature to a point, within `within` m (leaving out any within 600 m of the points in `not`). */
+export function nearFeature(p: Vec, within = 1800, not: Vec[] = []): string | null {
+  let best: { name: string; d: number } | null = null;
+  for (const f of FEATURES) { if (not.some(q => dist(q, f.p) < 600)) continue; const d = dist(f.p, p); if (d < within && (!best || d < best.d)) best = { name: f.name, d }; }
+  return best?.name ?? null;
+}
+
 /**
- * A place by its id: one of the PLACES, or a spot picked on the chart, 'at:<lat>,<lon>' (named by its latitude and
- * longitude, as on a chart).
+ * A spot on the water as the player reads it: by the nearest named feature within about 5 nm, else "open water"; never
+ * its coordinates (the owner's rule, r270).
+ */
+export const spotLabel = (p: Vec): string => nearFeature(p, 9000) ?? 'open water';
+
+/**
+ * A place by its id: one of the PLACES, or a spot picked on the chart, 'at:<lat>,<lon>' (named by the nearest feature,
+ * spotLabel).
  */
 export const place = (id: string | undefined): Place | null => {
   const m = id ? /^at:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(id) : null;
-  if (m) { const lat = Number(m[1]), lon = Number(m[2]); return { id: id!, name: latLon(LL(lat, lon)), group: 'Spots', p: LL(lat, lon) }; }
+  if (m) { const lat = Number(m[1]), lon = Number(m[2]); return { id: id!, name: spotLabel(LL(lat, lon)), group: 'Spots', p: LL(lat, lon) }; }
   return PLACES.find(p => p.id === id) ?? null;
 };
 /** A spot picked on the chart, as a place id (to about a metre). */
@@ -121,7 +142,7 @@ export function latLon(q: Vec): string {
   const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
   return `${dm(lat)}N ${dm(lon)}W`;
 }
-/** A spot picked on open water, with no name but its position (latLon's form): the 3D view marks it with a plain pin. */
+/** A spot picked on open water as the chart sends it to the sim, by its position (latLon's form); the sim renames it (spotLabel) and flags it. */
 export const isSpot = (name: string): boolean => /^\d+°[\d.]+′N \d+°[\d.]+′W$/.test(name);
 
 /** A place as the thing you're sailing to: the dials (compass bearing, laylines, range) treat it like a mark. */
@@ -129,6 +150,7 @@ export function destMark(pl: Place | null): CourseMark | null {
   if (!pl) return null;
   return {
     key: 'dest', name: pl.name, p: pl.p, type: 'round', side: 'p', shape: pl.buoy?.shape ?? 'cylinder', look: pl.buoy?.look ?? 'Y',
-    beat: false, leg: 'reach', prev: pl.p, next: pl.p, dir: { x: 0, y: 1 }, sv: { x: 0, y: 0 }, r: { x: 0, y: 1 }
+    beat: false, leg: 'reach', prev: pl.p, next: pl.p, dir: { x: 0, y: 1 }, sv: { x: 0, y: 0 }, r: { x: 0, y: 1 },
+    ...(pl.id.startsWith('at:') || (pl.id === 'pick' && isSpot(pl.name)) ? { spot: true as const } : {}) // (a spot on open water, from a saved setting or picked on the chart: the 3D view and the HUD give it a plain pin, r270)
   };
 }

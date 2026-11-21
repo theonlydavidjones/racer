@@ -43,11 +43,11 @@ describe('the old named launch points are gone from what the player picks (owner
 });
 
 describe('a spot picked on the big chart still reaches the sim by its position, so its pin shows (r270)', () => {
-  it('chart.ts sends latLon and reads destName', async () => {
+  it('chart.ts sends latLon and reads the spot by the nearest place (spotName; destName is gone, the sim names it: r270)', async () => {
     // @ts-ignore node:fs for the source text
     const { readFileSync } = await import('node:fs');
     const c = readFileSync('src/ui/chart.ts', 'utf8') as string;
     expect(c).toContain('name: latLon(q)');
-    expect(c).toContain('destName(this.pick)');
+    expect(c).toContain('isSpot(this.pick.name) ? spotName(this.pick.p)');
   });
 });

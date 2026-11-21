@@ -41,7 +41,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
-import { destMark, place as getPlace } from './places';
+import { destMark, isSpot, place as getPlace, spotLabel } from './places';
 import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, harborRoute, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, keptFastWhy, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
@@ -2586,7 +2586,8 @@ export class World {
   /** Just sail: a new destination, a place or a spot picked on the chart. */
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
-    this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
+    this.dest = destMark({ id: 'pick', name, group: 'Spots', p }); // (a spot on open water comes by its position and is flagged by it, destMark)
+    if (this.dest!.spot) name = this.dest!.name = spotLabel(p); // (then named by the nearest place, never its coordinates: r270)
     this.arrivedT = null; HELM.delete(this); OFF.delete(this);
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
@@ -2728,6 +2729,7 @@ export class World {
    * that would be a restart. False on land.
    */
   moveHere(p: Vec, name: string): boolean {
+    if (isSpot(name)) name = spotLabel(p); // (r270: never its coordinates)
     prepareBasins([p], BASINS_NEAR); // (a jump: the harbors round where she lands, at once)
     if (!this.freeSail || onLand(p) || hitsHarbor(p)) return false;
     const u = this.user;

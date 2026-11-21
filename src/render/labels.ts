@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { dist, type Vec } from '../core/math';
 import type { SimView } from '../sim/host';
 import { P3 } from './coords';
-import { isSpot } from '../sim/places';
 
 interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
 
@@ -93,7 +92,7 @@ export class Labels {
       const d = w.dest;
       if (d !== this.destOf) { // (a new destination, or none: its words and its look, once)
         this.destOf = d;
-        const pin = !!d && isSpot(d.name);
+        const pin = !!d?.spot;
         // (bound for her own slip: "Home", the owner, 18 Nov 2026)
         de.textContent = d && !pin ? (d.key === 'slip' ? 'Home' : d.name) : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
         if (pin) de.title = d!.name; else de.removeAttribute('title');

@@ -62,7 +62,6 @@ import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
 import { FIELD_LAYERS, fieldLayer, keyMenu, layersMenu, withLayer, type LayerKey } from './ui/layers';
-import { destName } from './ui/placeNames';
 import { dockHint } from './ui/dockHint';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
@@ -991,7 +990,7 @@ function pilotTick(dt: number): void {
   else if (p.mode === 'wind') txt = `Apparent wind ${side(p.awa)}`;
   else {
     const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
-    txt = d ? `→ ${destName(d).replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
+    txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
   }
   if (txt !== pilotShown && performance.now() > pilotNoteUntil) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
