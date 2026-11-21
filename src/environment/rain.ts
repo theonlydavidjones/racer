@@ -32,8 +32,13 @@ interface Forecast { mm: (number | null)[]; pop: (number | null)[]; code: (numbe
 interface Climate { wetDay: number; wetHour: number; heavy: number; spellH: number }
 const D = data as unknown as { stations: Record<string, Station>; forecast: Record<string, Forecast>; climate?: { months: Climate[] } };
 const IDS = Object.keys(D.stations);
-/** Moderate rain counts as heavy from this much an hour (mm): between the scene's light 2 and heavy 8 mm/h. */
-const MODERATE_SPLIT_MM = 4;
+/**
+ * Moderate rain counts as heavy from this much an hour (mm). A design choice, not a published line (w045): heavy rain
+ * (+RA) is past the observing rules' 7.6 mm an hour and is the scene's heavy by itself, so moderate (RA) is always below
+ * that line. The scene has only two strengths, light at 2 and heavy at 8 mm/h (render/scene.ts: the visibility in each),
+ * so a moderate hour goes to whichever its fall is nearer, by ratio: their geometric mean, √(2 · 8) = 4 mm/h.
+ */
+const MODERATE_SPLIT_MM = Math.sqrt(2 * 8);
 /** Measurable precipitation (mm): 0.01 in. */
 const MEASURABLE_MM = 0.25;
 
