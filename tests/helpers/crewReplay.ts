@@ -58,3 +58,31 @@ export function replayHelmKnee(rec: CrewRecording, from: number): number {
   }
   return top;
 }
+
+/** Drawn as replayDeepest draws it, from `from` (s) on: the deepest any crew figure's upper arm or forearm goes into
+ * their own torso (crewarms.test.ts's capsule: the spine, hips to head, 0.12 m a side; the upper arm's first 6 cm, its
+ * joint at the shoulder, left out), and who and when. */
+export function replayArmInTorso(rec: CrewRecording, from: number): { into: number; at: string } {
+  const c = newCrew(rec.spec, rec.frames[0]!.w > 0 ? 'S' : 'P'), cr = buildCrew(rec.spec.helm, rec.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1);
+  let prev = rec.frames[0]!.t, into = 0, at = '';
+  const w = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0));
+  for (const r of rec.frames) {
+    c.clock = r.clock; (c as { roll?: unknown }).roll = r.roll;
+    r.people.forEach((p, i) => Object.assign(c.people[i]!, { goal: undefined, job: null, ready: false, outUntil: 0, lean: 0 }, p));
+    syncCrew(cr, r.w, c, Math.max(1e-3, r.t - prev), false, undefined, r.heel, !!r.tacking); prev = r.t;
+    if (r.t < from || r.tacking) continue; // (a tack's own arms: r010)
+    cr.crew.forEach((f, i) => {
+      const fig = f as Figure; fig.root.updateMatrixWorld(true);
+      const a = w(fig.root), b = w(fig.head), ab = b.clone().sub(a), rad = 0.12 * fig.scale;
+      fig.arm.forEach((am, j) => {
+        const sh = w(am.root), el = w(am.mid), wr = w(am.mid, -BONE.fore);
+        for (const [p0, p1, skip] of [[sh, el, 0.06 * fig.scale], [el, wr, 0]] as const) for (let q = 0; q <= 20; q++) {
+          const p = p0.clone().lerp(p1, q / 20); if (q / 20 * p0.distanceTo(p1) < skip) continue;
+          const t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq())), d = rad - p.distanceTo(a.clone().addScaledVector(ab, t));
+          if (d > into) { into = d; at = `crew${i + 1} arm${j} ${(d * 100).toFixed(1)} cm into their torso at ${r.t.toFixed(2)} s`; }
+        }
+      });
+    });
+  }
+  return { into, at };
+}

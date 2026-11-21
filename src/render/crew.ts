@@ -421,11 +421,18 @@ function onDeck(s: number, z: number, lean: number, k: number): PoseT {
   const footY = (q: THREE.Vector3) => Math.max(ground(q.x, q.z) + 0.06, knee.y - 0.03 - BONE.shin * k);
   const foot = (j: number) => { const q = V(s * (c - 0.13), 0, z - 0.06 * (1 - corner) + 0.04 * corner).addScaledVector(r, (j ? 1 : -1) * 0.09 * k); return q.setY(footY(q)); };
   const hip = V(s * hipX, hipY, z), f = fwd(yaw);
-  // hands: sitting, on the knees; hiking, one on the coaming beside them and one across the chest (on the sheet)
-  const hands: [THREE.Vector3, THREE.Vector3] = lean > 0.15
-    ? [hip.clone().addScaledVector(f, 0.12 * k).add(V(0, 0.38 * k, 0)).addScaledVector(r, 0.08), V(s * (c + 0.02), knee.y + 0.02, z - 0.12)]
-    : [knee.clone().addScaledVector(r, -0.1 * k).add(V(0, 0.08, 0)), knee.clone().addScaledVector(r, 0.1 * k).add(V(0, 0.08, 0))];
-  return { hip, yaw, pitch: -0.15 + 1.35 * lean, roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone() };
+  // hands: sitting, on the knees; hiking, one on the coaming beside them and one out in front of the chest (on the sheet)
+  const p: PoseT = { hip, yaw, pitch: -0.15 + 1.35 * lean, roll: 0, feet: [foot(0), foot(1)], look: JIB_LUFF.clone(),
+    hands: [knee.clone().addScaledVector(r, -0.1 * k).add(V(0, 0.08, 0)), knee.clone().addScaledVector(r, 0.1 * k).add(V(0, 0.08, 0))] };
+  if (lean > 0.15) {
+    // (the coaming in the hand on its side; the sheet in the other, a forearm's length out in front of the chest as they
+    // lean back. Held 0.12 m in front of the hips at the chest's height, leant back it was inside the chest, and always
+    // the left hand, from the aft shoulder across: an arm through the torso up to 12.7 cm (the crew audit, 21 Nov 2026,
+    // item 7))
+    const rail = V(s * (c + 0.02), knee.y + 0.02, z - 0.12), i = sideHand(p, k, rail);
+    p.hands[i] = rail; p.hands[1 - i] = chest(p, k).addScaledVector(f, 0.32 * k).add(V(0, -0.12 * k, 0));
+  }
+  return p;
 }
 /**
  * Moving fore and aft along the side deck (`dir` −1 forward, +1 aft), past the thwart, as crew do: crouched low on the

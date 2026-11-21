@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mirrored, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
+import { mirrored, replayArmInTorso, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
 import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 import SIDE_DECK from './fixtures/crew-sidedeck-8kt.json';
 import EDGE_1 from './fixtures/crew-cabinedge-20kt-1.json';
 import EDGE_2 from './fixtures/crew-cabinedge-20kt-2.json';
 import EDGE_3 from './fixtures/crew-cabinedge-20kt-3.json';
 import FOREDECK from './fixtures/crew-foredeck-8kt.json';
+import SITOUT from './fixtures/crew-sitout-arm-12kt.json';
 
 // The sprint's soak (19 Nov 2026, Crew Habits' harness, seed 3, west, real sea), replayed: stretches of its races recorded
 // frame by frame from the harness (each person's place, pose, lean, goal and job, her heel, the windward side, tacking,
@@ -46,4 +47,17 @@ describe('The soak, replayed: the crew clear of the boat (render/crew.ts)', () =
       expect(replayDeepest(rec, 173)).toBe('');
     }, 120_000);
   }
+});
+
+// The crew audit (21 Nov 2026, docs/crew/crew-audit.md item 7): the race at 12 kt, Green, 945 to 952 s, close-hauled. The
+// main hand sat out on the side deck, leant a little out (lean 0.25: onDeck's sitting-out pose, short of hikeHold's), one
+// hand on the coaming and the other "across the chest, on the sheet": 0.12 m in front of the hips at the chest's height,
+// and leant back, inside the chest; the left hand always, from the aft shoulder across. An arm in the chest up to 12.7 cm.
+// Out of the torso, but for an elbow's brush (crewarms' capsule is a jacketed chest's, 3 cm allowed).
+describe('The crew audit, replayed: sat out, the arms in front of the chest (render/crew.ts onDeck)', () => {
+  for (const [tack, rec] of [['as sailed', SITOUT], ['mirrored', mirrored(SITOUT as unknown as CrewRecording)]] as const)
+    it(`the main hand sat out on the side deck, 12 kt, ${tack}`, () => {
+      const r = replayArmInTorso(rec as unknown as CrewRecording, 946);
+      expect(r.into, r.at).toBeLessThan(0.03);
+    }, 120_000);
 });
