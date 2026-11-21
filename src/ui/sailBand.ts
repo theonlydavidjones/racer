@@ -190,7 +190,7 @@ export const BAND_TIPS = {
   jibCunningham: "On as the wind builds, to hold the jib's draft forward.",
   jibHalyard: "Set before the start: tight keeps the jib's draft forward for a breeze.",
   jib: 'In to point; eased for speed and reaching.',
-  car: 'Forward for power, aft to depower. In to point; out for a wider, fuller slot.',
+  car: 'Forward for power, aft to depower. In to point; out to open the slot for speed.',
   windex: 'Arrow: the apparent wind. Red wedge: too close, the sails luff.',
   pole: 'Holds the jib out for wing-on-wing, past about 150° true.',
   hoistMain: 'Hauls the main up; head to wind makes it easy.',
