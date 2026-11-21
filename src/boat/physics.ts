@@ -12,7 +12,8 @@ import { paddleForce, paddleMoment, paddleYawRate } from './paddle';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
-import { beatFor, seaDrag, waveYaw } from './seaway';
+import { beatFor, seaDrag, targetFor, waveYaw } from './seaway';
+import { FLAT_SEA } from '../environment/sea';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, STALL_TURN, helmFor, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, carCall, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
@@ -57,6 +58,28 @@ export const PENALTY_TURN_RATE = 10;
  * slowed light-air races (claude/light-air: more slow tacks and time in irons). Being redone with the AI's irons
  * seamanship (claude/irons) and Deep Physics' measure of how she gathers way after a slow tack. */
 export const SLOW_TACK = 1.3;
+/** In light air, the way she needs for a tack is a share of the speed the wind can give her close-hauled, not SLOW_TACK:
+ * in 1-4 kt she sails close-hauled at 0.4-1.2 m/s, all under it, and every tack became a gybe right round, 100 s at
+ * 0.3 m/s (ROADMAP, "AI steering in a dying breeze"). A share is the right form: coasting into the wind on a fixed turning
+ * circle against drag that goes as her speed squared, the turn she gains depends on the ratio of her speeds, and the
+ * windage head to wind and her hull's drag stay in proportion as the wind changes (the physics review).
+ * TACK_WAY 0.6 is an ESTIMATE, the sailor's rule of a good part of her way on before a light-air tack: nothing here
+ * measures it. In this sim a committed tack gets round even from a dead stop, as the sculling floor (dynamics.ts
+ * HANDLING.minTurnRate, rule 42.3(d)) turns her the last of the way, so the sim has no edge to set it by.
+ * The wind it's judged in: the lighter of the wind now and her 20 s mean (Boat.twsSlow), as her speed lags the wind;
+ * judged on a fresh puff's, she'd be "too slow" for the wind just arrived and gybe round at the moment a light-air
+ * sailor most wants to tack (the physics review). SLOW_TACK still caps it, so from about 9 kt nothing changes.
+ * In chop: a seaway stops her head to wind sooner than flat water does, so she needs more way, not less; but her
+ * close-hauled speed falls in chop (targetFor), and a share of it fell with it, to nothing at 1 kt in 0.3 m, where a tack
+ * then took 201 s (the physics review, 20 Nov 2026). So it's never less than the flat-water share. How much more a
+ * seaway asks isn't measured, so nothing is added for it; nor is swell (not in targetFor at all): a follow-up. */
+export const TACK_WAY = 0.6;
+/** The least speed (m/s) at which the AI takes a turn through the wind as a tack rather than gybing round. */
+export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): number => {
+  const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
+  const flat = { ww: her.ww, sea: FLAT_SEA };
+  return Math.min(SLOW_TACK, TACK_WAY * Math.max(targetFor(her, beatFor(her)), targetFor(flat, beatFor(flat))));
+};
 
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
@@ -396,7 +419,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {

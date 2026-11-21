@@ -6,7 +6,7 @@ import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
-import { SLOW_TACK, yawLag } from '../boat/physics';
+import { slowTack, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
@@ -212,11 +212,11 @@ const CLEAR_HOLD_S = 0.5;
 function clearestHeading(w: World, b: Boat, want: number): number {
   const from = b.ww.from, tackOf = (h: number) => { const r = wrap(from - h); return Math.abs(r) > 176 ? b.tack : r >= 0 ? 'S' : 'P'; }; // (starboard: the wind on her right, rel >= 0, as physics.ts tackStep)
   const ai = b.ai, held = ai && ai.clearT != null && ai.clearH != null && ai.clearT < w.t && w.t - ai.clearT <= CLEAR_HOLD_S && Math.abs(wrap(ai.clearH - want)) <= 90 ? ai.clearH : null;
-  // (a tack away, though, with way on for it: from SLOW_TACK + 0.2 m/s, and once chosen, whatever her speed, until she's
-  // through the wind; a hard threshold would offer it at 1.31 m/s and take it back at 1.29 as she luffed into the tack:
-  // the physics review)
+  // (a tack away, though, with way on for it: from slowTack × 1.15, and once chosen, whatever her speed, until she's
+  // through the wind; a hard threshold would offer it just over slowTack and take it back just under as she luffed into
+  // the tack: the physics review)
   const tackAway = (h: number) => Math.abs(wrap(from - h)) < 90, heldAway = held != null && tackOf(held) !== b.tack && tackAway(held);
-  const mayTack = heldAway || b.v >= SLOW_TACK + 0.2;
+  const mayTack = heldAway || b.v >= slowTack(b) * 1.15;
   let best = want, bestS = -Infinity, bestC = 0;
   for (const k of [0, 20, -20, 40, -40, 60, -60, 90, -90]) {
     const h = sailable(b, want + k);
@@ -333,8 +333,8 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   let desired = sailable(b, crabFor(bq, targetFor(b, rel) * 0.9, b.cur));
   const beating = Math.abs(wrap(from - desired)) < beat + 5;
   // the land within 100 m along her track over the ground (her heading through the water and the current's set): off it.
-  // Beating, she tacks, with way enough to (below about 1.5 m/s a tack becomes a gybe right round: physics.ts
-  // SLOW_TACK), and not onto land; else, or slow, she bears away to build speed and clear it
+  // Beating, she tacks, with way enough to (below 1.15× physics.ts slowTack a tack becomes a gybe right round:
+  // her way for it in this wind), and not onto land; else, or slow, she bears away to build speed and clear it
   const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
   // (her whole width, not just her centreline: a line 4 m either side too, so she doesn't brush a breakwater's end)
   const landOn = (hd: number, d: number) => {
@@ -343,7 +343,7 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   };
   if (landOn(desired, 100)) {
     const other = n360(from + (b.tack === 'S' ? 1 : -1) * (beat + 1));
-    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
+    if (beating && b.v > slowTack(b) * 1.15 && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
     else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (!landOn(cand, 100)) { desired = cand; break; } }
   }
   return { desired, luff: false, beating };
@@ -865,11 +865,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           // which swings across the course's axis as she tacks)
           else if (Math.abs(lat) > width && dot(V(b.tack === 'S' ? csS : csP), sv) * lat > 0) doTack = true;
         }
-        // (too slow to tack, she'd stall head to wind or the turn would become a gybe right round (physics.ts SLOW_TACK):
+        // (too slow to tack, she'd stall head to wind or the turn would become a gybe right round (physics.ts slowTack):
         // a sailor bears away a little and builds speed first)
         // (nor does she tack onto a course the shore blocks close ahead: the shore check would only tack her straight back)
         if (doTack && blocked(w, b, other === 'S' ? csS : csP, 60)) doTack = false;
-        if (doTack && b.v < SLOW_TACK * 1.15) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
+        if (doTack && b.v < slowTack(b) * 1.15) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
         else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? csS : csP; planned = desired; decideTurn(b, w.t); } // (called or not, by her skipper: boat/calls.ts)
       }
     } else if (mode === 'run') {

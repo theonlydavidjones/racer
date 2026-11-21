@@ -64,7 +64,7 @@ function clearOf(p: Vec, prev: Vec, next: Vec): Vec {
 const GAP_DIRS = 36, DIRS = Array.from({ length: GAP_DIRS }, (_, k) => ({ x: Math.sin(2 * k * Math.PI / GAP_DIRS), y: Math.cos(2 * k * Math.PI / GAP_DIRS) }));
 /** The opposite-side pairs: 150° to 210° apart, in steps of the rays'. */
 const PAIR_LO = Math.round(GAP_DIRS * 150 / 360), PAIR_HI = Math.round(GAP_DIRS * 210 / 360);
-function narrowOn(a: Vec, b: Vec): Vec | null {
+export function narrowOn(a: Vec, b: Vec): Vec | null {
   const L = dist(a, b), n = Math.max(1, Math.ceil(L / 5));
   for (let k = 1; k <= n; k++) {
     const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
@@ -104,7 +104,7 @@ export function heldPast(P: HelmPlan, b: Vec): boolean {
  * a point near a structure fails only if it's nearer than she already is (beside one, the way off it isn't refused:
  * refused, she circled beside Pier 45's head, the physics review, 19 Nov 2026).
  */
-function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
+export function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
   if (landAlong(b, q) !== Infinity) return false;
   const L = dist(b, q), n = Math.max(1, Math.ceil(L / 5)), w0 = wharfNearest(b, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR;
   for (let k = 1; k <= n; k++) {
