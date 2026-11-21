@@ -60,7 +60,7 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
 const v = (pts: LLs) => pts.map(([la, lo]) => LL(la, lo));
-/** The dock's centre line, with an end that's within a few metres of another dock's centre line moved to meet that dock's edge (trimmed back if it crossed it, run out to it if it stopped short). */
+/** The dock's center line, with an end that's within a few meters of another dock's center line moved to meet that dock's edge (trimmed back if it crossed it, run out to it if it stopped short). */
 function meetEdge(pts: Vec[], others: Vec[][], otherW: number): Vec[] {
   const out = pts.map(p => ({ ...p }));
   for (const [i, j] of [[0, 1], [out.length - 1, out.length - 2]]) {
@@ -90,13 +90,13 @@ export interface Harbor {
   id: string; name: string; short: string;
   /** Breakwaters: rubble mounds, or a vertical concrete seawall (its top above the water, m, and the railing along its outer edge). */
   basin: Vec[]; breakwaters: { area: boolean; pts: Vec[]; seawall?: { top: number; rail: Vec[] } }[];
-  /** Main walkways (2.4 m wide) and slip fingers (1.0 m), as centre lines; and solid pier areas. */
+  /** Main walkways (2.4 m wide) and slip fingers (1.0 m), as center lines; and solid pier areas. */
   walkways: Vec[][]; fingers: Vec[][]; areas: Vec[][];
   /** Stretches of the basin's edge that are the shore itself, solid (where the terrain grid is too coarse to stop a boat). */
   shore: Vec[][];
   /** Entrance beacons (lateral marks), and the ways out of the harbor (the middle of each entrance). */
   beacons: { p: Vec; colour: 'red' | 'green' }[]; exits: Vec[];
-  /** The dock pilings' colour (white: plastic-sleeved, as at Horseshoe Bay; else timber), and paved paths along the breakwaters' tops. */
+  /** The dock pilings' color (white: plastic-sleeved, as at Horseshoe Bay; else timber), and paved paths along the breakwaters' tops. */
   piles: 'white' | 'timber'; paths: Vec[][];
   /** The basin's bounding box, and a box round everything solid that belongs to the harbor. */
   box: Box; reach: Box;
@@ -131,7 +131,7 @@ export const inBasin = (p: Vec): boolean => harborAt(p) !== null;
 /** The harbor whose basin, breakwaters and docks reach to here (for saying where something happened). */
 export const harborNear = (p: Vec): Harbor | null => { for (let i = 0; i < HARBORS.length; i++) if (inBox(p, HARBORS[i].reach)) return HARBORS[i]; return null; };
 
-/** Within `half` of a dock's centre line, square at its ends (as the docks are built), and round only at its bends. */
+/** Within `half` of a dock's center line, square at its ends (as the docks are built), and round only at its bends. */
 const nearLine = (p: Vec, pts: Vec[], half: number) => {
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy; if (l2 < 1e-9) continue;
@@ -206,7 +206,7 @@ export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
   return true;
 });
 /**
- * End ties: a berth alongside the free end of each main dock (the last few metres of a walkway that doesn't run into
+ * End ties: a berth alongside the free end of each main dock (the last few meters of a walkway that doesn't run into
  * another), where a boat lies parallel to the dock, bow out toward its end, as most marinas let a visitor or a boat
  * without a slip lie. Only where a Folkboat fits clear of every dock, finger and slip, with open water ahead.
  */
@@ -268,7 +268,7 @@ export function hullClear(c: Vec, h: number): boolean {
 
 
 /**
- * The boats lying in the marinas' slips: which slips have one, and the boat (kind, length, colours). Chosen here, once, the
+ * The boats lying in the marinas' slips: which slips have one, and the boat (kind, length, colors). Chosen here, once, the
  * same way for the sim and the drawing (render/marina.ts), so a slip that looks empty is empty: she can berth in it, and her
  * hull can't pass through a boat that's drawn. Drawn from a fixed seed per harbor, so every session has the same boats.
  *
@@ -333,7 +333,7 @@ function slipsNear(q: Vec, marina: string): Slip[] {
   }
   return g.get(cellKey(q.x, q.y)) ?? [];
 }
-/** The docks' corners and ends (their centre lines' points), filed in the same 10 m cells, per harbor. */
+/** The docks' corners and ends (their center lines' points), filed in the same 10 m cells, per harbor. */
 const corners = new Map<string, Map<string, Vec[]>>();
 function cornersNear(q: Vec, marina: string): Vec[] {
   let g = corners.get(marina);
@@ -389,7 +389,7 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
  * Leaving her berth under no engine, as it's done. The wind has the say (`windFrom`, deg, and `windKt`).
  * - **Swinging her out of a bow-in slip** (`swing`): a crew member walks her back along the finger by the shroud and steps
  *   aboard at its end with a bow line led round the cleat there and back aboard, which holds her bow just past the finger's
- *   end (`back`: how far her middle goes back, m; half a metre to two and a half past it, as little as clears the boats either
+ *   end (`back`: how far her middle goes back, m; half a meter to two and a half past it, as little as clears the boats either
  *   side) while her
  *   stern swings out across the fairway about it (`turn`, deg, + to starboard; to heading `h`). In a breeze across her
  *   (4 kt and more: WIND_SWINGS) the wind swings the stern, downwind: she ends up pointing toward the wind, and if
@@ -615,7 +615,7 @@ function clearRun(c: Vec, h: number, s: Slip, windFrom: number | undefined, wind
   }
   return true;
 }
-/** Turning her about a point on her centreline `pivot` m ahead of her middle (her bow: 3.8; her stern: −3.8), from (c0, h0) by `a` deg. */
+/** Turning her about a point on her centerline `pivot` m ahead of her middle (her bow: 3.8; her stern: −3.8), from (c0, h0) by `a` deg. */
 const about = (c0: Vec, h0: number, pivot: number, a: number) => {
   const u0 = dirOf(h0), P = { x: c0.x + u0.x * pivot, y: c0.y + u0.y * pivot }, u = dirOf(h0 + a);
   return { c: { x: P.x - u.x * pivot, y: P.y - u.y * pivot }, h: h0 + a };
@@ -705,7 +705,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   const fromBow = windFrom == null ? 0 : Math.abs(wrap180(windFrom - s.heading)); // (0: the wind blowing straight out of the slip, already on her bow)
   const windTurn = windFrom == null ? 0 : Math.sign(wrap180(windFrom - s.heading)) || 1;
   const windSwings = windFrom != null && windKt >= WIND_SWINGS && fromBow < 165; // (the wind has the say; blowing straight into the slip from astern, it could swing her either way: the crew's choice)
-  // her bow held on a short bow line by a crew member on the finger's end, half a metre to two and a half past it (the boats
+  // her bow held on a short bow line by a crew member on the finger's end, half a meter to two and a half past it (the boats
   // in the slips either side overhang their fingers' ends: her bow has to clear their sterns as she swings)
   type Way = { back: number; turn: number; h: number; gain: number; run: number; hold?: { off: number } };
   const ways: Way[] = [];
@@ -755,7 +755,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
     }
   };
   search(windSwings);
-  // the best: pointed most toward the way out (to within a couple of metres); then the shortest bow line and squarest turn (found first)
+  // the best: pointed most toward the way out (to within a couple of meters); then the shortest bow line and squarest turn (found first)
   const best = [...ways].sort((a, b) => Math.round(b.gain / 3) - Math.round(a.gain / 3)).find(fine);
   // walked out to the fairway and turned toward the way out there, as the owner does it (8m2, 15 Nov 2026): where the
   // wind's swing about the bow line would point her away from the way out, or she'd be shoved off astern into less clear

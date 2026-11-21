@@ -191,7 +191,7 @@ export const pierAt = (p: Vec): Pier | null => {
   return null;
 };
 export const hitsPier = (p: Vec): boolean => pierAt(p) !== null;
-/** The bridge pier or tower within r metres of p (the north tower's base is part of Lime Point's coastline: what she hits there is the tower). */
+/** The bridge pier or tower within r meters of p (the north tower's base is part of Lime Point's coastline: what she hits there is the tower). */
 export const pierNear = (p: Vec, r: number): Pier | null => {
   for (const G of PIER_GROUPS) if (p.x >= G.box.x0 - r && p.x <= G.box.x1 + r && p.y >= G.box.y0 - r && p.y <= G.box.y1 + r)
     for (const a of G.piers) if (inPoly(p, a.pts) || a.pts.some((v, k) => segPt(p, v, a.pts[(k + 1) % a.pts.length]) < r)) return a;
@@ -200,13 +200,13 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
 
 /*
  * The terrain's 50 m land grid (from elevation data) has some of the bigger piers in it as blocks of land: the Bay
- * Bridge's Pier A and centre anchorage stand well above the water. Where a pier is drawn exactly above, those blocks
+ * Bridge's Pier A and center anchorage stand well above the water. Where a pier is drawn exactly above, those blocks
  * would make a boat run aground 20–30 m short of it, so a patch of grid land that stands on its own in the water,
  * everywhere within 80 m of a pier, is water: the pier's outline is what's solid. (Land joined to real shore, such as
  * Yerba Buena Island's beside the Bay Bridge's Pier F, stays.)
  */
 {
-  // (each cell centred on its sample, at a grid node: see inTerrain)
+  // (each cell centered on its sample, at a grid node: see inTerrain)
   const cellC = (i: number, j: number): Vec => ({ x: (M.west + i * CW - LON0) * MLON, y: (M.north - j * CH - LAT0) * MLAT });
   const nearPier = (q: Vec, r: number) => PIERS.some(P => q.x > P.box.x0 - r && q.x < P.box.x1 + r && q.y > P.box.y0 - r && q.y < P.box.y1 + r && P.pts.some((v, k) => segPt(q, v, P.pts[(k + 1) % P.pts.length]) < r || inPoly(q, P.pts)));
   const done = new Uint8Array(M.nx * M.ny);
@@ -253,7 +253,7 @@ export function hitsWharf(p: Vec): boolean {
 
 /**
  * How far a boat at p passes alongside an outline (m), from its nearest segment k (from pts[k − 1] to pts[k]): the
- * stretch of the outline on either side that stays within a few metres of the line she'd sail along it (square to n,
+ * stretch of the outline on either side that stays within a few meters of the line she'd sail along it (square to n,
  * the way out from it to her), measured along that line. RRS 2025–2028, Definitions, Obstruction: it's a continuing
  * obstruction if she'd pass alongside it for at least three of her hull lengths.
  */
@@ -274,7 +274,7 @@ export function alongside(pts: Vec[], closed: boolean, k: number, q: Vec, n: Vec
 /**
  * The nearest of the Wharf's piers, breakwaters and docks, and (with `piers`) the bridges' piers: for Rule 19, the
  * passage planner. The current's shore relief leaves the bridges' piers out: one standing alone in the stream isn't a
- * harbour wall, and the water round it isn't slack (environment/pierWakes.ts does its wake).
+ * harbor wall, and the water round it isn't slack (environment/pierWakes.ts does its wake).
  */
 export function wharfNearest(p: Vec, max = 60, piers = true): { d: number; n: Vec; along: number } | null {
   if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
@@ -352,7 +352,7 @@ export function wharfCrossed(a: Vec, b: Vec, piers = true): boolean {
  * Open water, 25 m square by square: a square where onLand can't be true anywhere, so onLand there needn't ask the shore,
  * the marinas and the piers. Every boat asks onLand several times a step (her bow and her middle, aground or not), and
  * nearly all of them are out in open water. A square is open only if each thing onLand reads is shown to be water all
- * over it (each with a metre's pad against rounding at the edges):
+ * over it (each with a meter's pad against rounding at the edges):
  *   - no marina's reach (hitsHarbor answers no outside them all, in a basin or out of one);
  *   - no pier group's box (hitsWharf's piers, docks and breakwaters; the bridges' piers);
  *   - not Lime Point's box (its own coastline, in place of the terrain's cells);
@@ -444,7 +444,7 @@ function circleHit(a: Vec, b: Vec, c: Vec, r: number): number {
   const t = (-B - Math.sqrt(disc)) / (2 * A);
   return t >= 0 && t <= 1 ? t : Infinity;
 }
-/** As marina.ts draws a dock: within `half` of its centre line, square at its ends and round only at its bends. The first t on it. */
+/** As marina.ts draws a dock: within `half` of its center line, square at its ends and round only at its bends. The first t on it. */
 function dockHit(a: Vec, b: Vec, pts: Vec[], half: number): number {
   let best = Infinity;
   for (let i = 1; i < pts.length; i++) {
@@ -573,7 +573,7 @@ export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
   let best: { d: number; q: Vec; c: Vec } | null = null;
   for (let j = j0 - rj; j <= j0 + rj; j++) for (let i = i0 - ri; i <= i0 + ri; i++) {
     if (i < 0 || j < 0 || i >= M.nx || j >= M.ny || GRID[j * M.nx + i] !== 1) continue;
-    // the cell, in course metres; inside onGround's Cityfront box the terrain doesn't count (the Cityfront shore does)
+    // the cell, in course meters; inside onGround's Cityfront box the terrain doesn't count (the Cityfront shore does)
     const x0 = (M.west + (i - 0.5) * cw - LON0) * MLON, x1 = x0 + cw * MLON, y1 = (M.north - (j - 0.5) * ch - LAT0) * MLAT, y0 = y1 - ch * MLAT;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     if (cx > CF.x0 && cx < CF.x1 && cy > CF.y0 && cy < CF.y1) continue;
@@ -612,7 +612,7 @@ export const shoreDist = (p: Vec): number => shoreNearest(p).d;
  * The distance to any shore, not just the Cityfront's: the nearer of the Cityfront shore (shoreDist, exact) and the
  * terrain's land beyond it (the 50 m cells, from NOAA's chart: Marin, the islands, the East Bay, Richmond), for the
  * wind's slowing near the shore and the current's easing there. The terrain's part is an exact Euclidean distance
- * transform of the cells (Felzenszwalb & Huttenlocher 2012), worked out once, between cell centres, then interpolated
+ * transform of the cells (Felzenszwalb & Huttenlocher 2012), worked out once, between cell centers, then interpolated
  * and taken back half a cell to the cell's edge: within about 15 m of the true distance to the cells.
  */
 let DT: Float32Array | null = null;
@@ -669,9 +669,9 @@ export function landBetween(a: Vec, b: Vec): boolean {
 export const anyShoreDist = (p: Vec): number => Math.min(shoreDist(p), landDist(p));
 /**
  * landAlong for a boat's own short look ahead (the AI's "is the shore in the way" on every think, ai.ts blocked): when
- * the shore is further off than the look by a good margin, and no pier, dock, breakwater or harbour lies within its box,
+ * the shore is further off than the look by a good margin, and no pier, dock, breakwater or harbor lies within its box,
  * there's nothing it could meet, and the walk along it is skipped. Otherwise landAlong itself, so the answer is the same
- * (the margin, 30 m, is twice the terrain's distance error and the lattice's few metres: tests/landAlongNear.test.ts).
+ * (the margin, 30 m, is twice the terrain's distance error and the lattice's few meters: tests/landAlongNear.test.ts).
  */
 /** A box within 60 m of any edge of the Cityfront box (CF), across the edge's whole length. */
 function nearCfEdge(bb: Box): boolean {
@@ -699,7 +699,7 @@ export function landAlongNear(a: Vec, b: Vec): number {
  * (a boat's own current, eased near the shore: environment/current.ts shoreRelief, every boat every step), where the exact one
  * searches the shore's segments each time. (Not for what samples the whole Bay once in a while, as the wind's field
  * does: each such look would fill a tile for one use.) The
- * distance to a shore changes by no more than the distance moved, so between lattice points it is off by a few metres
+ * distance to a shore changes by no more than the distance moved, so between lattice points it is off by a few meters
  * at most, where two shores are equally near (tests/approx.test.ts measures it). Filled in tiles of 32 × 32
  * spaces (320 m) as boats first come near them, each in a few milliseconds. setShoreGrid(false): the exact one.
  */
@@ -787,9 +787,9 @@ function shoreTile(ti: number, tj: number): Float64Array {
 /*
  * Which segments can be nearest anywhere in a 25 m cell, worked out the first time a point in the cell is asked about.
  * Exact: the distance to the shore changes by at most the distance moved, so nowhere in the cell is the shore further
- * than U = (its distance from the cell's centre) + (the cell's half-diagonal), and a segment further than U from the
+ * than U = (its distance from the cell's center) + (the cell's half-diagonal), and a segment further than U from the
  * whole cell can't be the nearest (nor tie with it) for any point in it. So scanning the cell's list gives the same
- * answer as scanning every segment, for a handful of them (the ring search below finds the centre's distance). A cell
+ * answer as scanning every segment, for a handful of them (the ring search below finds the center's distance). A cell
  * gets its list once it's been asked about a few times (a boat crossing it asks hundreds of times): points asked about
  * here and there (the landscape's, building the city at load) are quicker by the ring search alone.
  */

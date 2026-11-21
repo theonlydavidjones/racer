@@ -20,7 +20,7 @@ import type { MooredKind } from '../geo/marina';
  */
 const DOCK_TOP = 0.45, DOCK_T = 0.35;
 
-/** A strip of dock along a centre line: its deck (UVs in metres, boards across) and its sides, mitred at the bends. */
+/** A strip of dock along a center line: its deck (UVs in meters, boards across) and its sides, mitered at the bends. */
 function strip(pts: Vec[], w: number): { top: THREE.BufferGeometry; side: THREE.BufferGeometry } {
   const n = pts.length, L: Vec[] = [], R: Vec[] = [], S: number[] = [];
   const dir = (i: number) => { const a = pts[i], b = pts[i + 1], l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; };
@@ -88,7 +88,7 @@ function rng(seed: number) { return () => { seed = (seed * 16807) % 2147483647; 
  */
 /**
  * The boats in a marina's slips of one kind (sail or power; render/mooredBoats.ts): each part one instanced mesh, every boat
- * that part scaled to her length; a hull and a sail cover in each boat's own colours.
+ * that part scaled to her length; a hull and a sail cover in each boat's own colors.
  */
 class SlipBoats {
   private parts: { mesh: THREE.InstancedMesh; own?: 'hull' | 'cover' }[] = [];
@@ -147,7 +147,7 @@ class SlipBoats {
   }
   /**
    * Before drawing: the slips within NEAR_R of the camera (the NEAR_MAX nearest) drawn in detail, and left out of the
-   * simpler set; worked out again once the camera has moved a few metres.
+   * simpler set; worked out again once the camera has moved a few meters.
    */
   update(cam: THREE.Vector3): void {
     if (!this.near.length || (!this.dirty && cam.distanceToSquared(this.lastCam) < 9)) return;
@@ -178,7 +178,7 @@ export class Harbor {
     const deck = new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide });
     const fascia = new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide });
     const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
-    const concrete = new THREE.MeshLambertMaterial({ color: 0xcfcbc2 }), white = new THREE.MeshLambertMaterial({ color: 0xf2f2ee }); // weathered white-grey concrete; white pipe rails
+    const concrete = new THREE.MeshLambertMaterial({ color: 0xcfcbc2 }), white = new THREE.MeshLambertMaterial({ color: 0xf2f2ee }); // weathered white-gray concrete; white pipe rails
     const whitePile = new THREE.MeshLambertMaterial({ color: 0xeeeeea }), paved = new THREE.MeshLambertMaterial({ color: 0x9c968c }); // white-sleeved piles; a weathered paved path
     const pileMat = new THREE.MeshLambertMaterial({ color: 0x5b4a3a }), capMat = new THREE.MeshLambertMaterial({ color: 0x8a8c8e });
     const pileGeo = new THREE.CylinderGeometry(0.17, 0.19, 4.2, 10), capGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10);
@@ -187,7 +187,7 @@ export class Harbor {
   }
 
   private build(H: HarborGeo, deck: THREE.Material, fascia: THREE.Material, rock: THREE.Material, concrete: THREE.Material, white: THREE.Material, whitePile: THREE.Material, paved: THREE.Material, pileMat: THREE.Material, capMat: THREE.Material, pileGeo: THREE.BufferGeometry, capGeo: THREE.BufferGeometry): void {
-    // the docks: each walkway one continuous strip with mitred corners; each finger a strip from the walkway's edge
+    // the docks: each walkway one continuous strip with mitered corners; each finger a strip from the walkway's edge
     // (trimmed or extended to meet it) to its end; decked in boards laid across, with darker fascias down the sides
     const walks = H.walkways, fingers = H.fingers; // (their ends already meet the walkways' edges: geo/marina.ts)
     const tops: THREE.BufferGeometry[] = [], sides: THREE.BufferGeometry[] = [], piles: Vec[] = [];
@@ -276,7 +276,7 @@ export class Harbor {
       g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
-    // (hulls mostly white or off-white gelcoat, some dark; the main's cover in the usual canvas colours; the share of powerboats
+    // (hulls mostly white or off-white gelcoat, some dark; the main's cover in the usual canvas colors; the share of powerboats
     // is an estimate (POWER_SHARE): the harbors' own figures weren't found)
     const fleet: Record<MooredKind, { slip: Slip; len: number; colour: number; cover: number }[]> = { sail: [], power: [] };
     for (const m of mooredIn(H.id)) fleet[m.kind].push(m);
