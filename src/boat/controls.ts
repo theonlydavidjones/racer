@@ -66,14 +66,23 @@ export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957;
  * stays until the track's measured: the AI's homing after racing's called off (tests/abandon-home.test.ts) turns on a
  * tenth of a degree here, which is flagged. (North Sails' guide moves the cars 15–20 cm to windward in light air: −0.3
  * to −0.4 of the travel.)
+ * The class leaves it to each boat: "The arrangement and the method of sheeting the mainsail and headsails is optional
+ * except that fittings for sheets shall be placed so that they do not protrude outboard of the sheer line" (NFIA Class
+ * Rules 2025–2028, March 2026 update, 8.40; the rules never name a traveller or horse,
+ * https://folkboat.com/wp-content/uploads/2026/03/NORDIC-FOLKBOAT-CLASS-RULES-2025-2028-Update-March-2026.pdf). No builder
+ * drawing of the thwart or its track has been found, so the travel is Josephine's own, read off her photos until it's
+ * measured aboard (docs/ABOARD-JOSEPHINE.md 1.14).
  */
 export const TRAVELLER_SWING = 9.5;
 /**
  * The boom's stop, eased right out (deg off the centreline): where its side meets the shroud. At boom height the shroud
- * is about 0.83 m out and 0.26 m aft of the gooseneck (NFIA Class Rules 2025–28, 7.20: the chainplates at least 0.90 m
- * out and 280–360 mm aft of the mast's after edge; 7.60: the hounds 5.30–5.50 m up; the drawn chainplate 0.98 m out),
- * so about 70° (about 66° at the class's limits; less with the vang off, the boom lifting). Not 85°: on a run that let
- * the main out further than a Folkboat's boom can go, through the shroud. (reference/design/sheet-geometry.md, Rigging.)
+ * is about 0.83 m out and 0.26 m aft of the gooseneck, so about 70° (about 66° at the class's limits; less with the vang
+ * off, the boom lifting). Not 85°: on a run that let the main out further than a Folkboat's boom can go, through the
+ * shroud. (reference/design/sheet-geometry.md, Rigging; the drawn chainplate 0.98 m out.) The class rules fix the
+ * shroud (NFIA Class Rules 2025–2028, March 2026 update, the PDF above): 7.20, "Shrouds shall intersect the deck not
+ * less than 900mm from the yacht's centreline … between two athwart ship straight lines at a distance of min. 280mm and
+ * max. 360 mm aft of the mast's aft edge"; 7.60, the main shrouds meet the mast's face 5300–5500 mm above the lower
+ * measurement band's upper edge. Nothing in them limits the boom's swing itself (6.3: its section and Boom Point only).
  */
 export const BOOM_STOP = 70;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */

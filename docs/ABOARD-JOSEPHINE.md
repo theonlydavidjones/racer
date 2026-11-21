@@ -154,6 +154,10 @@ Ordered by accuracy gain.
 
 **1.13 Drawing dimensions "read off photos, estimates within a few cm" (lowest priority; cosmetic).** These are in `hull.ts` and `boatMesh.ts`: cabin light heights (`hull.ts:443`), cabin-top crown height at the front on the centerline (`hull.ts:484`), the cabin front's rake, thwart underside depth (`COCKPIT_FIT`, "ESTIMATES, uncited", `hull.ts:377`), the footrest hollow, the companionway sill (150 mm over the sole), the mast-foot plate, horseshoe and boot sizes (`boatMesh.ts:1212`), and winch pedestal height. A tape and straight-on photos settle them. The Tacktick unit's tilt (20° is an estimate) and its stand height can be checked in the same way.
 
+**1.14 The traveler's track (w052; Rigging).** The class rules leave the mainsheet's arrangement free (CR 8.40) and no builder drawing of the thwart has been found, so this is hers alone.
+- **Do:** tape the car's travel from the middle to each end stop, and the distance from the mast's after edge to the thwart's track, along the centerline.
+- **Why:** `TRAVELLER_SWING` (9.5°, `controls.ts`) is atan(travel / sheet point), with the travel ±0.5 m and the point 2.957 m aft read off photos. Each 3 cm of travel is 0.6° of boom.
+
 ## 2. Underway: observing
 
 Ordered by accuracy gain. Where the existing GPS tracks (2.4) can answer, use them first.
