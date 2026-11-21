@@ -16,7 +16,7 @@ export type Host = 'ggyc' | 'practice';
 export const hostOf = (course: string): Host => course === RC_COURSE || COURSES.find(c => c.id === course)?.group ? 'ggyc' : 'practice';
 
 /**
- * Practice's course picker (r273's host toggle replaced, the owner's choice A, 20 Nov 2026): one list, grouped by who
+ * Practice's course picker (r275's host toggle replaced, the owner's choice A, 20 Nov 2026): one list, grouped by who
  * hosts the course, each club's series under its name, then the practice area's. Picking a course picks its host, so
  * there's no host to choose apart from it, and each new club or series is only another group. A club's committee's
  * choice heads its list.
