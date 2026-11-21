@@ -817,6 +817,8 @@ export class Hud {
     // 28 px in, it ran off it and into the chart's own names; chart audit #2)
     { const t = `WIND ${Math.round(wd.wind.kt)} KT`, tx = opts.cornerFree ? ox - 6 : w - 8; ctx.save(); ctx.textAlign = opts.cornerFree ? 'center' : 'right'; ctx.lineJoin = 'round'; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, tx, oy + 34); ctx.fillText(t, tx, oy + 34); ctx.restore(); }
     const nmPx = 1852 * scale, bar = nmPx > 240 ? nmPx / 10 : nmPx > 120 ? nmPx / 2 : nmPx, lab = nmPx > 240 ? '0.1 nm' : nmPx > 120 ? '0.5 nm' : '1 nm';
+    // (on a halo, so a ship or the chart's print under it doesn't swallow it: chart audit #10)
+    ctx.save(); ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.fillStyle = I.halo; ctx.fillRect(10, h - 28, bar + ctx.measureText(lab).width + 18, 20); ctx.restore();
     ctx.strokeStyle = I.text; ctx.fillStyle = I.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h - 18); ctx.lineTo(16 + bar, h - 18); ctx.moveTo(16, h - 23); ctx.lineTo(16, h - 13); ctx.moveTo(16 + bar, h - 23); ctx.lineTo(16 + bar, h - 13); ctx.stroke();
     ctx.textAlign = 'left'; ctx.fillText(lab, 20 + bar, h - 14);
     ctx.font = '9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'right';
