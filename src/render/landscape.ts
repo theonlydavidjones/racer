@@ -7,6 +7,7 @@ import { LAND, onLand, shoreDist } from '../geo/shore';
 import { HARBOR } from '../geo/marina';
 import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildAlcatraz } from './alcatraz';
+import { buildCityFront, inCityFront } from './cityfront';
 import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
@@ -30,6 +31,7 @@ function rng(seed: number) { return () => { seed = (seed + 0x6d2b79f5) | 0; let 
 export async function addLandscape(scene: THREE.Scene, month: number): Promise<Terrain> {
   const terrain = await buildTerrain(scene, month);
   const alcatraz = await buildAlcatraz(scene);
+  await buildCityFront(scene);
   buildBridge(scene, (x, y) => terrain.heightAt(x, y));
   const grp = new THREE.Group(); scene.add(grp);
   const ground = (lat: number, lon: number) => { const p = LL(lat, lon); return Math.max(0, alcatraz.heightAt(p.x, p.y) ?? terrain.heightAt(p.x, p.y)); };
@@ -114,6 +116,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       q.setFromAxisAngle(up, (rand() < 0.8 ? 0 : rand() * 1.5)); // the street grid, mostly
       m0.compose(P3(p.x, p.y, g - 3 + (h + 3) / 2), q, new THREE.Vector3(w, h + 3, d));
       const c = (h > 40 ? glass : pale)[Math.floor(rand() * (h > 40 ? glass.length : pale.length))].clone().offsetHSL(0, 0, (rand() - 0.5) * 0.06);
+      if (inCityFront(la, lo)) continue; // (the real footprints stand here: render/cityfront.ts. After the draws above, so the boxes elsewhere stay as they were)
       mats.push({ m: m0.clone(), c });
     }
     const cityMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
