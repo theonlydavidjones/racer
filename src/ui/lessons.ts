@@ -25,7 +25,7 @@ export function lessonGridHtml(passed: readonly LessonId[], hasSlip = true): str
     const tip = noSlip ? 'She needs a slip: give her one in the boat editor' : L ? (L.asa === '—' ? 'Beyond ASA 101' : `ASA 101: ${L.asa}`) : 'Coming';
     return `<button type="button" class="lsTile${done ? ' done' : ''}${live ? '' : ' soon'}"${live ? ` data-lesson="${l.id}"` : ' disabled'} title="${esc(tip)}">`
       + `<span class="lsNo">${l.no}</span><span class="lsIc">${l.icon}</span><b>${esc(l.title)}</b>${done ? '<span class="lsOk">✓</span>' : ''}</button>`;
-  }).join('')}</div><div class="lsSum">${n} of 12</div>`;
+  }).join('')}</div><div class="lsSum">${n} of 12 passed</div>`;
 }
 
 /**
