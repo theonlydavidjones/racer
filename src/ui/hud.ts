@@ -47,7 +47,7 @@ import { toast } from './feedback';
 import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
 import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
-import { drawEncNamesAgain, INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
+import { drawEncNamesAgain, encAidPoints, INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { drawCompass } from './compassTape';
@@ -740,6 +740,8 @@ export class Hud {
     const R = Math.min(w, h) / 2 - 6, under = [...(wd.freeSail ? [] : [...wd.C.marks.map(m => m.p), wd.C.pin, wd.C.committee]), ...wd.boats.map(b => ({ x: b.x, y: b.y }))].map(q => {
       const [x, y] = tf(q.x, q.y), dx = x - w / 2, dy = y - h / 2, d = Math.hypot(dx, dy); // (one off the map is shown on its rim)
       return d > R ? [w / 2 + dx / d * R, h / 2 + dy / d * R] : [x, y]; });
+    // (and NOAA's buoys inside the inset, the yellow ones by the line: those off it aren't drawn; chart audit #9)
+    for (const q of encAidPoints()) { const [x, y] = tf(q.x, q.y); if (Math.hypot(x - w / 2, y - h / 2) < R) under.push([x, y]); }
     const free = (x0: number) => !under.some(([x, y]) => x > x0 - 10 && x < x0 + bw + 10 && y > ly0 - 22 && y < ly0 + 10);
     const lx0 = [w / 2 - bw / 2, w / 2 - bw / 2 - bw * 0.75, w / 2 - bw / 2 + bw * 0.75].find(free) ?? w / 2 - bw / 2;
     say(lab, lx0, ly0, 'left');

@@ -31,6 +31,8 @@ export const ENC = chart as unknown as ChartData;
  * chart): zoomed out no further than the ENC cells' box fills the canvas, and panned no further than its edges.
  * `w`, `h`: the canvas in px; the view's scale in px per metre, its center in metres. Changes the view in place.
  */
+/** The chart's buoys and beacons, where they stand (metres): the inset's labels keep off them (chart audit #9). */
+export const encAidPoints = (): readonly { x: number; y: number }[] => built().aids;
 export function keepOnChart(v: { cx: number; cy: number; scale: number }, w: number, h: number): void {
   if (!(w > 0 && h > 0)) return;
   const b = ENC.box, sw = LL(b.south, b.west), ne = LL(b.north, b.east);
