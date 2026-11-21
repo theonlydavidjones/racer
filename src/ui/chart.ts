@@ -2,8 +2,8 @@ import type { SimView } from '../sim/host';
 import type { Command, CommandResult } from '../sim/commands';
 import type { Hud } from './hud';
 import { $ } from './dom';
-import { PLACES } from '../sim/places';
-import { destName, spotName } from './placeNames';
+import { PLACES, latLon } from '../sim/places';
+import { destName } from './placeNames';
 import { onLand } from '../geo/shore';
 import { KT, brg, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
@@ -126,7 +126,8 @@ export class Chart {
       if (d < bd) { bd = d; best = { p: pl.p, name: pl.name }; }
     }
     if (!best && onLand(q)) { this.pick = null; this.info('That\'s land. Pick a spot on the water.'); this.draw(); return; }
-    this.pick = best ?? { p: q, name: spotName(q) };
+    // (a spot on the water goes to the sim named by its position: the pin in the 3D view and on the HUD is told by that form, sim/places.ts isSpot; the player reads the nearest place's name, destName)
+    this.pick = best ?? { p: q, name: latLon(q) };
     this.info(); this.draw();
   }
 
@@ -144,7 +145,7 @@ export class Chart {
     const kind = twa < beat ? 'upwind of you: a beat, tacking' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'downwind: a run';
     const cur = w.currentDrawn(p), ckt = Math.hypot(cur.x, cur.y) / KT;
     const nm = d / 1852;
-    el.innerHTML = `<p><b>${this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
+    el.innerHTML = `<p><b>${destName(this.pick)}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
   }
 
