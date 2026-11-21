@@ -60,7 +60,7 @@ export function tacticsHtml(T: Tactics, boats: { id: number; name: string; short
     + boats.filter(b => b.id !== you).map(b => chip(String(b.id), b.name, b.color, shown.boats.has(b.id))).join('');
   const takes = T.rows.map(r => `<div class="ttk" data-tleg="${r.i}"><b>${r.i ? `L${r.i}` : 'S'}</b><span>${esc(r.take)}${r.side && r.side !== 'middle' ? ` <small>(${r.side})</small>` : ''}</span><em class="${r.vsMid > 0.5 ? 'lost' : r.vsMid < -0.5 ? 'won' : ''}">${Math.abs(r.vsMid) < 0.5 ? '±0' : `${r.vsMid > 0 ? '−' : '+'}${Math.round(Math.abs(r.vsMid))}`} s</em></div>`).join('');
   const legend = `<div class="tcauses">${CAUSES.map(c => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')}</div>`;
-  const how = `<details class="thow"><summary>How it's measured</summary><p>Each leg's time is from each boat's own rounding (or start) to the next; the middle is the fleet's median time on that leg. <b>The ideal</b> is the strategist's planned time for the leg, a perfect sail, each tack or jibe costing what the boat's own physics measured for the wind (from about 3 s in a breeze to over 20 in a drifter): upwind the sim's own fleet takes about a tenth longer, and more on the first beat and round the first mark, while on the reaches and runs it can match or beat the plan (tests/sim-fleet.test.ts): it's a yardstick, not a floor. The bars are your seconds against the fleet's middle, each cause measured for every boat from the race's track and yours set against the fleet's median of it: solid where you lost, pale where you gained. <b>Start</b>: your crossing against the middle's. <b>Shifts</b>: time on a header past 4° held more than 15 s, at the header's cost. <b>Tide</b>: the current along the leg under you against the fleet's (current across the leg is in "speed &amp; other"). <b>Clear air</b>: wind lost to other boats' and ships' shadows and the lee of the land. <b>Tacks &amp; jibes</b>: more of them than the fleet, at a good one's cost, and what each of yours cost past a good one. <b>Penalties</b>: time doing penalty turns. <b>Laylines</b>: time past the layline, measured for you only (against a boat that doesn't overstand). <b>Speed &amp; other</b>: the rest, boat speed, trim, puffs and roundings. Side of the course pays through the wind and the current, so it's shown as where you sailed (left, middle or right looking up the course), not as seconds.</p></details>`;
+  const how = howMeasured();
   return `<div class="tac${opts.compact ? ' compact' : ''}"><div class="tchips">${chips}</div>`
     + `<div class="tgrid"><svg class="tchart" viewBox="0 0 ${W} ${H + 6}" width="${W}" height="${H + 6}" role="img" aria-label="Your time on each leg against the fleet's middle">${axis}${rows}</svg>`
     + (opts.compact ? '' : `<div class="ttakes" style="padding-top:22px">${takes}</div>`) + `</div>${legend}${opts.compact ? `<div class="ttakes">${takes}</div>` : ''}${how}</div>`;
@@ -72,3 +72,21 @@ export function tacticsTop(T: Tactics, place: string, youT: string): string {
   return `<div class="ttiles"><div class="ttile"><b>${esc(place)}</b><span>${esc(youT)}${ideal}</span></div>${T.top.map(t => `<div class="ttile lost"><b>−${t.s} s</b><span>${esc(t.words)}</span></div>`).join('')}</div>`;
 }
 export type { Cause };
+
+/** The tactics view's "How it's measured" (w036): one short line a cause, the method behind each line's hover. */
+export function howMeasured(): string {
+  const li = (k: string, line: string, more = '') => `<li${more ? ` title="${more}"` : ''}><b>${k}</b>: ${line}</li>`;
+  return `<details class="thow"><summary>How it's measured</summary><ul>${[
+    li('The bars', 'your seconds against the fleet\'s middle; solid lost, pale gained', 'Each leg from each boat\'s own rounding (or start) to the next; the middle is the fleet\'s median on that leg, each cause measured for every boat from the race\'s track.'),
+    li('The ideal', 'the strategist\'s planned leg: a yardstick, not a floor', 'A perfect sail, each tack or jibe costing what the boat\'s physics measured for the wind (about 3 s in a breeze to over 20 in a drifter). Upwind the sim\'s fleet takes about a tenth longer; on reaches and runs it can match or beat it (tests/sim-fleet.test.ts).'),
+    li('Start', 'your crossing against the middle\'s'),
+    li('Shifts', 'time on a header past 4°, held over 15 s', 'At the header\'s cost.'),
+    li('Tide', 'the current along the leg, against the fleet\'s', 'Current across the leg is in Speed &amp; other.'),
+    li('Clear air', 'wind lost to boats\', ships\' and the land\'s shadows'),
+    li('Tacks &amp; jibes', 'more than the fleet, and each past a good one', 'At a good one\'s cost.'),
+    li('Penalties', 'time doing penalty turns'),
+    li('Laylines', 'time past the layline, yours only', 'Against a boat that doesn\'t overstand.'),
+    li('Speed &amp; other', 'the rest: speed, trim, puffs, roundings'),
+    li('Side', 'shown as where you sailed, not in seconds', 'Left, middle or right looking up the course: it pays through the wind and the current.')
+  ].join('')}</ul></details>`;
+}

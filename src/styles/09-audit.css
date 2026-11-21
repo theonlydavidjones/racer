@@ -75,6 +75,9 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .tcauses i{display:inline-block;width:10px;height:7px;margin-right:4px}
 .thow summary{cursor:pointer;color:var(--accent);font-size:12px}
 .thow p{font-size:12px;color:var(--muted);max-width:80ch}
+.thow ul{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--muted);max-width:80ch;display:grid;gap:2px}
+.thow li b{color:var(--text);font-weight:600}
+.thow li[title]{cursor:help}
 .ttiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .ttile{background:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:8px 10px}
 .ttile b{display:block;font:700 20px/1.1 var(--f-inst)} .ttile span{color:var(--muted);font-size:12px}
