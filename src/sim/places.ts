@@ -35,7 +35,7 @@ export const PLACES: Place[] = [
   P('m-6', '6 · Fort Mason "M"', 37.811667, -122.43, { shape: 'cylinder' }),
   P('m-16', '16 · Blackaller', 37.81, -122.465, { shape: 'column', look: 'Y' }),
   P('m-15', '15 · Hank Easom (Yellow Bluff)', 37.84, -122.468333, { shape: 'column', look: 'Y' }),
-  P('m-17', '17 · Harding Rock', 37.83824, -122.44599, { shape: 'lighted', look: 'RGR' }),
+  P('m-17', '17 · Harding Rock', 37.83799, -122.44604, { shape: 'lighted', look: 'RGR' }), // (the ENC's "HR", US5OAKFG BOYLAT 0226014C1D7F0032: it was 28 m north; ENC check #3)
   P('m-4', '4 · Knox (Angel Island)', 37.853333, -122.441667, { shape: 'lighted', look: 'R' }),
   P('m-18', '18 · Blossom Rock', 37.81838, -122.40345, { shape: 'lighted', look: 'GRG' }),
   P('m-21', '21 · North Channel G "1"', 37.83202, -122.40865, { shape: 'lighted', look: 'G' }),
