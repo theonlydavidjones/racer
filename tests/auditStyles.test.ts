@@ -12,3 +12,11 @@ describe('audit 1, 2: the Strategist card\'s lines take two lines, not an ellips
     expect(r).toContain('-webkit-line-clamp:2');
   });
 });
+
+describe('audit 6: the chart\'s info box clears the scale bar', () => {
+  it('its bottom is above the bar and its label (the bar is drawn 13 to 23 px up)', () => {
+    const r = rule(css('04-screens.css'), '.ch-info');
+    const bottom = +/bottom:(\d+)px/.exec(r)![1];
+    expect(bottom).toBeGreaterThanOrEqual(40);
+  });
+});
