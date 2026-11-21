@@ -20,3 +20,10 @@ describe('audit 6: the chart\'s info box clears the scale bar', () => {
     expect(bottom).toBeGreaterThanOrEqual(40);
   });
 });
+
+describe('audit 7: the bottom-left helm buttons are as tall as the bottom-right ones', () => {
+  it('40 px, as #viewBar .ib.meta', () => {
+    expect(css('07-band.css')).toMatch(/#helmBar \.ib\{height:40px\}/);
+    expect(rule(css('05-setup.css'), '#viewBar .ib.meta')).toContain('height:40px');
+  });
+});

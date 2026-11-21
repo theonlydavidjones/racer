@@ -34,6 +34,7 @@
 .sb-tillerslot #bPilot svg{width:12px;height:12px}
 /* the tiller pilot, bottom left with the Navigator: while it steers, its panel opens along the bottom edge in the button's
    place, two rows the height of a button, so it never covers the boat or reaches the band (owner, v148) */
+#helmBar .ib{height:40px} /* (as the bottom-right buttons are: the audit found the Crew button 6 px taller) */
 #helmBar #pilot{display:grid;grid-template-columns:repeat(6,auto);grid-template-rows:20px 20px;gap:2px;align-content:center;
   height:46px;box-sizing:border-box;padding:2px 4px;width:max-content;flex:0 0 auto}
 #helmBar #pilot[hidden]{display:none}
