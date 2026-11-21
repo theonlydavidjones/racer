@@ -21,11 +21,12 @@ import { HelmFeed, passageNow } from '../src/sim/navigator';
 import { wharfNearest } from '../src/geo/shore';
 
 const place = (id: string) => PLACES.find(p => p.id === id)!.p;
-type Start = { h?: number; v?: number; wind?: Settings['windKind'] };
+// (`traffic: 0`: no ships or ferries, for a case about pier handling that a vessel's schedule would run down instead)
+type Start = { h?: number; v?: number; wind?: Settings['windKind']; traffic?: 0 };
 function passage(from: { x: number; y: number }, to: string | { x: number; y: number }, seed: number, mins = 60, o: Start = {}) {
   // (as the soak sailed it: her home slip in the Berkeley Marina, ships about)
   const boat = { ...DEFAULT_BOAT, slip: SLIPS.find(s => s.marina === 'berkeley')!.id };
-  const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: to === 'slip' ? 'slip' : '', windKind: o.wind ?? 'west', windKt: 14, current: 'real', sea: 'real', tideDate: '2026-11-14', traffic: 1, fleet: 0, opponents: [], boats: [boat], boat, boatId: boat.id } as Settings;
+  const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: to === 'slip' ? 'slip' : '', windKind: o.wind ?? 'west', windKt: 14, current: 'real', sea: 'real', tideDate: '2026-11-14', traffic: o.traffic ?? 1, fleet: 0, opponents: [], boats: [boat], boat, boatId: boat.id } as Settings;
   const w = new World(COURSES[0], S, seed, { freeSail: true }), u = w.user;
   w.step(DT); u.x = from.x; u.y = from.y;
   // (her heading and way on as she's engaged, where a case gives them: along a pier, or in irons beside its head)
@@ -73,8 +74,11 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     ['beside it, along it', { x: 1984, y: 80 }, 'alcatraz', 107, 3],
     // (the third review's: running along a pier's face at 3 m/s with the way on astern, the way off dead astern turned her
     // through the pier; and in irons by a pier head, a way off across the wind held her hard over till she went astern)
-    ['running along a pier\'s face, the way on astern', { x: 3129, y: -113 }, 'alcatraz', 107, 3, { h: 164, v: 2.9 }],
-    ['in irons by a pier head in a northerly', { x: 2646, y: -122 }, 'alcatraz', 107, 3, { h: 27, v: 0.1, wind: 'north' }],
+    // (both with traffic off: they're about the pilot at a pier, and since the traffic routes' fix (Charts, a16bb939) the
+    // Alcatraz ferry, at 14 min, and the Bay cruise boat by Pier 41, at 1.2 min, run them down; traffic keeping clear of
+    // small boats is its own item)
+    ['running along a pier\'s face, the way on astern', { x: 3129, y: -113 }, 'alcatraz', 107, 3, { h: 164, v: 2.9, traffic: 0 }],
+    ['in irons by a pier head in a northerly', { x: 2646, y: -122 }, 'alcatraz', 107, 3, { h: 27, v: 0.1, wind: 'north', traffic: 0 }],
     // (the fourth review's: 4 m and 8 m off a pier face converging on her, handed over where a turn away kept 6 m, once
     // her turn could give up no more than 2 m; the turn onto an open leg astern, the shorter way round, through the wharf;
     // and a tack the pilot had decided on, toward Bay Bridge Pier D, overriding the way off)
