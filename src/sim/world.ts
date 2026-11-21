@@ -2015,7 +2015,7 @@ export class World {
         const big = v.kind === 'container' || v.kind === 'tanker';
         this.emit({ type: 'toast', ms: 7000, msg: big
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. She isn't racing: the Collision Regulations apply. Expect a wake.` }); // (RRS Part 2 preamble: IRPCAS between a boat racing and a vessel that isn't; 'keep clear' is an RRS term)
       }
       // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
