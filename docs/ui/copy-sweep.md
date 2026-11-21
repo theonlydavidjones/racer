@@ -75,3 +75,15 @@ Racing rules don't apply to her; keep clear, and expect a wake.").
 Sails, Lines, Home berth, Speed; v215's editor uses accordion headers, not "Change" buttons). Every page and every section:
 0 blocks of copy over 90 characters, 0 hovers over 110, no page errors. Nothing to cut. Stills and the scan are in
 `docs/ui/copy-sweep/editor/`.
+
+## Proposed one-line rewrites (for the Coordinator to rule on)
+
+Swell cell (`src/app/setup.ts:290`), now cut mid-aside at "…(the buoy reads 5 ft with the ocean's own wind waves, which…":
+- Proposed: `Swell 1 ft here · 4 ft, 13 s outside the Gate · buoy 5 ft with wind waves`
+
+Past-race caveats (`src/app.ts` ~1793), each cut mid-aside:
+- Course uncertain: `Course 3 as the sheet draws it: a perfect boat in the Fort Point wind (9 kt) finishes in …` (keep the wind and the time; the "perfect boat" explanation goes behind the existing hover/Why)
+- Distance: `Results say 6.1 nm; the sheet, drawn here, says 3.7 nm`
+- Course from a sailor: `Course from the owner, who sailed it: "a last-minute change"`
+
+The cruise boat sentence (`src/sim/world.ts:2018`): the Coordinator proposed "Bay cruise boat approaching at 11 kt. She isn't racing: the Collision Regulations apply. Expect a wake." (a boat racing meeting a vessel not racing follows the Collision Regulations, RRS Part 2 preamble; "keep clear" is an RRS term). Not applied from this session: src/sim is outside the UI brief.
