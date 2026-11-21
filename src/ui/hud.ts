@@ -1,4 +1,5 @@
 import { fillFlagIndex } from './flagIndex';
+import { rivals } from './rivals';
 import { turnsWord } from './words';
 import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
@@ -464,8 +465,7 @@ export class Hud {
   /** The most pressing nearby boat: who keeps clear, under which rule, and time to collision. */
   private situationFull(w: SimView, u: Boat): void {
     let best: { o: Boat; r: ReturnType<SimView['rights']>; c: { t: number; d: number }; d: number; risk: boolean } | null = null, bestScore = -1e9;
-    for (const o of w.boats) {
-      if (o.isUser) continue;
+    for (const o of rivals(w.boats, u)) { // (never herself, however she's sailed: ui/rivals.ts)
       const d = dist(u, o); if (d > 90) continue;
       const r = w.rights(u, o), c = cpa(u, o), risk = c.t < 10 && c.d < 14;
       const score = risk ? 100 - c.t * 5 - c.d : -d;
