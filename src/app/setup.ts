@@ -137,7 +137,7 @@ function buildSetupChoices(): void {
 function courseCard(): void {
   const C = app.w.C;
   const chips = ['<span class="m">Start</span>']
-    .concat(C.marks.map(m => `<span class="m ${m.type === 'pass' ? 'x' : m.side}">${m.name.split(' ')[0]}${m.type === 'pass' ? '' : ' ' + sideWord(m.side)}</span>`))
+    .concat(C.marks.map(m => `<span class="m ${m.type === 'pass' ? 'x' : m.side}" title="${m.type === 'pass' ? '' : `Leave it to ${sideWord(m.side)}`}">${m.name.split(' ')[0]}${m.type === 'pass' ? '' : ' ' + (m.side === 's' ? 'stbd' : 'port')}</span>`)) // (the chips keep "stbd": "starboard" put the longest courses on two lines; the chip's color says it too: w035)
     .concat(['<span class="m">Finish</span>']);
   const sig = app.w.courseSignal;
   $('courseCard').innerHTML = (sig ? `<div class="rcpick"><b>The committee will fly course ${sig.no}</b><small>${sig.why}</small></div>` : '')
