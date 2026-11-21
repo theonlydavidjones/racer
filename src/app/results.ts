@@ -307,16 +307,20 @@ function protestSection(): void {
   el.hidden = !mine.length; if (!mine.length) { el.innerHTML = ''; return; }
   const tick = (ok: boolean, what: string) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✔' : '✘'}</span> ${what}`;
   const OUT: Record<Decision['outcome'], string> = { invalid: 'Protest invalid: not hailed and flagged at the first reasonable opportunity (Rule 60.4)', dismissed: 'Dismissed: no rule broken', exonerated: 'No penalty: exonerated (Rule 43.1)', penaltyTaken: 'Penalty taken: no further penalty (Rule 60.5(c)(2))', notRacing: 'No penalty: not racing (Part 2 preamble)', DSQ: 'Disqualified (Rule 60.5(c))', pending: 'Still racing: her turns still to do', retired: 'Retired (RET): nothing to decide' };
+  const SHORT: Record<Decision['outcome'], string> = { invalid: 'Invalid', dismissed: 'Dismissed', exonerated: 'Exonerated', penaltyTaken: 'Turns taken', notRacing: 'Not racing', DSQ: 'DSQ', pending: 'Turns to do', retired: 'RET' };
   const clipOf = (t: number) => app.incidentClips.find(c => c.t != null && Math.abs(c.t - t) < 1.5);
   el.innerHTML = '<h3>Protests</h3>' + mine.map((d, i) => {
     const p = d.protest, key = `${p.vs}@${p.t}`, rule = d.rule && d.rule in RULES ? RULES[d.rule as keyof typeof RULES][0] : d.rule ? `Rule ${d.rule}` : 'no rule found';
     const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
+    // (decided: one row, who · rule · the decision, the rest behind a click (the debrief audit's M2, 21 Nov 2026))
+    const ruleNo = d.rule ? `Rule ${d.rule}` : 'No rule';
+    const row = `<summary class="pRow"><span>${nm(p.by)} → ${p.vs === u.id ? 'You' : nm(p.vs)}</span><span title="${app.esc(rule).replace(/"/g, '&quot;')}">${ruleNo}</span><b class="${d.outcome === 'DSQ' ? 'bad' : ''}" title="${app.esc(OUT[d.outcome]).replace(/"/g, '&quot;')}">${SHORT[d.outcome]}</b>${clipOf(p.t) ? `<a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</summary>`;
     if (owesAnswer(d)) return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" class="ghost" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
     const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
     const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : p.kind === 'mark' ? 'The mark' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
-    return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clipOf(p.t) ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
+    return `<details class="pOne">${row}<div class="pMore"><div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}</div>`
       + `<div class="pTiles">${tiles.map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
-      + `<div class="pDec${d.outcome === 'DSQ' ? ' bad' : ''}">${d.outcome === 'DSQ' ? `${p.vs === u.id ? 'You' : w.boats[p.vs].name}: ` : ''}${OUT[d.outcome]}</div>`;
+      + `<div class="pDec${d.outcome === 'DSQ' ? ' bad' : ''}">${d.outcome === 'DSQ' ? `${p.vs === u.id ? 'You' : w.boats[p.vs].name}: ` : ''}${OUT[d.outcome]}</div></div></details>`;
   }).join('');
   el.querySelectorAll<HTMLButtonElement>('[data-pr]').forEach(b => b.onclick = () => {
     const key = b.dataset.key!, how = b.dataset.pr as 'retire' | 'hearing'; answered.set(key, how);
@@ -326,10 +330,10 @@ function protestSection(): void {
     const t0 = performance.now(), wait = () => { if (app.w.user.retired || performance.now() - t0 > 3000) showResults(); else requestAnimationFrame(wait); }; wait();
   });
   el.querySelectorAll<HTMLAnchorElement>('[data-pclip]').forEach(a => a.onclick = e => {
-    e.preventDefault(); const c = clipOf(mine[Number(a.dataset.pclip)].protest.t);
+    e.preventDefault(); e.stopPropagation(); const c = clipOf(mine[Number(a.dataset.pclip)].protest.t);
     // (in its own small canvas in the section: the incident overlay's Continue would let the finished race run on)
     let cv = el.querySelector<HTMLCanvasElement>('canvas.pClip');
-    if (!cv) { cv = document.createElement('canvas'); cv.className = 'pClip'; a.closest('div')!.after(cv); }
+    if (!cv) { cv = document.createElement('canvas'); cv.className = 'pClip'; a.closest('details')!.after(cv); }
     if (c) { hearingView?.stop(); hearingView = new ReplayView(cv); hearingView.play(w, c.clip); }
   });
 }
