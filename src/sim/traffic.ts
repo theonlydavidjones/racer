@@ -26,22 +26,35 @@ export const VESSEL: Record<VesselKind, VesselType> = {
 };
 
 const route = (pts: [number, number][]) => pts.map(([la, lo]) => LL(la, lo));
-// Approximate tracks (lat, lon). Ships keep to the deep water north of the race area, inside Alcatraz.
+// Tracks (lat, lon). The big ships keep to NOAA's traffic scheme (ENC cells US5OAKFF, FG, FH; ENC check #4): inbound by
+// the lanes from sea (TSSLPT 0E22 and 6FB2, 69° and 55°), the south half of the Gate's precautionary area, the
+// eastbound lane south of Alcatraz's separation zone (C832, 90°), across the precautionary area east of it, then south of
+// Yerba Buena Island under the Bay Bridge's west span into the Oakland Inner Harbor channel (dredged, 14.6 m); outbound
+// the same way back on the other side: the westbound lane north of the separation zone (6F4A, 258°), the north half of
+// the Gate, the outbound lanes (A3CF, 4E4C: 240° and 245°). Each keeps to starboard, in water of 9 m (30 ft) or more or the
+// dredged channel, never across a separation zone or line or land (tests/traffic.test.ts). One way each: a ship
+// arriving is berthed, and one leaving is at sea (a loop's dwell at its start: the next ship).
 export const ROUTES: Record<string, Vec[]> = {
-  channel: route([[37.8060, -122.5350], [37.8160, -122.4790], [37.8240, -122.4500], [37.8330, -122.4200], [37.8240, -122.3900], [37.8060, -122.3500]]),
+  channel: route([[37.7895, -122.5480], [37.7914, -122.5400], [37.7945, -122.5250], [37.7980, -122.5150], [37.8045, -122.5050], [37.8098, -122.4950],
+    [37.8155, -122.4790], [37.8178, -122.4600], [37.8186, -122.4450], [37.8188, -122.4300], [37.8150, -122.4050], [37.8045, -122.3800], [37.8025, -122.3660],
+    [37.8020, -122.3560], [37.8030, -122.3500]]),
+  channelOut: route([[37.8030, -122.3500], [37.8040, -122.3620], [37.8060, -122.3700], [37.8085, -122.3790], [37.8200, -122.4000], [37.8320, -122.4250],
+    [37.8300, -122.4450], [37.8255, -122.4600], [37.8215, -122.4790], [37.8137, -122.5000], [37.8070, -122.5200], [37.8005, -122.5400], [37.7960, -122.5800]]),
   // (out clear of the pier heads: Piers 35 to 27 reach out to 37.810; geo/shore.ts)
   sausalito: route([[37.7960, -122.3910], [37.8050, -122.3930], [37.8110, -122.4040], [37.8190, -122.4330], [37.8400, -122.4640], [37.8560, -122.4770]]),
   alcatraz: route([[37.8085, -122.4030], // (off the head of Pier 33, the Alcatraz landing)
-     [37.8180, -122.4130], [37.8262, -122.4212]]),
-  // (from the berth on the west side of Pier 41, where OpenStreetMap's ferry routes end, out round Pier 45 and the Wharf's breakwater)
-  tour: route([[37.8102, -122.4135], [37.8128, -122.4140], [37.8128, -122.4300], [37.8145, -122.4560], [37.8195, -122.4760], [37.8280, -122.4790], [37.8300, -122.4500], [37.8300, -122.4250], [37.8200, -122.4120], [37.8102, -122.4135]]),
-  coastguard: route([[37.8325, -122.4740], [37.8200, -122.4600], [37.8150, -122.4400], [37.8260, -122.4350], [37.8325, -122.4740]])
+     [37.8180, -122.4130], [37.8252, -122.4202]]), // (alongside the island's dock: the old end was 110 m ashore; ENC check #5)
+  // (from the berth on the west side of Pier 41, where OpenStreetMap's ferry routes end, out round Pier 45 and the Wharf's breakwater;
+  // turning under the bridge mid-Gate, not at Lime Point, where the old turn was ashore: ENC check #5)
+  tour: route([[37.8102, -122.4135], [37.8128, -122.4140], [37.8128, -122.4300], [37.8145, -122.4560], [37.8195, -122.4760], [37.8230, -122.4850], [37.8240, -122.4745], [37.8300, -122.4500], [37.8300, -122.4250], [37.8285, -122.4160], [37.8200, -122.4120], [37.8102, -122.4135]]), // (round Alcatraz's east end, not over it)
+  // (from the station on Horseshoe Bay's east side, out by its mouth, not across the breakwater and the pier: ENC check #5)
+  coastguard: route([[37.8325, -122.4724], [37.8305, -122.4724], [37.8200, -122.4600], [37.8150, -122.4400], [37.8260, -122.4350], [37.8305, -122.4724], [37.8325, -122.4724]])
 };
 
 export interface Service { kind: VesselKind; route: string; loop: boolean; phase: number; dwell: number }
 export const SERVICES: Service[] = [
-  { kind: 'container', route: 'channel', loop: false, phase: 0.15, dwell: 1500 },
-  { kind: 'tanker', route: 'channel', loop: false, phase: 0.62, dwell: 2100 },
+  { kind: 'container', route: 'channel', loop: true, phase: 0.15, dwell: 1500 }, // (inbound, one way: see ROUTES)
+  { kind: 'tanker', route: 'channelOut', loop: true, phase: 0.62, dwell: 2100 }, // (outbound)
   { kind: 'ferry', route: 'sausalito', loop: false, phase: 0.3, dwell: 600 },
   { kind: 'alcatraz', route: 'alcatraz', loop: false, phase: 0.1, dwell: 420 },
   { kind: 'tour', route: 'tour', loop: true, phase: 0.05, dwell: 300 },
