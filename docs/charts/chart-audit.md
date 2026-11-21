@@ -66,4 +66,4 @@ Each fix is its own commit, citing "chart audit #n". The before/after stills are
 |---|--------|--------------|
 | 1 | 2d78d92b: NOAA's names whole inside the frame or left out ("…te Bridge", "…9M HORN") | 01b-names-left-edge.png |
 | 4 | 1d4a6edb: the destination's ETA drawn over the laylines | 04b-eta.png |
-| 9 | the commit after 1d4a6edb: the inset's label keeps off NOAA's buoys too | 09b-inset-buoy.png |
+| 9 | e20d6c0c: the inset's label keeps off NOAA's buoys too | 09b-inset-buoy.png |
