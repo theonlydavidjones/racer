@@ -43,7 +43,7 @@ export function paintSeasonView(d: SeasonViewData): void {
   // the calendar: every race of the series, published or still to come
   const tiles = series.races.map(r => {
     const cls = r.abandoned ? 'abn' : r.no === chosen ? 'on' : places[r.no] != null ? 'done' : '';
-    const sub = r.abandoned ? 'Abandoned' : places[r.no] != null ? ord(places[r.no]) : r.no === next ? 'Next' : '';
+    const sub = r.abandoned ? 'Abandoned' : places[r.no] != null ? ord(places[r.no]) : r.no === next ? 'To sail' : '';
     return `<button type="button" class="sv-day ${cls}" data-sv-race="${r.no}"${r.abandoned ? ' disabled' : ''} title="${r.abandoned ? 'Abandoned: every boat scored ABN' : places[r.no] != null ? 'Sail it again: your saved result is replaced' : 'Sail it: the day\'s real wind and tide'}">${dateTile(r.date)}<span class="t-text"><span class="sv-r">RACE ${r.no}</span><span class="sv-res">${sub || '&nbsp;'}</span></span></button>`;
   });
   // (the race days still to come: announced, dashed, sailed once the club publishes the race; club/season.ts calendar)
