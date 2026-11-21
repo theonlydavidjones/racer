@@ -282,13 +282,12 @@ function oneSail(q: number, a: number, ce: number, luffing: boolean, area: numbe
   // degree, tan β times the wing's slope: the drive falls away and the heel creeps up the harder she's sheeted; where
   // the stall starts and that its drag grows at that rate are estimates, no sail's measured curve was found, 21 Nov 2026)
   const tb = Math.tan(Math.min(a, 80 * D2R)), past = t.flow === 'stalled' ? Math.max(0, t.err - STALL_START) * slope * up : 0;
-  // (eased below it, the drag falls with the lift at the same rate, less the induced drag's own fall: the drive is at
-  // its peak at the best angle from both sides, and falls away as the square of the ease, the induced drag's curve. A
-  // degree or two eased costs next to no drive and takes heel off at once; never below the sail's profile drag)
-  const under = k < 1 ? (k - 1) * (cl0 * tb - 2 * ce * cl0 * cl0 * m) : 0;
+  // (eased below it, the lift falls at the wing's slope and the induced drag with it, as ORC's own depowering does
+  // (eq. 5.48, `flat` scaling CL): the drive falls at first order, slope·(sinβ − 2·ce·CL·cosβ) a radian, the heeling force
+  // faster, slope·(cosβ + 2·ce·CL·sinβ): about 0.3 N of drive given up for each newton of heeling force shed, beating)
   const over = (k > 1 ? Math.max(0, (k - 1) * cl0 * tb - ce * cl0 * cl0 * (k * k - 1) * m) : 0) + past * tb;
   const prof = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07); // (a worn sail's hooked leech adds its own profile drag)
-  const cd = prof + Math.max(0, ce * cl * cl * m + over + under);
+  const cd = prof + ce * cl * cl * m + over;
   const L = q * area * cl, D = q * area * cd;
   return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
 }

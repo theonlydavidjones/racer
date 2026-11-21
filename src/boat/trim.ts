@@ -72,9 +72,10 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   // flow along the sail (upwind/reaching)
   let effUp = 1, flow: Flow = 'good', amount = 0;
   if (err < -LUFF_START) { amount = clamp((-err - LUFF_START) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
-  // (eased below the best angle the sail makes less lift at the wing's slope, and less drag with it: the force model,
-  // balance.ts oneSail, takes heel off at once and keeps the drive at its peak there, falling as the square of the
-  // ease; the luff's own loss above is the drive's)
+  // (eased below the best angle the sail makes less lift at the wing's slope: the force model, balance.ts oneSail, takes
+  // heel off at once. The speed's loss stays the luff's own, above: the force model's drive falls at first order (ORC's
+  // depowering, about 0.3 N for each newton of heel shed), and that is what the crew's depowering search weighs a
+  // deliberate ease by; a degree or two of a sheet's error on its own the boat doesn't pay for, as before)
   else if (err > STALL_START) { amount = clamp((err - STALL_START) / STALL_SPAN, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
