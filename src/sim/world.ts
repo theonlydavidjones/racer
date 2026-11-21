@@ -83,6 +83,8 @@ const OFF_HELD_S = 5;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
+/** How far off her own slip the crew can get her lines ready, m (freeBerthsNear): its fairway and the turn into it. */
+const HOME_REACH = 50;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -2086,7 +2088,10 @@ export class World {
   freeBerthsNear(p: Vec, within = 16): Slip[] {
     const H = harborAt(p); if (!H) return [];
     const mine = this.homeSlip?.id;
-    return slipsIn(H.id).filter(s => (s.id === mine || !slipTaken(s)) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
+    // (her own slip from further off: lines got ready as she turns into its fairway, as a crew does coming home, not only
+    // once she's at its mouth: the owner, 18 Nov 2026, "the tie-up option never appeared" coming home to slip 572, where
+    // its fairway square lies 16 m off and G there said "no free berth here")
+    return slipsIn(H.id).filter(s => s.id === mine ? dist(s.p, p) < HOME_REACH : !slipTaken(s) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
   }
   /**
    * Lines ready (the Crew panel, or G coming in): a hand goes to the shrouds on the dock's side with the line coiled (the bow

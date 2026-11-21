@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import { LESSON_MARKS, LessonTracker } from '../src/sim/lessons';
+import { pointBand, LESSON_MARKS, LessonTracker } from '../src/sim/lessons';
 import { onLand } from '../src/geo/shore';
 import { slipsIn } from '../src/geo/marina';
 import { KT } from '../src/core/math';
@@ -205,5 +205,16 @@ describe('Learn to sail: the lessons\' checks', () => {
     Object.assign(u, { x: back.x, y: back.y, h: slip.heading, v: 0.4, astern: 0 });
     for (let i = 0; i < 60 * 20 && !w.lesson!.passed; i++) w.step(DT);
     expect(u.docked).toBeTruthy(); expect(w.lesson!.passed).toBe(true);
+  });
+});
+
+// (the v213 review: the beat angle runs past 67° in light air in a chop, boat/seaway.ts beatInChop, and the close reach's
+// band, from 8° below it to 75°, turned inside out)
+describe('the points of sail lesson keeps its bands the right way round', () => {
+  it('in light air in a big chop, where her beat angle is wide, each band runs low to high', () => {
+    for (const [kt, hs] of [[1, 0.5], [1.25, 0.5], [0.75, 0.4], [2, 0.8], [12, 0]]) {
+      const b = { ww: { kt }, sea: { hsW: hs, tpW: 2 + 2 * hs, hsS: 0, tpS: 10, fromW: 0, fromS: 0 } } as never;
+      for (let k = 0; k < 5; k++) { const [lo, hi] = pointBand(k, b); expect(lo, `${kt} kt, ${hs} m, band ${k}`).toBeLessThanOrEqual(hi); }
+    }
   });
 });

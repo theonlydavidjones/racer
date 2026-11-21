@@ -93,15 +93,17 @@ let chopNext = 0;
  * doesn't step closer than she sailed in flat water (the physics review of beat-chop, 20 Nov 2026: it stepped 0.8° toward pinching at 2 cm).
  * Searched from B0 to B1, wide enough that in light air in a chop, where her best is footing off at 60–90°, the window
  * isn't cut short: cut at 65°, it gave 56° at 1 kt in a 0.3 m chop, where she made no headway at all, and gave up 15%
- * at 2 kt in 0.8 m. With no headway at any angle, BEAT_NO_WAY. Within 0.9% of the most she could make good in any wind
- * from 4 kt and any chop, 1% from 3 kt, 3.1% from 2 kt (tests/beat-chop.test.ts); under 2 kt in a chop she barely makes
- * way at any angle, and the angle found may give up a few percent of almost nothing. In light air in a big chop (2–3 kt,
- * 0.5 m and more) the best angle itself moves fast, 2–6° a quarter knot, as the sea's drag overtakes the drive.
- * ESTIMATES, the widths.
+ * at 2 kt in 0.8 m. With no headway at any angle, the angle she's fastest at, footing off for speed (at 65°, where it
+ * was, it jumped 21° from its neighbors: 86° at 0.75 kt in 0.4 m, then 65° at 0.5 m; the v213 review). Within 0.9% of
+ * the most she could make good in any wind from 4 kt and any chop, 1% from 3 kt, 3.1% from 2 kt
+ * (tests/beat-chop.test.ts). In light air in a big chop (2–3 kt, 0.5 m and more) the best angle itself moves fast, 2–6°
+ * a quarter knot, as the sea's drag overtakes the drive. Under 2 kt in a chop it's rough: the speed made good is a
+ * sliver near nothing, its top wanders, 76°, 80°, 76° at 1 kt in 0.28, 0.30 and 0.32 m, and the angle found can be
+ * one where she's stopped (77° at 1.25 kt in 0.5 m, where 86° makes way). Left so: the sim's own sea has no chop under
+ * about 1.9 kt (environment/sea.ts: glassy below 1 m/s), so a boat there takes the flat-water angle (beatFor) and
+ * never sails this; only a caller passing its own chop reaches it (the v213 review). ESTIMATES, the widths.
  */
 const BEAT_SMOOTH_KT = 0.75, BEAT_SMOOTH_LIGHT = 0.25, BEAT_SMOOTH_DEG = 4, B0 = 30, B1 = 90, BN = Math.round((B1 - B0) / 0.5) + 1;
-/** The angle when she makes no headway at any (deg): footing off, wide, her only hope (a judgement). */
-const BEAT_NO_WAY = 65;
 const beatRaw = new Float64Array(BN), beatSm = new Float64Array(BN);
 function beatSearch(kt: number, hs: number, tp: number): number {
   // the speed made good at each half degree: the wind as it is and BEAT_SMOOTH_KT either side (¼ ½ ¼); in light air a
@@ -114,8 +116,9 @@ function beatSearch(kt: number, hs: number, tp: number): number {
   const W = Math.round(BEAT_SMOOTH_DEG / 0.5); let best = -1, bestV = -Infinity;
   for (let i = 0; i < BN; i++) { let sum = 0, wt = 0; for (let k = -W + 1; k < W; k++) { const j = i + k; if (j < 0 || j >= BN) continue; const w = W - Math.abs(k); sum += w * beatRaw[j]; wt += w; } beatSm[i] = sum / wt; if (beatSm[i] > bestV) { bestV = beatSm[i]; best = i; } }
   // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
-  // widest, footing off for speed being her only hope)
-  if (!(bestV > 0)) return NaN;
+  // angle she's fastest at, footing off for speed being her only hope; the widest of equals, and the widest searched
+  // if she's stopped at every one)
+  if (!(bestV > 0)) { let fi = BN - 1, fv = 0; for (let i = 0; i < BN; i++) { const v = speedInChop(kt, B0 + i * 0.5, hs, tp); if (v >= fv) { fv = v; fi = i; } } return B0 + fi * 0.5; }
   if (best <= 0 || best >= BN - 1) return B0 + best * 0.5;
   const l = beatSm[best - 1], m = beatSm[best], r = beatSm[best + 1], d = l - 2 * m + r;
   return B0 + (best + (d < 0 ? clamp(0.5 * (l - r) / d, -0.5, 0.5) : 0)) * 0.5;
@@ -125,16 +128,15 @@ const beatCache = new Map<number, number>();
 const leanCache = new Map<number, number>();
 function lean(kt: number): number {
   const k = Math.round(kt * 4); let v = leanCache.get(k);
-  if (v === undefined) { const s = beatSearch(k / 4, 0, 0); v = s === s ? beatAngleCalm(k / 4) - s : 0; leanCache.set(k, v); }
+  if (v === undefined) { v = beatAngleCalm(k / 4) - beatSearch(k / 4, 0, 0); leanCache.set(k, v); }
   return v;
 }
 /** The chop over which the flat-water lean is faded out (m): by then the sea's own shape of the curve governs the top,
  * and taken off whole in a big one it overshot a sharp top (1.2% given up at 6.5 kt in 0.8 m). An estimate
  * (docs/CONSTANTS.md). */
 const LEAN_FADE = 0.3;
-/** The angle from beatSearch's top: its flat-water lean taken off, fading out by LEAN_FADE of chop; or BEAT_NO_WAY with
- * no headway. */
-const fromSearch = (kt: number, hs: number, tp: number) => { const s = beatSearch(kt, hs, tp); return s === s ? s + lean(kt) * Math.max(0, 1 - hs / LEAN_FADE) : BEAT_NO_WAY; };
+/** The angle from beatSearch's top: its flat-water lean taken off, fading out by LEAN_FADE of chop. */
+const fromSearch = (kt: number, hs: number, tp: number) => beatSearch(kt, hs, tp) + lean(kt) * Math.max(0, 1 - hs / LEAN_FADE);
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
   // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)

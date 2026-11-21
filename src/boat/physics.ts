@@ -81,6 +81,15 @@ export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: nu
   return Math.min(SLOW_TACK, TACK_WAY * Math.max(targetFor(her, beatFor(her)), targetFor(flat, beatFor(flat))));
 };
 
+/** Whether bearing away 10° below close-hauled can build her the way for a tack (slowTack × 1.15, as the AI asks) in the
+ * wind and chop she has. Not always: the chop is the day's wind's (world.ts seaWind), slowTack the wind at her, so in a
+ * deep lull or another boat's shadow on a breezy day her footed speed in the chop can stay under it (0.5 m chop and
+ * 2 kt at her), and footing for it she never came round (v213 review). Then she wears round instead. */
+export const footReaches = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): boolean => {
+  const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
+  return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15;
+};
+
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 
@@ -173,6 +182,8 @@ export function sailPlan(b: Boat): SailPlan {
 export const HOIST = { main: 5, jib: 5, strikeMain: 4, strikeJib: 3 };
 /** How far up each sail is (0..1 of its luff): hauled up at the mast (b.rig), then its last inches taken up by the halyard
  * at the piano (controls.ts HALYARD). A boat with no b.rig has both hauled up. */
+/** Below this share of its luff up, the jib is struck: down on the foredeck, out of the air (step's sailForces). */
+export const JIB_STRUCK = 0.02;
 export const sailUp = (b: Boat, k: 'main' | 'jib'): number => (b.rig ? hoistedShare(b.rig[k], (k === 'main' ? b.rig.mainTaut : b.rig.jibTaut) ?? 1, k) : 1);
 /**
  * At the dock (and walked or pushed off it): the crew sit centred on the benches, not hiked or to leeward for a heel she
@@ -489,13 +500,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
-  const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+  // (the air sees no jib once it's struck: on the main alone the rig's span, its induced drag, its centre of effort's
+  // height and its flatness are the main's by itself, not a phantom jib's; part-hoisted it's there, its force scaled
+  // by the hoist below. r037, the owner, 15 Nov 2026: "sailing on just jib or just main")
+  const jibAir = jibOn && sailUp(b, 'jib') > JIB_STRUCK ? jibOn : null;
+  const sf = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibAir, b.luff);
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // your boat's condition: bottom, sails' age, spars, weight
   // an old sail's extra profile drag (hooked leech) and lost lift: the drive it costs, against the same shape in sound cloth
   let wornDrive = 1;
   if (cond && (b.shape.main.cd0 || b.shape.main.clMul || b.shape.jib?.cd0 || b.shape.jib?.clMul)) {
     const sound = (sh: Shape): Shape => ({ depth: sh.depth, draft: sh.draft, twist: sh.twist, ceAft: sh.ceAft });
-    const s0 = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibOn ? { trim: jibOn.trim, shape: sound(jibOn.shape) } : null, b.luff);
+    const s0 = sailForces(apF.aws, apF.awa, { trim: b.trim.main, shape: sound(b.shape.main), out: b.sheets.main }, jibAir ? { trim: jibAir.trim, shape: sound(jibAir.shape) } : null, b.luff);
     const d0 = s0.main.drive + s0.jib.drive, d1 = sf.main.drive + sf.jib.drive;
     if (d0 > 5) wornDrive = clamp(d1 / d0, 0.6, 1.05);
   }
@@ -571,7 +586,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const sway = rigSway(b), surge = rigSurge(b);
   if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
     const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across, b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
-    const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
+    const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibAir, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - dm * sf0.main.drive - dj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
   }

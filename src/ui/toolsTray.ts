@@ -3,7 +3,7 @@
  * shit we've built, like wind-in-air and wind-over-sails, but it's hard to find these things"; built from
  * design/features-tray with the owner's changes: labeled Tools, compact, Hail left at the top level). A button in the top
  * bar opens a small tray of icon tiles: each does what its key does, shows its key, and is lit while its feature is on;
- * a dashed tile is an action, not a switch. Time's speed is the tray's last row.
+ * a dashed tile is an action, not a switch.
  */
 export interface Tool {
   id: string; label: string; icon: string;
@@ -19,6 +19,7 @@ const svg = (d: string) => `<svg viewBox="0 0 20 20" aria-hidden="true">${d}</sv
 /** 20×20 line icons, as the top bar's. */
 export const TOOL_ICONS = {
   wind: '<path d="M3 7h9a2.5 2.5 0 1 0-2.5-2.5"/><path d="M3 11h12a2.5 2.5 0 1 1-2.5 2.5"/><path d="M3 15h6"/>',
+  rose: '<circle cx="10" cy="10" r="6.5"/><path d="M10 3.5v13M3.5 10h13"/>',
   flow: '<path d="M4 4c5 1 8 5 9 12"/><path d="M8 3c4 2 6 6 7 12"/><path d="M3 9c3 1 5 3 6 7"/>',
   band: '<path d="M5 3v14M10 3v14M15 3v14"/><path d="M3.5 7h3M8.5 12h3M13.5 9h3"/>',
   chart: '<path d="M3 5l4-2 6 2 4-2v12l-4 2-6-2-4 2Z"/><path d="M7 3v12M13 5v12"/>',
@@ -33,13 +34,12 @@ export const TOOL_ICONS = {
 };
 
 export class ToolsTray {
-  constructor(private btn: HTMLElement, private el: HTMLElement, private tools: Tool[], private speed: { get: () => number; set: (v: number) => void }) {
+  constructor(private btn: HTMLElement, private el: HTMLElement, private tools: Tool[]) {
     btn.addEventListener('click', e => { e.stopPropagation(); this.toggle(); });
     el.addEventListener('click', e => {
       e.stopPropagation();
-      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tool]'), s = (e.target as HTMLElement).closest<HTMLElement>('[data-speed]');
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tool]');
       if (t) { this.tools.find(x => x.id === t.dataset.tool)?.act(); this.refresh(); }
-      if (s) { this.speed.set(+s.dataset.speed!); this.refresh(); }
     });
     // (a click anywhere else closes it, as the other small overlays do)
     addEventListener('pointerdown', e => { if (this.open && !el.contains(e.target as Node) && !btn.contains(e.target as Node)) this.close(); });
@@ -48,15 +48,12 @@ export class ToolsTray {
   toggle(): void { if (this.open) this.close(); else { this.render(); this.el.hidden = false; this.btn.classList.add('on'); } }
   close(): void { this.el.hidden = true; this.btn.classList.remove('on'); }
   private render(): void {
-    this.el.innerHTML = this.tools.filter(t => !t.hidden?.()).map(t => `<button type="button" class="tt${t.on ? '' : ' act'}" data-tool="${t.id}" title="${t.label} (${t.key()})"><kbd>${t.key()}</kbd>${svg(TOOL_ICONS[t.icon as keyof typeof TOOL_ICONS] ?? '')}<span>${t.label}</span></button>`).join('')
-      + `<div class="tt-speed">${svg(TOOL_ICONS.speed)}<span>Speed</span><span class="seg">${[1, 2, 4].map(v => `<button type="button" data-speed="${v}">${v}×</button>`).join('')}</span></div>`;
+    this.el.innerHTML = this.tools.filter(t => !t.hidden?.()).map(t => `<button type="button" class="tt${t.on ? '' : ' act'}" data-tool="${t.id}" title="${t.label} (${t.key()})"><kbd>${t.key()}</kbd>${svg(TOOL_ICONS[t.icon as keyof typeof TOOL_ICONS] ?? '')}<span>${t.label}</span></button>`).join('');
     this.refresh();
   }
   /** The tiles lit for what's on now (on open, after a press, and each frame while it's open). */
   refresh(): void {
     if (!this.open && this.el.childElementCount === 0) return;
     for (const t of this.tools) { const b = this.el.querySelector(`[data-tool="${t.id}"]`); if (b && t.on) b.classList.toggle('on', t.on()); }
-    const v = this.speed.get();
-    this.el.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => b.classList.toggle('on', +b.dataset.speed! === v));
   }
 }

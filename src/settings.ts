@@ -2,6 +2,7 @@ import type { LessonId } from './sim/lessons';
 import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
+import { PLACES } from './sim/places';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings' | 'lesson'; // (and a Learn to sail lesson, open water, alone: sim/lessons.ts) full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
@@ -106,6 +107,8 @@ export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet' | 'dri
   return { ...s, opponents: pool.slice(0, n), fleet: n };
 };
 
+/** Whether `id` is one of the old named spots (sim/places.ts: places that aren't marks or buoys), no longer offered to the player. */
+export const isRemovedSpot = (id: string | undefined): boolean => !!id && PLACES.some(p => p.id === id && !p.buoy);
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };
   try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) Object.assign(s, saved); } catch { /* private mode etc. */ }
@@ -126,6 +129,10 @@ export function loadSettings(): Settings {
   s.fleet = s.opponents.length;
   // (a 'Wind from' saved before Turn the wind replaced it would pin the wind with nothing on screen to show it: drop it)
   s.windDir = null;
+  // (the old named spots are no longer places to start from or sail to: a save that names one starts from her slip, and sails to
+  // nowhere in particular; the owner, 20 Nov 2026. The spots stay in sim/places.ts as plain positions for the AI and the tests.)
+  if (isRemovedSpot(s.sailFrom)) s.sailFrom = 'slip';
+  if (isRemovedSpot(s.sailTo)) s.sailTo = '';
   return s;
 }
 export function saveSettings(s: Settings): void {
