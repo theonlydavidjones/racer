@@ -1,0 +1,8 @@
+{"label":"12 boats · hers USA 12345","view":"collapsed","width":104,"rightEdges":[121],"issues":[]}
+{"label":"12 boats · hers USA 12345","view":"expanded","width":104,"rightEdges":[232],"issues":["name hidden: Fjord","name hidden: Skarv","name hidden: Kiwi","12345: \"You\" dropped"]}
+{"label":"12 boats · hers GBR 1234, near the back","view":"collapsed","width":104,"rightEdges":[379],"issues":[]}
+{"label":"12 boats · hers GBR 1234, near the back","view":"expanded","width":104,"rightEdges":[490],"issues":["name hidden: Fjord","name hidden: Skarv","name hidden: Kiwi"]}
+{"label":"12 boats · hers USA 12345, a 5-digit neighbor","view":"collapsed","width":104,"rightEdges":[637],"issues":["name hidden: Kiwi","12345: \"You\" dropped","name hidden: Ran"]}
+{"label":"12 boats · hers USA 12345, a 5-digit neighbor","view":"expanded","width":104,"rightEdges":[748],"issues":["name hidden: Kiwi","12345: \"You\" dropped","name hidden: Ran","name hidden: Fjord","name hidden: Skarv"]}
+{"label":"8 boats (setup's most) · the club's own","view":"collapsed","width":104,"rightEdges":[895],"issues":["name cut: Kestrel of the Golden Gate (56 px)","name cut: Cicciolina (37 px)"]}
+{"label":"8 boats (setup's most) · the club's own","view":"expanded","width":104,"rightEdges":[1006],"issues":["name cut: Kestrel of the Golden Gate (33 px)","name cut: Cicciolina (28 px)"]}
