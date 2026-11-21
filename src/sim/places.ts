@@ -30,13 +30,17 @@ export const PLACES: Place[] = [
   P('baybridge', 'Bay Bridge, west span', 37.8000, -122.3800),
   P('clipper', 'Clipper Cove, Treasure Island', 37.8150, -122.3700),
   P('ti-north', 'North of Treasure Island', 37.8350, -122.3750),
-  P('m-A', 'A · St. Felix outer buoy', 37.810767, -122.446817, { shape: 'sphere' }),
-  P('m-X', 'X · off Dorado YC', 37.811667, -122.443333, { shape: 'cylinder' }),
-  P('m-6', '6 · Fort Mason "M"', 37.811667, -122.43, { shape: 'cylinder' }),
+  // A, X, 6, 16 and 15: YRA's positions and descriptions (YRA, "Central Bay racing marks", CentralBay.pdf, May 2025;
+  // ENC check #2). NOAA's ENC charts yacht-racing buoys A–D and X here too (US5OAKFG BOYSPP, from Local Notice to
+  // Mariners 51/11, 2011), 66–148 m off YRA's: A 136 m east, a nun; X 66 m south, spherical; C 148 m west of 16, a can.
+  // YRA's list is the current one, so the marks stay at YRA's positions; the ENC's are 2011's.
+  P('m-A', 'A · St. Felix outer buoy', 37.810767, -122.446817, { shape: 'sphere' }), // (YRA: "Yellow sphere")
+  P('m-X', 'X · off Dorado YC', 37.811667, -122.443333, { shape: 'sphere' }), // (YRA: "Yellow/blue sphere"; drawn yellow, its blue band not yet)
+  P('m-6', '6 · Fort Mason "M"', 37.811667, -122.43, { shape: 'column', look: 'Y' }), // (YRA: "Lighted yellow column 'M'")
   P('m-16', '16 · Blackaller', 37.81, -122.465, { shape: 'column', look: 'Y' }),
   P('m-15', '15 · Hank Easom (Yellow Bluff)', 37.84, -122.468333, { shape: 'column', look: 'Y' }),
   P('m-17', '17 · Harding Rock', 37.83799, -122.44604, { shape: 'lighted', look: 'RGR' }), // (the ENC's "HR", US5OAKFG BOYLAT 0226014C1D7F0032: it was 28 m north; ENC check #3)
-  P('m-4', '4 · Knox (Angel Island)', 37.853333, -122.441667, { shape: 'lighted', look: 'R' }),
+  P('m-4', '4 · Knox (Angel Island)', 37.853333, -122.441667, { shape: 'lighted', look: 'R' }), // (YRA's "Lighted red nun buoy near Pt Knox": club-laid, not charted, so not in the ENC)
   P('m-18', '18 · Blossom Rock', 37.81838, -122.40345, { shape: 'lighted', look: 'GRG' }),
   P('m-21', '21 · North Channel G "1"', 37.83202, -122.40865, { shape: 'lighted', look: 'G' }),
   P('m-7', '7 · North Channel R "2"', 37.83332, -122.39644, { shape: 'lighted', look: 'R' }),

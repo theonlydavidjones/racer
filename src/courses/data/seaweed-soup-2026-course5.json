@@ -14,7 +14,8 @@
       "name": "6 · Fort Mason",
       "lat": 37.811667,
       "lon": -122.43,
-      "shape": "cylinder"
+      "shape": "column",
+      "look": "Y"
     },
     "17": {
       "name": "17 · Harding Rock",
@@ -27,7 +28,7 @@
       "name": "X",
       "lat": 37.811667,
       "lon": -122.443333,
-      "shape": "cylinder"
+      "shape": "sphere"
     },
     "A": {
       "name": "A",

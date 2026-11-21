@@ -35,7 +35,7 @@
       "name": "X",
       "lat": 37.811667,
       "lon": -122.443333,
-      "shape": "cylinder"
+      "shape": "sphere"
     }
   },
   "startLine": {

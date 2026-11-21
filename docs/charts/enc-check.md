@@ -51,3 +51,6 @@ Requested by Coordinator 2: a one-by-one check of the sim's chart features again
   - obstructions: K40 and K41;
   - H44 tide rips, J14 sand waves, F22 piles.
   The depth figure, in feet, is shown where there's room. The dotted danger line rings what's 20 m or less (S-4 B-411). Each frame draws the symbols as one path per pen, not a stroke apiece, and the chart's text is kept off the figures. Per view, the paired old/new draw time is within +3.2% (limit +5%): bay 1.011, central 0.995, City Front 1.000, Anita Rock 1.010, Gate 1.000, Alcatraz 1.010, inset 1.032, wide inset 1.000. Stills: `enc-check/enc-05-anita-rock.png`, `enc-06-alcatraz.png`, `enc-07-gate-rip.png`.
+- **#2:** YRA's list (CentralBay.pdf, May 2025) wins: the City Front marks stay at YRA's positions, with the ENC's 2011 positions noted in `places.ts`. The shapes follow YRA: X is a sphere, and 6 is a yellow column. 4 · Knox stays as YRA has it: a club-laid mark, not a charted aid.
+- **Follow-up:** X is "Yellow/blue sphere" in YRA's list, but no source found says how the colors are laid out (halves, a band, stripes). It's drawn yellow until a photo or YRA's description settles it.
+

@@ -14,13 +14,14 @@
       "name": "6 · Fort Mason",
       "lat": 37.811667,
       "lon": -122.43,
-      "shape": "cylinder"
+      "shape": "column",
+      "look": "Y"
     },
     "X": {
       "name": "X",
       "lat": 37.811667,
       "lon": -122.443333,
-      "shape": "cylinder"
+      "shape": "sphere"
     }
   },
   "startLine": {

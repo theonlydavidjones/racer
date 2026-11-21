@@ -14,7 +14,8 @@ describe('the government marks against the ENC', () => {
     expect(h.name).toMatch(/Harding Rock/); expect(h.d).toBeLessThan(3);
   });
   it('every lighted buoy and beacon among the marks is within 10 m of an ENC aid', () => {
-    // (4 · Knox is drawn as a red lighted buoy but has no ENC aid within a kilometer: YRA's own, flagged in docs/charts/enc-check.md)
+    // (4 · Knox: YRA's "Lighted red nun buoy near Pt Knox", a club-laid racing mark, not a charted aid, so the ENC has none
+    // within a kilometer; it stays at YRA's position and description: the Coordinator's ruling, ENC check, 21 Nov 2026)
     for (const p of PLACES.filter(q => q.buoy && (q.buoy.shape === 'lighted' || q.buoy.shape === 'beacon') && q.id !== 'm-4')) expect(nearest(p.p).d, p.name).toBeLessThan(10);
   });
 });
