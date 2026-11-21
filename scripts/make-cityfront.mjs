@@ -136,6 +136,53 @@ for (const w of ways.values()) {
 }
 out.sort((a, b) => a.xy[0][0] - b.xy[0][0]);
 
+// ---- the lidar's roof heights (--lidar [--depth 10]): where OSM gives no height and no levels, the footprint's roof from the
+// USGS 3DEP lidar (CA_SanFrancisco_1_B23, flown 2023-04-20; public domain; EPT on AWS): the 75th percentile of the non-ground
+// returns inside it, less the ground. The thinned top levels of the point tree are enough for a roof (about 0.5 m between points).
+if (process.argv.includes('--lidar')) {
+  const { createRequire } = await import('node:module'), require = createRequire(import.meta.url), { createLazPerf } = require('laz-perf');
+  const EPT = 'https://usgs-lidar-public.s3.amazonaws.com/CA_SanFrancisco_1_B23', DEPTH = +arg('--depth', 10);
+  const merc = (lat, lon) => [lon * 20037508.342789244 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) * 6378137];
+  const todo = out.filter(b => (b.flag & 3) < 2);
+  for (const b of todo) { b.m = b.xy.map(([x, y]) => merc(LAT0 + y / 10 / MLAT, LON0 + x / 10 / MLON)); b.z = []; b.box = [Math.min(...b.m.map(p => p[0])), Math.min(...b.m.map(p => p[1])), Math.max(...b.m.map(p => p[0])), Math.max(...b.m.map(p => p[1]))]; }
+  const CELLG = 64, grid = new Map(); // (Web Mercator metres, 64 m cells)
+  for (const b of todo) for (let i = Math.floor(b.box[0] / CELLG); i <= Math.floor(b.box[2] / CELLG); i++) for (let j = Math.floor(b.box[1] / CELLG); j <= Math.floor(b.box[3] / CELLG); j++) { const k = `${i},${j}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(b); }
+  const inside = (poly, x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if ((poly[i][1] > y) !== (poly[j][1] > y) && x < (poly[j][0] - poly[i][0]) * (y - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]) c = !c; return c; };
+  const lo = merc(STRIP.s, STRIP.w), hi = merc(STRIP.n, STRIP.e), X0 = lo[0], Y0 = lo[1], X1 = hi[0], Y1 = hi[1];
+  const ept = await (await fetch(`${EPT}/ept.json`)).json(), [bx0, by0, , bx1] = ept.bounds, size = bx1 - bx0, nodes = [];
+  const walk = async key => {
+    const h = await (await fetch(`${EPT}/ept-hierarchy/${key}.json`)).json();
+    for (const [k, n] of Object.entries(h)) {
+      const [d, x, y] = k.split('-').map(Number), sz = size / 2 ** d, nx = bx0 + x * sz, ny = by0 + y * sz;
+      if (d > DEPTH || nx > X1 || nx + sz < X0 || ny > Y1 || ny + sz < Y0) continue;
+      if (n === -1) await walk(k); else if (n > 0) nodes.push(k);
+    }
+  };
+  await walk('0-0-0-0');
+  const lp = await createLazPerf(); let seen = 0;
+  for (const k of nodes) {
+    const f = CACHE && `${CACHE}/lidar_${k}.laz`; let buf;
+    if (f && existsSync(f)) buf = await readFile(f); else { const r = await fetch(`${EPT}/ept-data/${k}.laz`); if (!r.ok) throw new Error(`${k}: HTTP ${r.status}`); buf = Buffer.from(await r.arrayBuffer()); if (f) await writeFile(f, buf); }
+    const sc = [buf.readDoubleLE(131), buf.readDoubleLE(139), buf.readDoubleLE(147)], of = [buf.readDoubleLE(155), buf.readDoubleLE(163), buf.readDoubleLE(171)];
+    const ptr = lp._malloc(buf.length); lp.HEAPU8.set(buf, ptr); const z = new lp.LASZip(); z.open(ptr, buf.length);
+    if (z.getPointFormat() !== 1) throw new Error(`point format ${z.getPointFormat()}`);
+    const n = z.getCount(), rec = lp._malloc(z.getPointLength());
+    for (let i = 0; i < n; i++) {
+      z.getPoint(rec); const dv = new DataView(lp.HEAPU8.buffer, rec, 29); if ((dv.getUint8(15) & 31) !== 1) continue;
+      const x = dv.getInt32(0, true) * sc[0] + of[0], y = dv.getInt32(4, true) * sc[1] + of[1], cand = grid.get(`${Math.floor(x / CELLG)},${Math.floor(y / CELLG)}`); if (!cand) continue;
+      seen++; for (const b of cand) if (x >= b.box[0] && x <= b.box[2] && y >= b.box[1] && y <= b.box[3] && inside(b.m, x, y)) { b.z.push(dv.getInt32(8, true) * sc[2] + of[2]); break; }
+    }
+    z.delete(); lp._free(ptr); lp._free(rec);
+  }
+  let used = 0; const pct = (a, p) => { a = a.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
+  for (const b of todo) {
+    if (b.z.length >= 5) { const h = pct(b.z, 0.75) - MSL_NAVD88 - b.g / 100; if (h >= 2.5 && h < 250) { b.h = Math.round(h * 10); b.flag = (b.flag & ~3) | 3; used++; } }
+    delete b.m; delete b.z; delete b.box;
+  }
+  console.log(`lidar: ${nodes.length} nodes to depth ${DEPTH}, ${seen} non-ground returns in the strip; ${used} of ${todo.length} buildings without an OSM height got the lidar's roof`);
+}
+
+
 // ---- pack
 let bytes = 0; for (const b of out) bytes += 2 + 2 + 2 + 1 + 8 + (b.xy.length - 1) * 4;
 const buf = Buffer.alloc(bytes); let o = 0;
@@ -147,7 +194,7 @@ const packed = deflateSync(buf, { level: 9 });
 await writeFile(new URL('../src/render/data/cityfront.json', import.meta.url), JSON.stringify({
   source: 'OpenStreetMap contributors (ODbL), api.openstreetmap.org: building ways in the strip; ground from the USGS 3DEP 1 m DEM, CA_SanFrancisco_B23 tile x54y419 (public domain).',
   made: 'scripts/make-cityfront.mjs', fetched: new Date().toISOString().slice(0, 10), strip: STRIP,
-  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 3 m deck',
+  datum: 'ground is NAVD88 m less 0.969 m (mean sea level, the drawn water)', flags: 'bits 0-1: 3 lidar roof height (--lidar), 2 OSM height, 1 levels x 3.3 m, 0 default by type; bit 2 (4): no DEM ground, on a 3 m deck',
   count: out.length, mesh: packed.toString('base64'),
 }) + '\n');
 console.log(`${out.length} buildings (${stat.h2} OSM heights, ${stat.h1} from levels, ${stat.h0} default; ${stat.deck} on a deck); skipped: ${stat.cleared} in landmarks' ground, ${stat.outside} outside the strip, ${stat.tiny} under 8 m²; ${relations} relations seen, ${relBuildings} multipolygon buildings (${relChained} outer ways not closed on their own, skipped)`);
