@@ -34,7 +34,7 @@ The probes are throwaway test files, kept outside the repository; the numbers be
 | 3 | The fleet starts late: a median of 27 m behind the line at 12 kt, 36 m at 4 kt, the worst 146 m. | ai.ts:717, world.ts:789 | M |
 | 4 | In 4 kt against the tide, the fleet doesn't make the first mark in 50 minutes. Probed: it's the tide in the lulls, not the flickers. In slack water all 21 boats round. | ai.ts:848–886 | M |
 | 5 | After AP over A, the fleet stays by the line for 11–50 minutes instead of sailing home (Debrief's report). | ai.ts:680, homeCourse | M, to probe |
-| 6 | Up to 13 tacks on a beat at 12 kt and 19 at 22 kt, some within 40 m of the mark. | ai.ts:848 | M |
+| 6 | ~~Up to 13 and 19 tacks a beat~~: those counts included penalty turns and roundings. Remeasured, a median of 4, at most 7 and 10. What's left is untagged tacks within 120 m of the mark (33 at 22 kt). | ai.ts:446–458, :848 | M |
 | – | Good, no change: she almost never tacks in dirty air (0–1 of 141–331 turns per wind); roundings are close (median 7–8 m at A); no boat was OCS. | | |
 
 ## 1. Overstanding the windward mark: remeasured, no fix
@@ -258,27 +258,53 @@ What the AI does wrong on top of the physics:
 
 **Fix (M):** trace Red and Black's tacks by cause first. The scatter of finding 1's long final legs (±19 m, from shifts and the set changing under her) is folded in here, the Coordinator's ruling: the trace should say which triggers make it.
 
-### Proposal 6, for the Coordinator's approval
+### Probe of 6, and proposal 6, for the Coordinator's approval
 
-**Cause:** not traced yet. Candidates, as before:
-- the header tack (a hazard-rate draw each think while headed more than 4° for more than 15 s, ai.ts:866–870);
-- the rhumb-line width tack (ai.ts:877);
-- tacking below the mark when she can't fetch it, which finding 1's remeasure puts at 12 of 37 boats inside 25 m.
+**The probe:**
+- Every tack on the first beat was tagged by the decision behind it, at 12 and 22 kt, seeds 1–3, 7 AI boats each.
+- Tags were set where ai.ts decides a tack. The fetch test gives the layline (ai.ts:859). Then the header (:870), dirty air (:871), the rhumb-line width (:874), an obstruction ahead or a boat pinning her (:967), dodging another boat (:968), and a hail for room to tack (:1131).
+- A tack with no tag in the 30 s before it is "untagged". A tack while she owes or turns a penalty is "penalty". A tack within 20 s before she rounds A and inside 40 m is "rounding".
 
-**Note:** main's newer skipper knobs (src/ai/skipper.ts, after 5de4d67c) scale the header tack by her strategy, down to a 1° header held 3 s. 1° is under the wind's own short swing of 2–3° (the ai.ts comment on beat hysteresis). If that's in v216, expect more tacks than this audit measured. Its author should check that against the same trace.
+| Tacks on the first beat, all boats | 12 kt | 22 kt |
+|---|---|---|
+| All tack flips | 129 | 123 |
+| Penalty turns (each turn is two flips) | 27 | 24 |
+| The rounding itself | 14 | 10 |
+| The width (back toward the rhumb line) | 44 | 50 |
+| The layline | 8 | 1 |
+| A header | 6 | 0 |
+| Answering a hail, an obstruction | 3 | 0 |
+| Untagged, the first 60 s | 8 | 3 |
+| Untagged, after | 19 | 35 |
+
+**Revised finding:** the audit's "up to 13 and 19 tacks a beat" counted penalty turns and the rounding as tacks. Red's 19 at 22 kt, seed 1, are two penalties' turns, 8 flips, plus a struggle at the mark. Leaving those out:
+
+| Beat tacks per boat | Median | Most | n |
+|---|---|---|---|
+| 12 kt | 4 | 7 | 21 |
+| 22 kt | 4 | 10 | 21 |
+
+A 440 m beat wants 2–4 tacks. The median is fine.
+
+**What's left worth fixing:** the untagged tacks near the mark.
+- At 22 kt, 33 of the 35 untagged tacks after the first minute were within 120 m of A, and 18 of them inside 40 m. At 12 kt it was 15 of 19.
+- Black at 22 kt, seed 1, tacked at 17, 16, 41 and 18 m from the mark.
+- None came from the beat's decisions. The likely source, not yet confirmed: inside 35 m her aim point switches to the rounding ray (ai.ts:446–458). If that point lies more than 48° off the wind, she's in reach mode and steers straight for it, through the wind. That's a tack without the fetch test, below a mark she can't yet fetch.
+- The long final legs' ±19 m scatter (finding 1) belongs to the same place: she reaches the 35 m switch wherever the last tack left her.
+
+**The width tack is the largest decided trigger:** 35–40% of all flips, mostly more than 120 m out. A sailor keeping to the middle of the course does the same. It's not counted as a fault without a strategic reason, such as a favoured side, which the AI doesn't model yet.
 
 **Fix:**
-1. A probe first. Tag each tack with its trigger (header, width, dirty air, layline, at the mark) at 12 and 22 kt, seeds 1–3.
-2. Then, by what it finds:
-   - header tacks only on a header larger than the short swing;
-   - inside about 3 lengths of the layline, tack only on the layline;
-   - if at-mark tacks dominate, nothing more: they're finding 1's underlays.
-3. The test: median tacks per beat at most 4 at 12 kt, with the incidents bound unchanged.
+1. Confirm the source with one more tag, the mode and aim-point branch at each untagged tack.
+2. If it's the 35 m switch: on a beat, she doesn't tack toward the rounding point until the fetch test says she lays it. Otherwise she holds her tack and the beat's tack logic decides, as more than 35 m out.
+3. The test: untagged tacks inside 120 m of A, over the six races, from 33 to at most 8 at 22 kt (an ESTIMATE of what's left: real dodges), with the incidents bound unchanged.
 
 **Expected effect (ESTIMATES):**
-- *Tacks:* the median per beat from 7 to about 4 at 12 kt.
-- *Finish times:* each tack saved is about a length (Dellenbaugh), so about 3 lengths, 23 m, about 10 s a beat at 12 kt.
-- *Fouls:* fewer crossings mean slightly fewer rule-10 port-starboard incidents. A guess is −0.1 a race.
+- *Tacks:* about 1.5 fewer a boat at the mark at 22 kt, about 0.7 at 12 kt.
+- *Finish times:* about a length a tack (Dellenbaugh), so 5–10 s a windward mark.
+- *Fouls:* near-mark tacks are where rule 13 and 18 incidents happen, so slightly fewer. A guess is −0.1 a race.
+
+**For claude/skipper-beliefs (5eb10298):** header tacks are 6 of 129 flips at 12 kt and none at 22 kt today. Its scaling, down to a 1° header held 3 s, would be measured against this table.
 
 ## Good, and left alone
 
