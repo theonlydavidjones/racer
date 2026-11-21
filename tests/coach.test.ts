@@ -52,6 +52,14 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     const v = lineNotes(b2).notes.find(x => x.line === 'vang')!;
     if (!v.fix) expect(v.tick).toBe(false);
   });
+  // (the debrief audit's M3, 21 Nov 2026: "In heavy air, the backstay stays off" read as wrong upwind trim when she was
+  // off the wind; the crew's notes name her point of sail)
+  it('Trim Notes: the crew\'s notes that name the air name her point of sail with it', () => {
+    for (const heading of [318, 0, 90]) {
+      const b = boat({ heading, windKt: 22 });
+      for (const x of lineNotes(b).notes) if (x.who === 'crew') expect(x.ok).not.toMatch(/^In (light|medium|heavy)/);
+    }
+  });
   it('a fix that turns up while she settles is said once the quiet is over', () => {
     const b = boat({ heading: 318, windKt: 10 }), m = new CoachMemory();
     m.step(b, 0); m.quietUntil = 5; wrong(b, 'jibsheet', 0.6);

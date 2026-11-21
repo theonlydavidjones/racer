@@ -386,7 +386,10 @@ function lineWords(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheetW
  * lessons"). The words never claim a state they don't check (the review): a sail's flow, a line's setting, the draft.
  */
 function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boolean } {
-  const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40, air = airOf(s), In = 'In ' + air;
+  // (with her point of sail: "In heavy air, the backstay stays off" read as wrong trim upwind, where it isn't said; the
+  // debrief audit's M3, 21 Nov 2026)
+  const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40, air = airOf(s);
+  const In = `${upwind ? 'Upwind' : s.awa > 120 ? 'Running' : 'Reaching'} in ${air}`;
   const d = b.shape.main.draft, draft = `${draftWords(d)} (${Math.round(100 * d)}%)`;
   switch (k) {
     case 'mainsheet':
@@ -404,16 +407,16 @@ function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boole
       // whatever small gain the speed model finds either way)
       const down = c.traveller > 0.1, up = c.traveller < -0.1, upw = s.awa <= 60;
       if (down && !upw) return { text: 'Off the wind, the traveler goes down so the boom can swing out.', tick: true };
-      if (down && (s.over || s.band === 'heavy')) return { text: `In ${s.over ? 'a breeze' : air}, a traveler down to leeward eases heel and helm.`, tick: true };
+      if (down && (s.over || s.band === 'heavy')) return { text: `Upwind in ${s.over ? 'a breeze' : air}, a traveler down to leeward eases heel and helm.`, tick: true };
       if (down) return { text: s.band === 'light' ? 'Upwind in light air, the traveler goes up to bring the boom to the centerline.' : 'Upwind in medium air, the traveler sits near the middle; down is for when she\'s overpowered.', tick: false };
-      if (up && upw && s.band === 'heavy' && !s.over) return { text: 'In heavy air, the traveler comes down as she starts to heel too far.', tick: true };
-      return { text: up ? `Upwind in ${air}, the traveler goes up to center the boom, for height.` : `In ${air}, the traveler in the middle balances height and heel.`, tick: true };
+      if (up && upw && s.band === 'heavy' && !s.over) return { text: 'Upwind in heavy air, the traveler comes down as she starts to heel too far.', tick: true };
+      return { text: up ? `Upwind in ${air}, the traveler goes up to center the boom, for height.` : `${In}, the traveler in the middle balances height and heel.`, tick: true };
     }
     case 'vang':
       // (North Sails' Folkboat guide: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little
       // to say so, but no ✓)
       if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Upwind, leave the vang slack until heavy air (18 kt).', tick: true } : { text: 'Upwind, ease the vang off until heavy air (18 kt).', tick: false };
-      return { text: c.vang <= 0.15 ? `In ${air}, a slack vang lets the top of the main twist open.` : 'Off the wind, the vang holds the boom down so the leech keeps its shape.', tick: true };
+      return { text: c.vang <= 0.15 ? `${In}, a slack vang lets the top of the main twist open.` : 'Off the wind, the vang holds the boom down so the leech keeps its shape.', tick: true };
     case 'outhaul': return { text: c.outhaul < 0.4 ? `Easing the outhaul gives more power in ${air}.` : `${In}, a tight outhaul flattens the foot and depowers the main.`, tick: true };
     case 'downhaul': return { text: `${In}, the main's draft sits ${draft}.`, tick: true };
     case 'cunningham': return { text: c.cunningham < 0.15 ? `${In}, the Cunningham stays slack; the halyard sets the luff.` : `${In}, the Cunningham holds the main's draft ${draft}.`, tick: true };
