@@ -69,8 +69,12 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #lb .lb-r{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:baseline;font:600 11px/1.6 var(--f-inst);font-variant-numeric:tabular-nums;white-space:nowrap}
 #lb .lb-p{color:var(--muted);min-width:8px;margin-right:4px}
 #lb .lb-r b{color:#e9f2f5;font-weight:700} #lb .lb-r b:not(:empty){margin-right:3px} /* (a sail number is never cut) */
-#lb .lb-n{font-style:normal;color:#a9bcc6;min-width:0;overflow:hidden;text-overflow:ellipsis;margin-right:4px}
-#lb .lb-n.you{display:flex;flex-wrap:wrap;height:1.6em;text-overflow:clip} #lb .lb-n.you s{width:0;text-decoration:none} /* ("You" wraps out of sight, whole, where it won't fit) */
+#lb .lb-n{font-style:normal;color:#a9bcc6;min-width:0;overflow:hidden;margin-right:4px;display:flex;flex-wrap:wrap;height:1.6em}
+#lb .lb-n s{width:0;text-decoration:none}
+/* a name: cut with an ellipsis, but where fewer than 3 letters and the ellipsis would show it wraps out of sight whole
+   (option (b), the owner, 21 Nov 2026); her "You" the same, never cut */
+#lb .lb-n span{flex:1 1 0;min-width:2.4em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lb .lb-n.you span{flex:none;min-width:0}
 #lb .lb-g{color:#a9bcc6;font-size:10px}
 #lb .me{background:rgba(255,182,39,.14);border-radius:4px;margin:0 -3px;padding:0 3px}
 #lb .me .lb-p,#lb .me .lb-n{color:var(--accent)}
@@ -79,4 +83,3 @@ body.showroom #compassBar,body.showroom #navStrip,body.still #compassBar,body.st
 #lb .lb-chip{border:1px solid var(--rule);border-radius:4px;padding:0 4px}
 #lb .lb-chip.me{margin:0;padding:0 4px}
 #lb .lb-ch{font-size:10px;color:var(--muted)} #lb .lb-ch.up{color:var(--row)} #lb .lb-ch.dn{color:var(--giveway)}
-#lb .lb-flag{height:8px;width:auto;margin-right:3px;border-radius:1px;box-shadow:0 0 0 .5px rgba(255,255,255,.35)} /* (her ensign for the sail letters: the owner) */
