@@ -1,0 +1,59 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'fs';
+import { COURSES } from '../src/courses/registry';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { DT, World } from '../src/sim/world';
+import { applyCommand } from '../src/sim/commands';
+import { CoachMemory } from '../src/boat/coach';
+import { n360, wrap } from '../src/core/math';
+
+const OUT = '/tmp/claude-0/-home-user-racer/757c46a8-a39c-5c6d-b31d-6ff57c256bf9/scratchpad/audit/';
+const S = (kt: number): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real' });
+const KEYS = ['mainsheet', 'traveller', 'vang', 'outhaul', 'cunningham', 'backstay', 'jibsheet'] as const;
+
+for (const kt of [4, 12, 22]) it(`audit ${kt}`, () => {
+  const w = new World(COURSES[0], S(kt), 11, { freeSail: true }), u = w.user;
+  applyCommand(w, { k: 'running', on: true });
+  const log: string[] = [];
+  const say = (t: string) => log.push(`${w.t.toFixed(1).padStart(6)} ${t}`);
+  // the plan: beat 600 s tacking every 90 s, bear away, run 400 s jibing every 100 s
+  let twaT = kt < 6 ? 46 : 42, side = u.tack === 'S' ? 1 : -1, lastTurn = 0, phase = 'beat';
+  u.h = n360(w.wind.from - side * 42); u.v = 2;
+  const twaS: number[] = []; const mem = new CoachMemory(); let held = '';
+  const travel: Record<string, number> = {}, rev: Record<string, number> = {}, dir: Record<string, number> = {};
+  let poseFlips = 0, toasts = 0, coachLines = 0;
+  let prevCtl: Record<string, number> = {}, prevJobs = '', prevHead = '', prevCrew = '', prevPose = '', turns = 0;
+  const pilot = () => { const want = n360(w.wind.from - (u.tack === 'S' ? 1 : -1) * twaT); const e = wrap(want - u.h); applyCommand(w, { k: 'tiller', v: Math.max(-1, Math.min(1, -e / 40 + (u.turnRate ?? 0) * 0.08)) }); };
+  for (let i = 0; i < 1000 / DT; i++) {
+    const t = w.t;
+    if (phase === 'beat' && t > 600) { phase = 'run'; twaT = 155; say(`== bear away to run`); lastTurn = t; }
+    const busy = u.turnTarget != null || u.callWait != null;
+    if (!busy) pilot();
+    if (t - lastTurn > (phase === 'beat' ? 90 : 100) && !busy && Math.abs(wrap(n360(w.wind.from - (u.tack === 'S' ? 1 : -1) * twaT) - u.h)) < 10) { applyCommand(w, { k: 'turn' }); lastTurn = t; turns++; say(`>> CALL turn #${turns} (${phase}) tack=${u.tack}`); }
+    w.step(DT);
+    if (w.t > 300 && w.t < 330 && i % Math.round(0.25 / DT) === 0) say(`fine awa=${(u.awa ?? 0).toFixed(1)} js=${u.ctl.jibsheet.toFixed(3)} ms=${u.ctl.mainsheet.toFixed(3)} tr=${u.ctl.traveller.toFixed(2)} heel=${(u.heelMag ?? 0).toFixed(1)} jobs=${u.crew!.people.map(p => p.job ? p.job.line : '-').join('/')}`);
+    for (const e of w.drainEvents()) if (e.type === 'toast') { say(`TOAST ${(e as any).msg}`); toasts++; }
+    if (i % Math.round(0.5 / DT) === 0) {
+      const st = mem.step(u, w.t, {});
+      if (st.view.top.head !== prevHead) { say(`COACH ${st.view.top.head}`); prevHead = st.view.top.head; coachLines++; }
+      if (st.fresh) say(`FRESH ${st.fresh}`);
+      if (st.view.crew !== prevCrew) { say(`CREW ${st.view.crew}`); prevCrew = st.view.crew; }
+    }
+    for (const k of KEYS) { const v = (u.ctl as any)[k] as number, last = (travel as any)['_' + k]; if (last != null) { const d = v - last; travel[k] = (travel[k] ?? 0) + Math.abs(d); if (Math.abs(d) > 1e-4) { const sg = Math.sign(d); if (dir[k] && sg !== dir[k]) rev[k] = (rev[k] ?? 0) + 1; dir[k] = sg; } } (travel as any)['_' + k] = v; }
+    if (i % Math.round(1 / DT) === 0) {
+      // trims that move
+      const ch: string[] = [];
+      for (const k of KEYS) { const v = (u.ctl as any)[k] as number; if (prevCtl[k] == null || Math.abs(v - prevCtl[k]) > 0.05) { ch.push(`${k} ${prevCtl[k]?.toFixed(2) ?? '-'}→${v.toFixed(2)}`); prevCtl[k] = v; } }
+      if (ch.length) say(`ctl ${ch.join(', ')}`);
+      const ppl = u.crew!.people;
+      const jobs = ppl.map((p, j) => `${j}:${p.job ? p.job.line : '-'}`).join(' ');
+      if (jobs !== prevJobs) { say(`jobs ${jobs}`); prevJobs = jobs; }
+      const pose = ppl.map((p, j) => `${j}:${p.pose}`).join(' ');
+      if (pose !== prevPose) { say(`pose ${pose}`); prevPose = pose; poseFlips++; }
+
+      if (i % Math.round(10 / DT) === 0) { twaS.push(Math.abs(u.twa ?? 0)); } say(`state tws=${((u.twsSlow ?? 0) / 0.5144).toFixed(1)} twa=${Math.round(u.twa ?? 0)} v=${(u.v / 0.5144).toFixed(2)}kt heel=${Math.round(u.heelMag ?? 0)} tack=${u.tack} callOn=${u.callOn}`);
+    }
+  }
+  const sum = KEYS.map(k => `${k}: travel ${(travel[k] ?? 0).toFixed(1)} reversals ${rev[k] ?? 0}`).join('\n');
+  writeFileSync(`${OUT}kt${kt}.log`, `SUMMARY twa10s=${twaS.slice(2,55).map(x=>Math.round(x)).join(',')} turns=${turns} poseChanges=${poseFlips} toasts=${toasts} coachLines=${coachLines}\n${sum}\n` + log.join('\n'));
+}, 900_000);
