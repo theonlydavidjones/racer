@@ -780,7 +780,7 @@ export class Hud {
     // on her (chart audit #11); the chart's print keeps clear of them
     { const busy = (x: number) => [me, ...(wd.dest ? [tf(wd.dest.p.x, wd.dest.p.y)] : [])].some(([bx, by]) => Math.abs(bx - x) < 48 && by < 130);
       this.northX = opts.cornerFree ? (busy(w - 72) && !busy(48) ? 48 : w - 72) : w - 28;
-      if (opts.cornerFree) avoid.push([this.northX - 34, 6, 68, 116]); }
+      avoid.push(opts.cornerFree ? [this.northX - 34, 6, 68, 116] : [w - 84, 64, 80, 118]); } // (the full chart's too, so its print isn't under "WIND n KT": chart audit #2)
     // the chart's own panels over it, the Layers panel, the field picker and Day | Dusk, the passage line, the info box: the
     // names keep clear of them, the sim's and the chart's own print alike (chart audit #1)
     const panels: [number, number, number, number][] = [];
