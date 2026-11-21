@@ -27,10 +27,25 @@ One pass, kept light because usage is light until Tue 24 Nov.
 | 2 | **Berkeley's only berth, the Berkeley YC guest dock alongside, has a moored boat in it.** So Berkeley never has a free berth, and G there says "No free berth here". `mooredIn` fills every slip at the default 78%, guest docks included. | (none: Berkeley has no slip to be home to) | `src/geo/marina.ts:295` | S |
 | 3 | **"Heading home: her slip, Slip 405, West Harbor."** The toast says slip twice. It should read "Heading home to Slip 405, West Harbor" (or "to B22, Olympian YC"). | (toast) | `src/sim/world.ts:2729` | S |
 | 4 | **The trim coach with her sails struck, coming in: "Sails going up (or down): the coach waits until they're set."** They are set: down. The line shows whenever either sail isn't fully up, moving or not. It should say so only while a sail is moving. | `audit/richmond-yc-4-lines-ready.jpg` (bottom left) | `src/boat/coach.ts:701` | S |
-| 5 | **Six East Bay harbors have no slips:** Live Oak YC (Encinal), Oaktown YC, Harbor Town (Marina Village), Fortmann, Grand Marina and Alameda Marina. None can be a home or take her lines; they're water and docks only (`marina.ts:47` says their slips aren't published where we could reach). This needs the slip data, as Richmond's came from its harbor plan. | (none) | `src/geo/marina.ts:53-58` | M |
+| 5 | **Six East Bay harbors had no slips** (Oaktown YC now has 26, see below; the other five wait on the harbors' own plans, no fingers inferred): Live Oak YC (Encinal), Oaktown YC, Harbor Town (Marina Village), Fortmann, Grand Marina and Alameda Marina. None can be a home or take her lines; they're water and docks only (`marina.ts:47` says their slips aren't published where we could reach). This needs the slip data, as Richmond's came from its harbor plan. | (none) | `src/geo/marina.ts:53-58` | M |
 | 6 | **UK spellings in code comments:** `src/geo/marina.ts` (15), `src/geo/shore.ts` (12) and `src/render/marina.ts` (10), the British spellings of meter, center and harbor. None is player-facing. `colour` is also a field name (`MooredBoat.colour`), so it stays. Comments only; leave them until the files are next touched. | (none) | as listed | S (not fixed) |
 
 ## Notes
 - **The page ran slow.** In headless Chromium (software GL) the sim ran about a tenth of real time: "+0:04" after about 45 s. So the page run's berthing timed out mid-way in every harbor. The berthing results above are from the headless runs, which step the sim directly.
 - **Docks against the chart:** no slip or dock looked out of place in the stills (`audit/<harbor>-1-slip.jpg`). Corinthian's slip B22 lies in a wind shadow (the TWS reads 0, "LEE −80%"). That's real for a slip under the Tiburon shore, not an error.
 - **The tie-up check** (`scripts/check/tie-up-home.cjs`, Gashouse Cove 572) covers the same steps in one harbor. This audit runs them in each.
+
+## Oaktown YC (Oakland YC), slips added (item 5, the first of six)
+- **Where they come from:** regenerated from OSM (`scripts/make-marinas.mjs oakland-yc`, fetched 21 Nov 2026), with `noSlips` off. Its basin, walkways and 20 fingers are unchanged from the 12 Nov fetch.
+- **26 slips,** along the mapped fingers only, none inferred, numbered by the sim (the club's own numbers aren't published where we could reach). That's against the club's roughly 200 slips (Latitude 38, from a search snippet, https://www.latitude38.com/?p=115975).
+- **Four piers left out:** four mapped piers run 32–33 m out from the walkways, which is a side-tie's or a short dock's length, not a slip finger's. Slips along them would be 32 m long, and push off failed at all four (B4, C3, E3, F3 in the first run). `slipFingerMax: 20` leaves those piers without slips. The 20 m (about 65 ft) is an ESTIMATE.
+- **Push off:** every berth passes (`pushoff-all.test.ts`), and the sweep passes with no touches.
+- **Berthing** at all five free bow-in slips (B3, B4, C4, E2, E4), at 2, 8 and 14 kt westerly: in her berth every time, in 36–57 s.
+- **The page run** (`marina-audit.cjs oakland-yc:B3`):
+  - pushed off;
+  - the hint "G · lines ready" and the tag "Home" at 45, 30 and 18 m;
+  - G readies her lines for B3;
+  - "Heading home to B3, Oaktown YC";
+  - no page errors.
+  - Stills: `audit/oakland-yc-1-slip.jpg` and `audit/oakland-yc-3-coming-in.jpg`.
+

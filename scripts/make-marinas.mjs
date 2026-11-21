@@ -119,7 +119,12 @@ const HARBORS = {
   // the Oakland Estuary's other harbors, between Alameda and Oakland (OSM marina outlines; their ways out found from the
   // chart's water beyond their edges): water to sail into, their docks solid. No berths: their dock letters and slips
   // aren't published where we could reach
-  'oakland-yc': { name: 'Oakland Yacht Club, Alameda', bbox: [-122.2685, 37.7815, -122.2615, 37.7860], basin: { marina: 'Oakland Yacht Club' }, letter: 'north-south', noSlips: true, exits: 'auto' },
+  // Oakland YC: its fingers are mapped in OSM (20 of them, against the club's about 200 slips), so it has slips along
+  // those: the mapped fingers only, none inferred, numbered by this sim (the club's own numbers aren't published where
+  // we could reach). Four of its mapped piers run 32-33 m from the walkways, a side-tie or short dock's length, not a
+  // slip finger's (ESTIMATE: 20 m, about 65 ft, as the longest finger a slip is laid along here): no slips along those.
+  // The marina audit, 21 Nov 2026
+  'oakland-yc': { name: 'Oakland Yacht Club, Alameda', bbox: [-122.2685, 37.7815, -122.2615, 37.7860], basin: { marina: 'Oakland Yacht Club' }, letter: 'north-south', exits: 'auto', slipFingerMax: 20 },
   'marina-village': { name: 'Marina Village Yacht Harbor, Alameda', bbox: [-122.2760, 37.7820, -122.2640, 37.7900], basin: { marina: 'Marina Village Yacht Harbor - East Basin' }, letter: 'north-south', noSlips: true, exits: 'auto' },
   'fortmann': { name: 'Fortmann Marina, Alameda', bbox: [-122.2590, 37.7765, -122.2540, 37.7820], basin: { marina: 'Fortmann Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
   'grand-marina': { name: 'Grand Marina, Alameda', bbox: [-122.2575, 37.7765, -122.2500, 37.7815], basin: { marina: 'Grand Marina' }, letter: 'north-south', noSlips: true, exits: 'auto' },
@@ -237,6 +242,7 @@ async function make(id, H) {
     // (measured from the walkway's edge: a finger split where it crossed the walkway starts at its centre line)
     const L0 = Math.hypot(tip.x - root.x, tip.y - root.y), u = { x: (tip.x - root.x) / L0, y: (tip.y - root.y) / L0 }, n = { x: -u.y, y: u.x };
     const off = Math.max(0, 1.2 - distTo(root, dock)), L = L0 - off; root.x += u.x * off; root.y += u.y * off;
+    if (H.slipFingerMax && L > H.slipFingerMax) continue; // (a pier that long isn't a slip's finger: a side-tie or a short dock)
     for (const s of [1, -1]) {
       const c = { x: root.x + u.x * L * 0.55 + n.x * s * (SLIP_W / 2 + 0.5), y: root.y + u.y * L * 0.55 + n.y * s * (SLIP_W / 2 + 0.5) };
       if (!inBasin(c)) continue;

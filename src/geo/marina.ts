@@ -47,7 +47,8 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
   // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
   // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
-  // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
+  // alongside Berkeley Yacht Club's guest dock; Oakland YC's slips lie along its fingers mapped in OSM (26 of its about 200,
+  // numbered by this sim); the others' slips aren't published where we could reach, and too few of their fingers are mapped
   { id: 'berkeley', name: 'Berkeley Marina (Campanile Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Brickyard Racing Club, Brickyard Cove', short: 'Brickyard RC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Live Oak Yacht Club, Alameda', short: 'Live Oak YC', data: encinal as unknown as HarborData },
