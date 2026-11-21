@@ -9,7 +9,7 @@ Rigging, 21 Nov 2026, for the Coordinator. This audit checks every rig control t
 
 **Stills:** they are on the `stills/rig-audit` branch (PNGs only, 320c0ad9):
 - `trav-lee_*`, `trav-wind_*`: the traveler at each end, beating in 16 kt.
-- `vang-off_*`, `vang-on_*`: the vang off and on, reaching in 12 kt.
+- `vang-off_*`, `vang-on_*`: the vang off and on, reaching in 12 kt (the boom level in both, rightly: finding 2).
 
 Each set is from starboard and port, on both tacks.
 
@@ -35,7 +35,7 @@ Every hover tip is one line, under 90 characters (tests/bandTips.test.ts), and e
 | # | Size | What | Where | Source that says it's wrong |
 |---|---|---|---|---|
 | 1 | M | **The main wants about 8° of boom beating in medium air, where North's Folkboat sails with the boom near the centerline.** The auto crew beats with the boom at 7–8° in 9–12 kt and 10° in 16 kt (car in the middle, sheet eased to 0.21). A player who sheets in as the guide says (car in the middle, sheet tight, boom about 2.5°) stalls the main by 6° at 12 kt and by 8–10° at 16–20 kt (`trim.main.err`). So letting the traveler down at 16–20 kt *raises* heel (18.0° → 18.8°) and weather helm, the opposite of the guide. The cause is the main's best angle of attack, 22° from the boom. | src/boat/trim.ts:37 (`aoa: 22`); the boom from controls.ts:87 | North Sails, Nordic Folkboat tuning guide: "In medium winds (6-14 knots) set them [the traveller cars] in the middle"; the sheet "sheeted tight" (both quoted at controls.ts:212 and :323). "In higher wind the cars are eased to leeward to decrease heel." This wants a physics-reviewer pass before anything changes: it moves every boat's beat. It ties into the depowering check against North's guide (Rigging, open). |
-| 2 | M | **The drawn boom never lifts.** With the vang off on a reach, the physics twists the main open (19.9°) because the sail lifts the boom, but the boom is drawn level. Only its swing is drawn. The stills show the boom at the same height with the vang off and on. | src/render/boatMesh.ts:1633 (only `rotation.y`) | The sim's own physics: "the sail lifts the boom and the leech opens" (controls.ts:215). A vang's whole job is holding the boom down. |
+| 2 | — | **Withdrawn (21 Nov): the drawn boom's not lifting is right.** The audit first read the level boom with the vang off as missing a lift. A leech of fixed length only slackens to second order as the head twists open: the slack is δ ≈ (E·Δφ)²/(6H), with the foot E 3.38 m, the luff H 8.75 m and Δφ the extra twist at the head (radians), each section turned about the luff and its chord tapering to the head. The physics' 10.8° more twist with the vang off (19.9° against 9.1°) asks the boom end to rise about 8 mm, or 0.15°. The drawn sail already turns its sections about the luff with the clew on the boom (sails.ts:150), so the drawing matches the physics to within a centimeter. A boom seen to sky needs far more twist than the sim's ceiling of 24°, plus the cloth stretching. | src/render/boatMesh.ts:1633 (no change) | the geometry above |
 | 3 | S | **The jib car's tip says "out for a wider, fuller slot".** Out only widens the lead angle (controls.ts jibAngle); the jib's depth doesn't change with it (jibShape reads only the car's fore-and-aft hole). "Fuller" is wrong. | src/ui/sailBand.ts:193 | controls.ts:123 and :247 |
 
 ## Notes (no change proposed)
