@@ -26,7 +26,7 @@ export function tacticsHtml(T: Tactics, boats: { id: number; name: string; short
     const key = `${d > 0 ? 'l' : 'r'}${Math.round(Math.abs(d))}`;
     if (seen.has(key)) return '';
     seen.add(key);
-    const n = d > 0 ? edge.l++ : edge.r++, dy = [4, -8, -20, 28][n % 4]; // (up first, clear of the cause bars under the row)
+    const n = d > 0 ? edge.l++ : edge.r++, dy = [5, -9, -23, 30][n % 4]; // (up first, clear of the cause bars under the row; 14 px apart, so two 10 px labels both read)
     return `<text x="${(x + (d > 0 ? 10 : -10)).toFixed(1)}" y="${y + dy}" fill="${c}" font-size="10" text-anchor="${d > 0 ? 'start' : 'end'}">${d > 0 ? '−' : '+'}${Math.round(Math.abs(d))} s</text>`;
   };
   const rows = T.rows.map((r, i) => {
