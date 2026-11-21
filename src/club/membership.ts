@@ -16,8 +16,16 @@ export const myClub = (S: { club?: string }): ClubInfo | undefined => {
   const c = clubInfo(S.club); return c && c.tier === 1 ? c : undefined;
 };
 
-/** A season's races are open to members of any yacht club. */
-export const canEnterSeason = (S: { club?: string }): boolean => !!myClub(S);
+/**
+ * Whether a season's races need a club yet (r276; the Coordinator, 21 Nov 2026): not until the club browser lands (the
+ * owner held the dropdown join, 20 Nov). Off, everyone may sail a season's races and they count, as before membership;
+ * turning it on is a deliberate change (tests/membership.test.ts pins it off).
+ */
+export const SEASON_NEEDS_CLUB = false;
+/** A member of a racing club (any one). */
+export const isMember = (S: { club?: string }): boolean => !!myClub(S);
+/** A season's races are open to members of any yacht club (once SEASON_NEEDS_CLUB is on; to everyone until then). */
+export const canEnterSeason = (S: { club?: string }): boolean => !SEASON_NEEDS_CLUB || isMember(S);
 
 /**
  * A save from before membership: you belong to the club your boats fly the burgee of (the one most of them fly; the

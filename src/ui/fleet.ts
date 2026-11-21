@@ -3,7 +3,7 @@ import { bottomLine, colorName } from './colorName';
 import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { burgeeCanvas } from '../render/burgees';
 import { clubFullName } from '../club/clubs';
-import { joinableClubs, myClub, setClub } from '../club/membership';
+import { SEASON_NEEDS_CLUB, joinableClubs, myClub, setClub } from '../club/membership';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
@@ -198,7 +198,8 @@ export class Fleet {
    */
   private clubHead(): string {
     const c = myClub(this.S), opts = joinableClubs().filter(x => x.id !== c?.id).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
-    const pick = `<select class="ycjoin" data-f="club" aria-label="${c ? 'Switch club' : 'Join a club'}"><option value="">${c ? 'Switch club…' : 'Join a club…'}</option>${opts}</select>`;
+    // (the Join/Switch menu waits for the club browser: membership.ts SEASON_NEEDS_CLUB, r276)
+    const pick = SEASON_NEEDS_CLUB ? `<select class="ycjoin" data-f="club" aria-label="${c ? 'Switch club' : 'Join a club'}"><option value="">${c ? 'Switch club…' : 'Join a club…'}</option>${opts}</select>` : '';
     const flag = c ? flagImg('b:' + c.id, () => burgeeCanvas(c.id), c.name).replace('class="fflag"', 'class="ycburgee"') : '';
     return `<div class="ychead">${flag}<div><div class="eyebrow">${c ? 'Your yacht club' : 'San Francisco · Folkboat fleet'}</div><h1>${c ? esc(c.name) : 'The Yacht Club'}</h1></div>${pick}</div>`;
   }
