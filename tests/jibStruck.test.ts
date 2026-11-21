@@ -66,6 +66,19 @@ describe('the physics on one sail (balance.ts sailForces, weighted by each sail\
     const mast = sailForces(aws, awa, main, jib, luff, { ...up!, main: 1 }); // (the span as if the mast were all rig: as before)
     expect(step.out.jib.drive).toBeLessThan(mast.jib.drive);
   });
+  // (a sail part-hoisted is drawn squeezed onto its boom or stay, the tack where it is and the luff h of its length,
+  // boatMesh.ts: ORC eq. 5.7's centre of effort, its girths' centroid, scales with the luff that's up)
+  it('the arm falls with the hoist: a part-hoisted sail\'s centre of effort is as high as its luff is up', () => {
+    const { step } = onRig(), [aws, awa, main, jib, luff] = step.args;
+    for (const h of [0.25, 0.5, 0.75, 1]) {
+      const m = sailForces(aws, awa, main, null, luff, { main: h, jib: 0 });
+      expect(Math.abs(m.ceh - oneSailCeh(RIG.BAS + h * (RIG.zMain - RIG.BAS), m.flat))).toBeLessThan(0.02);
+      const j = sailForces(aws, awa, main, jib, luff, { main: 0, jib: h });
+      expect(Math.abs(j.ceh - oneSailCeh(h * RIG.zJib, j.flat))).toBeLessThan(0.02);
+    }
+    const half = sailForces(aws, awa, main, null, luff, { main: 0.5, jib: 0 }), full = sailForces(aws, awa, main, null, luff, { main: 1, jib: 0 });
+    expect(full.ceh - half.ceh).toBeGreaterThan(1); // (half the main's luff up: its arm about 1.7 m lower)
+  });
   for (const which of ['main', 'jib'] as const) it(`the forces and the arm change smoothly as the ${which} goes up, 0 to 1, weighted as physics.ts weights them`, () => {
     const { step } = onRig(), [aws, awa, main, jib, luff] = step.args;
     let last: number[] = [], worst = 0;

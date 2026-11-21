@@ -282,7 +282,11 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure
   const wM = hypot(clM, cdM) * Am, wJ = hypot(clJ, cdJ) * Aj;
   const flat = (fM * Am + fJ * Aj) / Aref;
-  const zce = (RIG.zMain * wM + RIG.zJib * wJ) / Math.max(1e-6, wM + wJ);
+  // (a sail part-hoisted is the full sail squeezed onto its boom or stay, the tack where it is and the luff `up` of its
+  // length, as it's drawn (render/boatMesh.ts): eq. 5.7's centre of effort, its girths' centroid, scales with the luff
+  // that's up, the main's from the boom (BAS above the sheer), the jib's from its tack just above the deck)
+  const zM = RIG.BAS + up.main * (RIG.zMain - RIG.BAS), zJ = up.jib * RIG.zJib;
+  const zce = (zM * wM + zJ * wJ) / Math.max(1e-6, wM + wJ);
   const low = (0.5 * (1 - flat) + 0.902 * (1 - flat) * (1 - RIG.frac)) * (1 - (RIG.overlap - 0.9) / 0.6);
   const ceh = RIG.hbi + zce * (1 - low) + RIG.rm4;
   return { main: mainF, jib: jibF, twist: main.shape.twist, ceh, flat };
