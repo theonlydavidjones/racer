@@ -33,6 +33,6 @@ The stills are in `audit/`. Line numbers are on 5de4d67c.
 | 13 | **Wordy hovers: the Wind and Current pickers** (90 and 137 characters). | — | index.html (planField, chartField) | done (fc4a70b3, w037) |
 | 14 | **Two chart checks are stale since r270.** `nav-layer.cjs` and `plan-chart.cjs` start from and sail to the removed named spots (alcatraz, crissy). On v215 they open with no destination: nav-layer fails, and plan-chart throws. | — | scripts/check/nav-layer.cjs:17; scripts/check/plan-chart.cjs | S |
 | 15 | **UK spelling.** None in what the player reads on the charts. `spelling.cjs` finds 3, all in docs/marinas drafts. A few code comments in encChart.ts and hud.ts say "colours"/"grey"; they're not shown. | — | — | — |
-| 16 | **Chart features against NOAA's ENC.** No wrong or missing features seen in the sailed area: the TSS lanes, precautionary areas, cable areas, soundings and lights match the ENC's symbols in the key. A feature-by-feature comparison with the ENC wasn't done; it would be a research task of its own. | — | — | — |
+| 16 | **Chart features against NOAA's ENC.** Not compared feature by feature: that needs the ENC's own data beside the drawing, a research task of its own. Nothing looked wrong or missing in the area sailed. | — | — | — |
 
 The S items fixed on `claude/leaderboard-b`: 1, 2, 3, 7, 8, 10, 12 and 14. Each commit cites "chart audit #n".
