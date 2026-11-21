@@ -732,8 +732,14 @@ export class Hud {
     ctx.font = '600 9px "Saira Semi Condensed", sans-serif';
     const lab = nav ? 'NAVIGATOR' : W === 0 && wd.freeSail ? 'NORTH UP' : 'WIND ↓';
     // (the inset is a circle: the label and the north arrow go at its top middle, inside the rim, where it's widest
-    // enough for them, clear of the layers button on its upper left)
-    const tw = ctx.measureText(lab).width, lx0 = w / 2 - (tw + 22) / 2, ly0 = 26;
+    // enough for them, clear of the layers button on its upper left; racing, wind up, the next mark often lands there, so
+    // they step aside, left or right along the rim, off any mark or boat under them: chart audit #9)
+    const tw = ctx.measureText(lab).width, ly0 = 26, bw = tw + 22;
+    const R = Math.min(w, h) / 2 - 6, under = [...(wd.freeSail ? [] : [...wd.C.marks.map(m => m.p), wd.C.pin, wd.C.committee]), ...wd.boats.map(b => ({ x: b.x, y: b.y }))].map(q => {
+      const [x, y] = tf(q.x, q.y), dx = x - w / 2, dy = y - h / 2, d = Math.hypot(dx, dy); // (one off the map is shown on its rim)
+      return d > R ? [w / 2 + dx / d * R, h / 2 + dy / d * R] : [x, y]; });
+    const free = (x0: number) => !under.some(([x, y]) => x > x0 - 10 && x < x0 + bw + 10 && y > ly0 - 22 && y < ly0 + 10);
+    const lx0 = [w / 2 - bw / 2, w / 2 - bw / 2 - bw * 0.75, w / 2 - bw / 2 + bw * 0.75].find(free) ?? w / 2 - bw / 2;
     say(lab, lx0, ly0, 'left');
     // north, as the map's turned (wind up in a race): a small arrow by the label, so a westerly's map isn't read as north-up
     { const a = northOnMap(W), nx = lx0 + tw + 14, ny = ly0 - 3;
