@@ -832,8 +832,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const relC = Math.abs(wrap(ww.from - crab));
     ai.running = b.started && !b.ocs && (ai.running ? relC > ra - 8 : relC > ra - 2);
     const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
-    // (the 20 s lapse not while she's in the turn it began: a slow tack or a wear round takes 30-200 s: the v214 review)
-    if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || (w.t - ai.goTack.at > 20 && ai.turnCommit === 0) || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
+    // (the 20 s lapse not while she's in the turn a slow tack began, which takes 30-200 s (the v214 review); but only
+    // that one: held past 20 s for every tack while her helm was committed, the fleet's races changed and more boats met
+    // a boat doing her turns (tests/ai-berth-turns: 29 21.2 calls against a bound of 28, 27 with the lapse as before;
+    // v215. Why, not traced: likely a held tack's course keeping her from the berth ai.ts pastCircle gives))
+    if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || (w.t - ai.goTack.at > 20 && !(ai.goTack.slow && ai.turnCommit !== 0)) || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
     if (mode !== 'beat' || ai.goTack) ai.footT = 0;
     let headedNow = false;
     if (mode === 'beat' && ai.goTack) { beating = true; desired = ai.goTack.to === 'S' ? csS : csP; planned = desired; } // (the planned tack, held on later thinks)

@@ -14,7 +14,7 @@ import { litWindows } from './night';
  */
 export const CITYFRONT_STRIP = data.strip;
 /** Beyond this distance (m) from a tile's middle a tile is drawn as boxes. */
-const FAR_M = 800;
+const FAR_M = 800, FAR_MIN_M2 = 60, FARTHER_M = 1600, FARTHER_MIN_M2 = 220, FARTHER_MIN_H = 18; // (past 1.6 km only the big and the tall: a boat sees the hillside's blocks and towers, not each house)
 
 /** Is a point (degrees) inside the strip the real footprints cover, where the random boxes are left out? */
 export const inCityFront = (lat: number, lon: number): boolean => lat >= CITYFRONT_STRIP.s && lat <= CITYFRONT_STRIP.n && lon >= CITYFRONT_STRIP.w && lon <= CITYFRONT_STRIP.e;
@@ -72,10 +72,10 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
 
   // one geometry per tile and per kind of lighting (homes, and offices over 24 m: night.ts)
   type Acc = { pos: number[]; nrm: number[]; col: number[] };
-  type Tile = { full: Acc; far: Acc; cx: number; cz: number };
+  type Tile = { full: Acc; far: Acc; farther: Acc; cx: number; cz: number };
   const tiles = new Map<string, Tile>();
   const acc = (tx: number, tz: number, office: boolean) => { // (offices over 24 m are few, so all of them share one mesh drawn whole: one call, not one for each tile)
-    const k = office ? 'offices' : `${tx},${tz},0`; if (office) { tx = -1; tz = -1; } let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, cx: office ? 0 : (tx + 0.5) * 1000, cz: office ? 0 : -(tz + 0.5) * 1000 }); return a; };
+    const k = office ? 'offices' : `${tx},${tz},0`; if (office) { tx = -1; tz = -1; } let a = tiles.get(k); if (!a) tiles.set(k, a = { full: { pos: [], nrm: [], col: [] }, far: { pos: [], nrm: [], col: [] }, farther: { pos: [], nrm: [], col: [] }, cx: office ? 0 : (tx + 0.5) * 1000, cz: office ? 0 : -(tz + 0.5) * 1000 }); return a; };
   const wc = new THREE.Color(), rc = new THREE.Color();
   for (const b of list) {
     const pts: THREE.Vector2[] = [];
@@ -86,7 +86,9 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
     wc.copy(walls[Math.floor(hash(b.id) * walls.length)]).offsetHSL(0, 0, (hash(b.id + 91) - 0.5) * 0.05); rc.copy(roofs[Math.floor(hash(b.id + 7) * roofs.length)]);
     const y0 = b.g - 2.5, y1 = b.g + b.h;
     prism(tile.full, tile, pts, y0, y1, wc, rc, true);
-    prism(tile.far, tile, enclosingBox(pts), y0, y1, wc, rc, false);
+    const m2 = Math.abs(area) / 2, box = m2 >= FAR_MIN_M2 ? enclosingBox(pts) : null; // (sheds and garages are too small to see from 800 m, and are many)
+    if (box) prism(tile.far, tile, box, y0, y1, wc, rc, false);
+    if (box && (m2 >= FARTHER_MIN_M2 || b.h >= FARTHER_MIN_H)) prism(tile.farther, tile, box, y0, y1, wc, rc, false);
   }
   const homes = new THREE.MeshLambertMaterial({ vertexColors: true }), offices = new THREE.MeshLambertMaterial({ vertexColors: true });
   litWindows(homes, { kind: 'home', glow: 1.1 }); litWindows(offices, { kind: 'office', glow: 1.1 });
@@ -101,7 +103,7 @@ export async function buildCityFront(scene: THREE.Object3D): Promise<THREE.Group
     if (k === 'offices') { grp.add(mesh(t.full, offices)); continue; }
     const mat = homes, lod = new THREE.LOD();
     lod.position.set(t.cx, 0, t.cz); lod.updateMatrix(); lod.matrixAutoUpdate = false; // (the distance is to the tile's middle; the vertices are relative to it)
-    lod.addLevel(mesh(t.full, mat), 0); lod.addLevel(mesh(t.far, mat), FAR_M);
+    lod.addLevel(mesh(t.full, mat), 0); lod.addLevel(mesh(t.far, mat), FAR_M); lod.addLevel(t.farther.pos.length ? mesh(t.farther, mat) : new THREE.Group(), FARTHER_M); // (an empty level is no draw call)
     grp.add(lod);
   }
   scene.add(grp);
