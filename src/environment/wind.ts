@@ -48,6 +48,13 @@ export const WIND_DAY_LABEL = ['Light day', 'Typical day', 'Windy day'] as const
  * Open water vs the NOAA station. The station (9414290) is on the shore at Crissy Field, where the land
  * slows the wind; out on the race course it blows harder. This factor is an estimate, not a measurement:
  * with the shore slowdown below (0.8 at the beach), it makes the field agree with the station at the station.
+ * Why it isn't fitted (w049, 21 Nov 2026): no station measures the wind over the open water of the course. NOAA's other
+ * Bay stations with wind are all on piers or the shore (Pier 1, Pier 17, Oakland's berths, Alameda, Richmond: CO-OPS
+ * metadata), NDBC 46237 has no wind, and 46026 is 18 nm out in the ocean, not inside the Gate. The published
+ * over-water/over-land ratios (Hsu 1986, J. Phys. Oceanogr. 16, 390–394; the USACE Coastal Engineering Manual, EM
+ * 1110-2-1100 Part II-2, Fig. II-2-7, after Resio and Vincent 1977) vary with the wind's speed, were fitted for open
+ * seas and the Great Lakes, and couldn't be read from here to check. What would fit it: wind measured on the course
+ * itself (a committee boat's log, the 2013 America's Cup's course buoys) against the station on the same afternoons.
  */
 export const OPEN_WATER = 1.25;
 
