@@ -151,7 +151,8 @@ function callLine(st: ReturnType<typeof startDebrief>['stats']): string {
   const lean = (favLeft == null ? 0 : favLeft ? -1 : 1) * Math.max(4, Math.min(30, bias)) * Math.PI / 180, wx = 22 + Math.sin(lean) * 16, wy = 22 - Math.cos(lean) * 16;
   const pic = `<svg class="dcall-pic" viewBox="0 0 44 26" width="66" height="39" aria-hidden="true"><line x1="5" y1="22" x2="39" y2="22"/><circle cx="5" cy="22" r="2.4"/><rect x="36.5" y="19.5" width="5" height="5"/>`
     + `<line class="sq" x1="22" y1="22" x2="22" y2="4"/><line class="wd" x1="22" y1="22" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}"/></svg>`;
-  const what = fav ? `${name(fav)} favored ${bias}°` : 'a square line: neither end';
+  // (the end by its name, and what the degrees are: the first-hour audit #17, "X favored 38°" said neither)
+  const what = fav ? `<span title="The line is ${bias}° off square to the wind: the ${name(fav)} end is that much nearer upwind">the ${name(fav)} end favored by ${bias}°</span>` : 'a square line: neither end';
   const head = call ? `Your call: <b class="${ok === false ? 'bad' : 'ok'}">${name(call)} ${ok === false ? '✗' : '✓'}</b> · ${what}` : `No call · ${what}`;
   const dots = call || left < 3 ? `<span class="dcall-dots" title="The read's drawn on the water for ${left} more start${left === 1 ? '' : 's'}">${'●'.repeat(left)}${'○'.repeat(3 - left)}</span>` : '';
   return `<li class="dcall">${pic}<span>${head}</span>${dots}</li>`;
